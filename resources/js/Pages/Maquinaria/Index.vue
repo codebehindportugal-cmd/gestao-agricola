@@ -55,6 +55,8 @@ const maquinaBase = {
     ano_aquisicao: '',
     horas_uso: '',
     horas_manutencao: '',
+    consumo_agua_ha: '',
+    consumo_combustivel: '',
     estado: 'operacional',
     observacoes: '',
 };
@@ -66,6 +68,7 @@ const alfaiaBase = {
     descricao: '',
     comprimento: '',
     largura: '',
+    consumo_agua_ha: '',
     estado: 'operacional',
     observacoes: '',
 };
@@ -120,9 +123,14 @@ watch(
 const labels = {
     em_manutencao: 'em manutenção',
     moto_4: 'moto 4',
+    camiao: 'camião',
 };
 
 const labelize = (value) => labels[value] ?? String(value ?? '').replaceAll('_', ' ');
+const isPulverizador = (tipo) => String(tipo ?? '').toLowerCase() === 'pulverizador';
+const isVeiculo = (tipo) => ['carro', 'carrinha', 'camião', 'camiao', 'moto_4'].includes(String(tipo ?? '').toLowerCase());
+const usesFuelConsumption = (tipo) => ['trator', 'ceifeira', 'carregador', 'carro', 'carrinha', 'camião', 'camiao', 'moto_4'].includes(String(tipo ?? '').toLowerCase());
+const fuelConsumptionLabel = computed(() => (isVeiculo(maquinaForm.tipo) ? 'Consumo de combustível (L/100 km)' : 'Consumo de combustível (L/h)'));
 
 const formatNumber = (value) => {
     if (value === null || value === undefined || value === '') {
@@ -185,6 +193,8 @@ const normalizeMaquina = (form) => form.transform((data) => ({
     ano_aquisicao: data.ano_aquisicao || null,
     horas_uso: data.horas_uso || null,
     horas_manutencao: data.horas_manutencao || null,
+    consumo_agua_ha: data.consumo_agua_ha || null,
+    consumo_combustivel: data.consumo_combustivel || null,
     observacoes: data.observacoes || null,
 }));
 
@@ -194,6 +204,7 @@ const normalizeAlfaia = (form) => form.transform((data) => ({
     descricao: data.descricao || null,
     comprimento: data.comprimento || null,
     largura: data.largura || null,
+    consumo_agua_ha: data.consumo_agua_ha || null,
     observacoes: data.observacoes || null,
 }));
 
@@ -225,6 +236,8 @@ const openEditMaquina = (maquina) => {
         ano_aquisicao: maquina.ano_aquisicao?.toString() ?? '',
         horas_uso: maquina.horas_uso?.toString() ?? '',
         horas_manutencao: maquina.horas_manutencao?.toString() ?? '',
+        consumo_agua_ha: maquina.consumo_agua_ha?.toString() ?? '',
+        consumo_combustivel: maquina.consumo_combustivel?.toString() ?? '',
         estado: maquina.estado ?? 'operacional',
         observacoes: maquina.observacoes ?? '',
     });
@@ -255,7 +268,7 @@ const submitMaquina = () => {
 };
 
 const deleteMaquina = (maquina) => {
-    if (!window.confirm(`Remover a máquina "${maquina.nome}"?`)) {
+    if (!window.confirm(`Remover a mÃ¡quina "${maquina.nome}"?`)) {
         return;
     }
 
@@ -281,6 +294,7 @@ const openEditAlfaia = (alfaia) => {
         descricao: alfaia.descricao ?? '',
         comprimento: alfaia.comprimento?.toString() ?? '',
         largura: alfaia.largura?.toString() ?? '',
+        consumo_agua_ha: alfaia.consumo_agua_ha?.toString() ?? '',
         estado: alfaia.estado ?? 'operacional',
         observacoes: alfaia.observacoes ?? '',
     });
@@ -336,7 +350,7 @@ const openEditRevisao = (revisao) => {
     revisaoForm.defaults({
         maquina_id: revisao.maquina_id?.toString() ?? '',
         data_manutencao: revisao.data_manutencao ?? '',
-        tipo: revisao.tipo ?? 'revisão',
+        tipo: revisao.tipo ?? 'revisÃ£o',
         descricao: revisao.descricao ?? '',
         custo: revisao.custo?.toString() ?? '',
         duracao_minutos: revisao.duracao_minutos?.toString() ?? '',
@@ -370,7 +384,7 @@ const submitRevisao = () => {
 };
 
 const deleteRevisao = (revisao) => {
-    if (!window.confirm(`Remover a revisão de "${revisao.maquina_nome}"?`)) {
+    if (!window.confirm(`Remover a revisÃ£o de "${revisao.maquina_nome}"?`)) {
         return;
     }
 
@@ -400,7 +414,7 @@ const cleanFilters = () => {
                     <p class="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700">Frota agricola</p>
                     <h1 class="mt-2 text-3xl font-black text-slate-900">Maquinaria</h1>
                     <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                        Gere tratores, viaturas, equipamentos e alfaias para associar às operações no terreno.
+                        Gere tratores, viaturas, equipamentos e alfaias para associar Ã s operaÃ§Ãµes no terreno.
                     </p>
                 </div>
                 <div class="flex flex-wrap gap-3">
@@ -409,7 +423,7 @@ const cleanFilters = () => {
                         class="rounded-full bg-emerald-700 px-5 py-3 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600"
                         @click="openCreateMaquina"
                     >
-                        Nova máquina
+                        Nova mÃ¡quina
                     </PrimaryButton>
                     <PrimaryButton
                         v-if="can.create_alfaia"
@@ -423,7 +437,7 @@ const cleanFilters = () => {
                         class="rounded-full bg-amber-700 px-5 py-3 text-sm normal-case tracking-normal hover:bg-amber-600 focus:bg-amber-600"
                         @click="openCreateRevisao()"
                     >
-                        Nova revisão
+                        Nova revisÃ£o
                     </PrimaryButton>
                 </div>
             </div>
@@ -437,7 +451,7 @@ const cleanFilters = () => {
 
                 <section class="grid gap-4 md:grid-cols-3 xl:grid-cols-7">
                     <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.20)]">
-                        <p class="text-sm font-medium text-slate-500">Máquinas</p>
+                        <p class="text-sm font-medium text-slate-500">MÃ¡quinas</p>
                         <p class="mt-3 text-4xl font-black text-slate-900">{{ summary.maquinas }}</p>
                     </article>
                     <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.20)]">
@@ -445,7 +459,7 @@ const cleanFilters = () => {
                         <p class="mt-3 text-4xl font-black text-emerald-700">{{ summary.operacionais }}</p>
                     </article>
                     <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.20)]">
-                        <p class="text-sm font-medium text-slate-500">Em manutenção</p>
+                        <p class="text-sm font-medium text-slate-500">Em manutenÃ§Ã£o</p>
                         <p class="mt-3 text-4xl font-black text-amber-700">{{ summary.manutencao }}</p>
                     </article>
                     <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.20)]">
@@ -457,11 +471,11 @@ const cleanFilters = () => {
                         <p class="mt-3 text-4xl font-black text-emerald-700">{{ summary.alfaias_operacionais }}</p>
                     </article>
                     <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.20)]">
-                        <p class="text-sm font-medium text-slate-500">Revisões</p>
+                        <p class="text-sm font-medium text-slate-500">RevisÃµes</p>
                         <p class="mt-3 text-4xl font-black text-slate-900">{{ summary.revisoes }}</p>
                     </article>
                     <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.20)]">
-                        <p class="text-sm font-medium text-slate-500">Próximas revisões</p>
+                        <p class="text-sm font-medium text-slate-500">PrÃ³ximas revisÃµes</p>
                         <p class="mt-3 text-4xl font-black text-amber-700">{{ summary.proximas_revisoes }}</p>
                     </article>
                 </section>
@@ -473,14 +487,14 @@ const cleanFilters = () => {
                             <TextInput v-model="filterState.search" class="mt-2 block w-full rounded-2xl" placeholder="Nome, marca, matricula ou alfaia" />
                         </div>
                         <div>
-                            <InputLabel value="Tipo de máquina" />
+                            <InputLabel value="Tipo de mÃ¡quina" />
                             <select v-model="filterState.tipo" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
                                 <option value="">Todos</option>
                                 <option v-for="tipo in maquinaTipoOptions" :key="tipo" :value="tipo">{{ labelize(tipo) }}</option>
                             </select>
                         </div>
                         <div>
-                            <InputLabel value="Estado da máquina" />
+                            <InputLabel value="Estado da mÃ¡quina" />
                             <select v-model="filterState.estado" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
                                 <option value="">Todos</option>
                                 <option v-for="estado in maquinaEstadoOptions" :key="estado" :value="estado">{{ labelize(estado) }}</option>
@@ -494,21 +508,21 @@ const cleanFilters = () => {
                             </select>
                         </div>
                         <div>
-                            <InputLabel value="Máquina associada" />
+                            <InputLabel value="MÃ¡quina associada" />
                             <select v-model="filterState.maquina_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
                                 <option value="">Todas</option>
                                 <option v-for="maquina in maquinaOptions" :key="maquina.id" :value="String(maquina.id)">{{ maquina.nome }}</option>
                             </select>
                         </div>
                         <div>
-                            <InputLabel value="Tipo de revisão" />
+                            <InputLabel value="Tipo de revisÃ£o" />
                             <select v-model="filterState.revisao_tipo" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
                                 <option value="">Todas</option>
                                 <option v-for="tipo in revisaoTipoOptions" :key="tipo" :value="tipo">{{ labelize(tipo) }}</option>
                             </select>
                         </div>
                         <div>
-                            <InputLabel value="Máquina revista" />
+                            <InputLabel value="MÃ¡quina revista" />
                             <select v-model="filterState.revisao_maquina_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
                                 <option value="">Todas</option>
                                 <option v-for="maquina in maquinaOptions" :key="maquina.id" :value="String(maquina.id)">{{ maquina.nome }}</option>
@@ -525,7 +539,7 @@ const cleanFilters = () => {
                 <section class="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
                     <div class="flex flex-col gap-4">
                         <div class="flex items-center justify-between gap-4">
-                            <h2 class="text-xl font-black text-slate-900">Máquinas e viaturas</h2>
+                            <h2 class="text-xl font-black text-slate-900">MÃ¡quinas e viaturas</h2>
                             <p class="text-sm text-slate-500">{{ maquinas.total }} registos</p>
                         </div>
 
@@ -556,7 +570,7 @@ const cleanFilters = () => {
                                     <p class="mt-2 text-xl font-black text-slate-900">{{ formatNumber(maquina.horas_uso) }}</p>
                                 </div>
                                 <div class="rounded-3xl bg-slate-50 p-4">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Próx. manut.</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">PrÃ³x. manut.</p>
                                     <p class="mt-2 text-xl font-black text-amber-700">{{ formatNumber(maquina.horas_manutencao) }}</p>
                                 </div>
                                 <div class="rounded-3xl bg-slate-50 p-4">
@@ -564,13 +578,25 @@ const cleanFilters = () => {
                                     <p class="mt-2 text-xl font-black text-slate-900">{{ maquina.alfaias_count }}</p>
                                 </div>
                                 <div class="rounded-3xl bg-slate-50 p-4">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Operações</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">OperaÃ§Ãµes</p>
                                     <p class="mt-2 text-xl font-black text-slate-900">{{ maquina.operacoes_count }}</p>
+                                </div>
+                                <div v-if="isPulverizador(maquina.tipo)" class="rounded-3xl bg-sky-50 p-4 sm:col-span-2">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Consumo de ?gua</p>
+                                    <p class="mt-2 text-xl font-black text-sky-900">
+                                        {{ maquina.consumo_agua_ha ? `${formatNumber(maquina.consumo_agua_ha)} L/ha` : '-' }}
+                                    </p>
+                                </div>
+                                <div v-if="isVeiculo(maquina.tipo)" class="rounded-3xl bg-amber-50 p-4 sm:col-span-2">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Consumo de combustÃ­vel</p>
+                                    <p class="mt-2 text-xl font-black text-amber-900">
+                                        {{ maquina.consumo_combustivel ? `${formatNumber(maquina.consumo_combustivel)} L/100 km` : '-' }}
+                                    </p>
                                 </div>
                             </div>
 
                             <p class="mt-4 rounded-3xl bg-lime-50/60 p-4 text-sm leading-7 text-slate-600">
-                                {{ maquina.observacoes || 'Sem observações adicionais.' }}
+                                {{ maquina.observacoes || 'Sem observaÃ§Ãµes adicionais.' }}
                             </p>
 
                             <div class="mt-5 flex flex-wrap gap-3">
@@ -578,7 +604,7 @@ const cleanFilters = () => {
                                     Editar
                                 </PrimaryButton>
                                 <SecondaryButton v-if="can.create_revisao" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="openCreateRevisao(maquina)">
-                                    Registar revisão
+                                    Registar revisÃ£o
                                 </SecondaryButton>
                                 <DangerButton v-if="maquina.can_delete" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="deleteMaquina(maquina)">
                                     Remover
@@ -587,7 +613,7 @@ const cleanFilters = () => {
                         </article>
 
                         <section v-if="!maquinas.data.length" class="rounded-[32px] border border-dashed border-slate-300 bg-white/70 px-6 py-10 text-center text-sm text-slate-600">
-                            Nenhuma máquina encontrada com os filtros atuais.
+                            Nenhuma mÃ¡quina encontrada com os filtros atuais.
                         </section>
 
                         <section v-if="maquinas.links?.length > 3" class="flex flex-wrap items-center gap-2">
@@ -620,7 +646,7 @@ const cleanFilters = () => {
                                     </div>
                                     <p class="mt-2 text-sm font-medium capitalize text-emerald-700">{{ labelize(alfaia.tipo) }}</p>
                                     <p class="mt-2 text-sm text-slate-500">
-                                        Associada a: {{ alfaia.maquina_nome || 'Sem máquina' }}
+                                        Associada a: {{ alfaia.maquina_nome || 'Sem mÃ¡quina' }}
                                     </p>
                                 </div>
                                 <div class="rounded-3xl bg-emerald-50 px-4 py-3 text-center">
@@ -638,10 +664,16 @@ const cleanFilters = () => {
                                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Largura</p>
                                     <p class="mt-2 text-sm font-bold text-slate-800">{{ alfaia.largura ? `${formatNumber(alfaia.largura)} m` : '-' }}</p>
                                 </div>
+                                <div v-if="isPulverizador(alfaia.tipo)" class="rounded-3xl bg-sky-50 p-4 sm:col-span-2">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Consumo de ?gua</p>
+                                    <p class="mt-2 text-sm font-bold text-sky-900">
+                                        {{ alfaia.consumo_agua_ha ? `${formatNumber(alfaia.consumo_agua_ha)} L/ha` : '-' }}
+                                    </p>
+                                </div>
                             </div>
 
                             <p class="mt-4 rounded-3xl bg-slate-50 p-4 text-sm leading-7 text-slate-600">
-                                {{ alfaia.descricao || alfaia.observacoes || 'Sem descrição para esta alfaia.' }}
+                                {{ alfaia.descricao || alfaia.observacoes || 'Sem descriÃ§Ã£o para esta alfaia.' }}
                             </p>
 
                             <div class="mt-5 flex flex-wrap gap-3">
@@ -675,15 +707,15 @@ const cleanFilters = () => {
                 <section class="flex flex-col gap-4">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                            <h2 class="text-xl font-black text-slate-900">Revisões</h2>
-                            <p class="mt-1 text-sm text-slate-500">{{ revisoes.total }} registos de manutenção e revisão</p>
+                            <h2 class="text-xl font-black text-slate-900">RevisÃµes</h2>
+                            <p class="mt-1 text-sm text-slate-500">{{ revisoes.total }} registos de manutenÃ§Ã£o e revisÃ£o</p>
                         </div>
                         <PrimaryButton
                             v-if="can.create_revisao"
                             class="rounded-full bg-amber-700 px-5 py-3 text-sm normal-case tracking-normal hover:bg-amber-600 focus:bg-amber-600"
                             @click="openCreateRevisao()"
                         >
-                            Nova revisão
+                            Nova revisÃ£o
                         </PrimaryButton>
                     </div>
 
@@ -692,7 +724,7 @@ const cleanFilters = () => {
                             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
                                     <div class="flex flex-wrap items-center gap-3">
-                                        <h3 class="text-2xl font-black text-slate-900">{{ revisao.maquina_nome || 'Máquina removida' }}</h3>
+                                        <h3 class="text-2xl font-black text-slate-900">{{ revisao.maquina_nome || 'MÃ¡quina removida' }}</h3>
                                         <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold capitalize text-amber-700">
                                             {{ labelize(revisao.tipo) }}
                                         </span>
@@ -707,15 +739,15 @@ const cleanFilters = () => {
 
                             <div class="mt-5 grid gap-3 sm:grid-cols-3">
                                 <div class="rounded-3xl bg-slate-50 p-4">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Duração</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">DuraÃ§Ã£o</p>
                                     <p class="mt-2 text-sm font-bold text-slate-800">{{ formatDuration(revisao.duracao_minutos) }}</p>
                                 </div>
                                 <div class="rounded-3xl bg-slate-50 p-4">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Próxima</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">PrÃ³xima</p>
                                     <p class="mt-2 text-sm font-bold text-slate-800">{{ formatDate(revisao.proxima_manutencao) }}</p>
                                 </div>
                                 <div class="rounded-3xl bg-slate-50 p-4">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Máquina</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">MÃ¡quina</p>
                                     <p class="mt-2 text-sm font-bold capitalize text-slate-800">{{ labelize(revisao.maquina_tipo || '-') }}</p>
                                 </div>
                             </div>
@@ -739,7 +771,7 @@ const cleanFilters = () => {
                     </div>
 
                     <section v-if="!revisoes.data.length" class="rounded-[32px] border border-dashed border-slate-300 bg-white/70 px-6 py-10 text-center text-sm text-slate-600">
-                        Nenhuma revisão encontrada com os filtros atuais.
+                        Nenhuma revisÃ£o encontrada com os filtros atuais.
                     </section>
 
                     <section v-if="revisoes.links?.length > 3" class="flex flex-wrap items-center gap-2">
@@ -759,12 +791,12 @@ const cleanFilters = () => {
 
         <Modal :show="maquinaModalOpen" max-width="2xl" @close="closeMaquinaModal">
             <div class="p-6 sm:p-8">
-                <h2 class="text-2xl font-black text-slate-900">{{ editingMaquina ? 'Editar máquina' : 'Nova máquina' }}</h2>
-                <p class="mt-2 text-sm text-slate-500">Regista tratores, automóveis, carrinhas e outros equipamentos motorizados.</p>
+                <h2 class="text-2xl font-black text-slate-900">{{ editingMaquina ? 'Editar mÃ¡quina' : 'Nova mÃ¡quina' }}</h2>
+                <p class="mt-2 text-sm text-slate-500">Regista tratores, automÃ³veis, carrinhas e outros equipamentos motorizados.</p>
 
                 <form class="mt-6 grid gap-4 sm:grid-cols-2" @submit.prevent="submitMaquina">
                     <div v-if="maquinaErrors.length" class="sm:col-span-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                        <p class="font-semibold">Não foi possível guardar a máquina. Revê estes pontos:</p>
+                        <p class="font-semibold">NÃ£o foi possÃ­vel guardar a mÃ¡quina. RevÃª estes pontos:</p>
                         <ul class="mt-2 list-disc space-y-1 pl-5">
                             <li v-for="message in maquinaErrors" :key="message">{{ message }}</li>
                         </ul>
@@ -820,19 +852,24 @@ const cleanFilters = () => {
                         <InputError class="mt-2" :message="maquinaForm.errors.horas_uso" />
                     </div>
                     <div>
-                        <InputLabel value="Próxima manutenção (h)" />
+                        <InputLabel value="PrÃ³xima manutenÃ§Ã£o (h)" />
                         <TextInput v-model="maquinaForm.horas_manutencao" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="maquinaForm.errors.horas_manutencao" />
                     </div>
+                    <div v-if="isPulverizador(maquinaForm.tipo)">
+                        <InputLabel value="Consumo de ï¿½gua (L/ha)" />
+                        <TextInput v-model="maquinaForm.consumo_agua_ha" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                        <InputError class="mt-2" :message="maquinaForm.errors.consumo_agua_ha" />
+                    </div>
                     <div class="sm:col-span-2">
-                        <InputLabel value="Observações" />
+                        <InputLabel value="ObservaÃ§Ãµes" />
                         <textarea v-model="maquinaForm.observacoes" rows="4" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500" />
                         <InputError class="mt-2" :message="maquinaForm.errors.observacoes" />
                     </div>
                     <div class="sm:col-span-2 flex justify-end gap-3">
                         <SecondaryButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="closeMaquinaModal">Cancelar</SecondaryButton>
                         <PrimaryButton class="rounded-full bg-emerald-700 px-4 py-2 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600" :disabled="maquinaForm.processing">
-                            Guardar máquina
+                            Guardar mÃ¡quina
                         </PrimaryButton>
                     </div>
                 </form>
@@ -842,11 +879,11 @@ const cleanFilters = () => {
         <Modal :show="alfaiaModalOpen" max-width="2xl" @close="closeAlfaiaModal">
             <div class="p-6 sm:p-8">
                 <h2 class="text-2xl font-black text-slate-900">{{ editingAlfaia ? 'Editar alfaia' : 'Nova alfaia' }}</h2>
-                <p class="mt-2 text-sm text-slate-500">Associa alfaias e implementos às máquinas usadas nas operações.</p>
+                <p class="mt-2 text-sm text-slate-500">Associa alfaias e implementos Ã s mÃ¡quinas usadas nas operaÃ§Ãµes.</p>
 
                 <form class="mt-6 grid gap-4 sm:grid-cols-2" @submit.prevent="submitAlfaia">
                     <div v-if="alfaiaErrors.length" class="sm:col-span-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                        <p class="font-semibold">Não foi possível guardar a alfaia. Revê estes pontos:</p>
+                        <p class="font-semibold">NÃ£o foi possÃ­vel guardar a alfaia. RevÃª estes pontos:</p>
                         <ul class="mt-2 list-disc space-y-1 pl-5">
                             <li v-for="message in alfaiaErrors" :key="message">{{ message }}</li>
                         </ul>
@@ -865,9 +902,9 @@ const cleanFilters = () => {
                         <InputError class="mt-2" :message="alfaiaForm.errors.tipo" />
                     </div>
                     <div class="sm:col-span-2">
-                        <InputLabel value="Máquina associada" />
+                        <InputLabel value="MÃ¡quina associada" />
                         <select v-model="alfaiaForm.maquina_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
-                            <option value="">Sem máquina associada</option>
+                            <option value="">Sem mÃ¡quina associada</option>
                             <option v-for="maquina in maquinaOptions" :key="maquina.id" :value="String(maquina.id)">
                                 {{ maquina.nome }} - {{ labelize(maquina.tipo) }}
                             </option>
@@ -884,6 +921,11 @@ const cleanFilters = () => {
                         <TextInput v-model="alfaiaForm.largura" type="number" step="0.01" min="0.01" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="alfaiaForm.errors.largura" />
                     </div>
+                    <div v-if="isPulverizador(alfaiaForm.tipo)" class="sm:col-span-2">
+                        <InputLabel value="Consumo de ï¿½gua (L/ha)" />
+                        <TextInput v-model="alfaiaForm.consumo_agua_ha" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                        <InputError class="mt-2" :message="alfaiaForm.errors.consumo_agua_ha" />
+                    </div>
                     <div class="sm:col-span-2">
                         <InputLabel value="Estado" />
                         <select v-model="alfaiaForm.estado" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
@@ -892,12 +934,12 @@ const cleanFilters = () => {
                         <InputError class="mt-2" :message="alfaiaForm.errors.estado" />
                     </div>
                     <div class="sm:col-span-2">
-                        <InputLabel value="Descrição" />
+                        <InputLabel value="DescriÃ§Ã£o" />
                         <textarea v-model="alfaiaForm.descricao" rows="3" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500" />
                         <InputError class="mt-2" :message="alfaiaForm.errors.descricao" />
                     </div>
                     <div class="sm:col-span-2">
-                        <InputLabel value="Observações" />
+                        <InputLabel value="ObservaÃ§Ãµes" />
                         <textarea v-model="alfaiaForm.observacoes" rows="3" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500" />
                         <InputError class="mt-2" :message="alfaiaForm.errors.observacoes" />
                     </div>
@@ -913,21 +955,21 @@ const cleanFilters = () => {
 
         <Modal :show="revisaoModalOpen" max-width="2xl" @close="closeRevisaoModal">
             <div class="p-6 sm:p-8">
-                <h2 class="text-2xl font-black text-slate-900">{{ editingRevisao ? 'Editar revisão' : 'Nova revisão' }}</h2>
-                <p class="mt-2 text-sm text-slate-500">Regista revisões, inspeções e manutenções feitas às máquinas e viaturas.</p>
+                <h2 class="text-2xl font-black text-slate-900">{{ editingRevisao ? 'Editar revisÃ£o' : 'Nova revisÃ£o' }}</h2>
+                <p class="mt-2 text-sm text-slate-500">Regista revisÃµes, inspeÃ§Ãµes e manutenÃ§Ãµes feitas Ã s mÃ¡quinas e viaturas.</p>
 
                 <form class="mt-6 grid gap-4 sm:grid-cols-2" @submit.prevent="submitRevisao">
                     <div v-if="revisaoErrors.length" class="sm:col-span-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                        <p class="font-semibold">Não foi possível guardar a revisão. Revê estes pontos:</p>
+                        <p class="font-semibold">NÃ£o foi possÃ­vel guardar a revisÃ£o. RevÃª estes pontos:</p>
                         <ul class="mt-2 list-disc space-y-1 pl-5">
                             <li v-for="message in revisaoErrors" :key="message">{{ message }}</li>
                         </ul>
                     </div>
 
                     <div class="sm:col-span-2">
-                        <InputLabel value="Máquina" />
+                        <InputLabel value="MÃ¡quina" />
                         <select v-model="revisaoForm.maquina_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
-                            <option value="">Seleciona uma máquina</option>
+                            <option value="">Seleciona uma mÃ¡quina</option>
                             <option v-for="maquina in maquinaOptions" :key="maquina.id" :value="String(maquina.id)">
                                 {{ maquina.nome }} - {{ labelize(maquina.tipo) }}
                             </option>
@@ -935,7 +977,7 @@ const cleanFilters = () => {
                         <InputError class="mt-2" :message="revisaoForm.errors.maquina_id" />
                     </div>
                     <div>
-                        <InputLabel value="Data da revisão" />
+                        <InputLabel value="Data da revisÃ£o" />
                         <TextInput v-model="revisaoForm.data_manutencao" type="date" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="revisaoForm.errors.data_manutencao" />
                     </div>
@@ -947,34 +989,34 @@ const cleanFilters = () => {
                         <InputError class="mt-2" :message="revisaoForm.errors.tipo" />
                     </div>
                     <div>
-                        <InputLabel value="Custo (€)" />
+                        <InputLabel value="Custo (â‚¬)" />
                         <TextInput v-model="revisaoForm.custo" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="revisaoForm.errors.custo" />
                     </div>
                     <div>
-                        <InputLabel value="Duração (min)" />
+                        <InputLabel value="DuraÃ§Ã£o (min)" />
                         <TextInput v-model="revisaoForm.duracao_minutos" type="number" min="1" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="revisaoForm.errors.duracao_minutos" />
                     </div>
                     <div class="sm:col-span-2">
-                        <InputLabel value="Próxima revisão" />
+                        <InputLabel value="PrÃ³xima revisÃ£o" />
                         <TextInput v-model="revisaoForm.proxima_manutencao" type="date" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="revisaoForm.errors.proxima_manutencao" />
                     </div>
                     <div class="sm:col-span-2">
-                        <InputLabel value="Descrição" />
+                        <InputLabel value="DescriÃ§Ã£o" />
                         <textarea v-model="revisaoForm.descricao" rows="4" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500" />
                         <InputError class="mt-2" :message="revisaoForm.errors.descricao" />
                     </div>
                     <div class="sm:col-span-2">
-                        <InputLabel value="Observações" />
+                        <InputLabel value="ObservaÃ§Ãµes" />
                         <textarea v-model="revisaoForm.observacoes" rows="3" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500" />
                         <InputError class="mt-2" :message="revisaoForm.errors.observacoes" />
                     </div>
                     <div class="sm:col-span-2 flex justify-end gap-3">
                         <SecondaryButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="closeRevisaoModal">Cancelar</SecondaryButton>
                         <PrimaryButton class="rounded-full bg-amber-700 px-4 py-2 text-sm normal-case tracking-normal hover:bg-amber-600 focus:bg-amber-600" :disabled="revisaoForm.processing">
-                            Guardar revisão
+                            Guardar revisÃ£o
                         </PrimaryButton>
                     </div>
                 </form>

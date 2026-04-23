@@ -26,6 +26,7 @@ class UpdateFuncionarioRequest extends FormRequest
             'data_admissao' => ['required', 'date'],
             'data_saida' => ['nullable', 'date', 'after_or_equal:data_admissao'],
             'tipo_contrato' => ['required', Rule::in(['permanente', 'temporario', 'estagiario'])],
+            'valor_hora' => ['nullable', 'numeric', 'min:0'],
             'status' => ['required', Rule::in(['ativo', 'inativo', 'em_licenca'])],
             'observacoes' => ['nullable', 'string'],
         ];
@@ -38,6 +39,7 @@ class UpdateFuncionarioRequest extends FormRequest
             'telefone' => $this->input('telefone') ?: null,
             'data_saida' => $this->input('data_saida') ?: null,
             'tipo_contrato' => $this->input('tipo_contrato') ?: 'permanente',
+            'valor_hora' => $this->input('valor_hora') === '' ? null : $this->input('valor_hora'),
             'status' => $this->input('status') ?: 'ativo',
         ]);
     }

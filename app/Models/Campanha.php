@@ -35,7 +35,6 @@ class Campanha extends Model
         'custo_real' => 'decimal:2',
     ];
 
-    // Relacionamentos
     public function cultura(): BelongsTo
     {
         return $this->belongsTo(Cultura::class);
@@ -56,16 +55,15 @@ class Campanha extends Model
         return $this->hasMany(Custo::class);
     }
 
-    // Método para calcular custo por kg de produção
-    public function getCustoPorKgAttribute()
+    public function getCustoPorKgAttribute(): float
     {
-        $totalKg = $this->colheitas->sum('quantidade');
+        $totalKg = (float) $this->colheitas->sum('quantidade_total');
 
         if ($totalKg <= 0) {
             return 0;
         }
 
-        $totalCusto = $this->operacoes->sum('custo_real') + $this->custos->sum('valor');
+        $totalCusto = (float) $this->operacoes->sum('custo_real') + (float) $this->custos->sum('valor');
 
         return round($totalCusto / $totalKg, 2);
     }

@@ -1,230 +1,187 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import InputLabel from '@/Components/InputLabel.vue';
+import Pagination from '@/Components/Pagination.vue';
+import TextInput from '@/Components/TextInput.vue';
+import { Head, Link, router } from '@inertiajs/vue3';
+import { computed, reactive, watch } from 'vue';
 
 const props = defineProps({
-    campanhas: {
-        type: Object,
-        required: true,
-    },
-    filters: {
-        type: Object,
-        default: () => ({}),
-    },
-    summary: {
-        type: Object,
-        required: true,
-    },
-    can: {
-        type: Object,
-        required: true,
-    },
-    statusOptions: {
-        type: Array,
-        default: () => [],
-    },
-    anos: {
-        type: Array,
-        default: () => [],
-    },
-    culturas: {
-        type: Array,
-        default: () => [],
-    },
+    campanhas: { type: Object, required: true },
+    filters: { type: Object, default: () => ({}) },
+    summary: { type: Object, required: true },
+    can: { type: Object, required: true },
+    statusOptions: { type: Array, default: () => [] },
+    anos: { type: Array, default: () => [] },
+    culturas: { type: Array, default: () => [] },
 });
 
-const formatCurrency = (value) => {
-    return new Intl.NumberFormat('pt-PT', {
-        style: 'currency',
-        currency: 'EUR',
-    }).format(value || 0);
-};
+const filterState = reactive({
+    search: props.filters.search ?? '',
+    status: props.filters.status ?? '',
+    ano: props.filters.ano ?? '',
+    cultura_id: props.filters.cultura_id ?? '',
+});
 
-const formatNumber = (value) => {
-    return new Intl.NumberFormat('pt-PT', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    }).format(value || 0);
-};
+const currentQuery = computed(() => ({
+    search: filterState.search || undefined,
+    status: filterState.status || undefined,
+    ano: filterState.ano || undefined,
+    cultura_id: filterState.cultura_id || undefined,
+}));
+
+watch(
+    () => [filterState.search, filterState.status, filterState.ano, filterState.cultura_id],
+    () => {
+        router.get(route('app.campanhas.index'), currentQuery.value, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
+    },
+);
+
+const formatCurrency = (value) => new Intl.NumberFormat('pt-PT', {
+    style: 'currency',
+    currency: 'EUR',
+}).format(value || 0);
+
+const formatNumber = (value) => new Intl.NumberFormat('pt-PT', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+}).format(value || 0);
+
+const statusLabel = (status) => ({
+    planejada: 'planeada',
+    em_curso: 'em curso',
+    concluida: 'concluída',
+    cancelada: 'cancelada',
+}[status] ?? status);
+
+const statusBadgeClass = (status) => ({
+    planejada: 'bg-sky-50 text-sky-700',
+    em_curso: 'bg-amber-50 text-amber-700',
+    concluida: 'bg-emerald-50 text-emerald-700',
+    cancelada: 'bg-slate-100 text-slate-600',
+}[status] ?? 'bg-slate-100 text-slate-600');
 </script>
 
 <template>
+    <Head title="Custos e Campanhas" />
+
     <AuthenticatedLayout>
-        <Head title="Campanhas" />
+        <template #header>
+            <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700">Custos e campanhas</p>
+                    <h1 class="mt-2 text-3xl font-black text-slate-900">Fechar campanhas com custos, produção e caderno de campo</h1>
+                    <p class="mt-2 max-w-3xl text-sm text-slate-600">
+                        Esta área deve responder a três perguntas: quanto custou, quanto produziu e que operações ficaram registadas.
+                    </p>
+                </div>
+            </div>
+        </template>
 
-        <div class="py-12">
-            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
-                    <div class="p-6 lg:p-8 bg-white border-b border-gray-200">
-                        <div class="flex items-center justify-between mb-6">
-                            <h1 class="text-2xl font-medium text-gray-900">Campanhas</h1>
+        <div class="bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_32%),linear-gradient(180deg,_#f8fafc_0%,_#eef6f1_100%)] py-10">
+            <div class="mx-auto flex max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
+                <section class="grid gap-4 md:grid-cols-3">
+                    <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                        <p class="text-sm font-medium text-slate-500">Campanhas</p>
+                        <p class="mt-3 text-4xl font-black text-slate-900">{{ summary.total }}</p>
+                    </article>
+                    <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                        <p class="text-sm font-medium text-slate-500">Concluídas</p>
+                        <p class="mt-3 text-4xl font-black text-emerald-700">{{ summary.concluidas }}</p>
+                    </article>
+                    <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                        <p class="text-sm font-medium text-slate-500">Custo total registado</p>
+                        <p class="mt-3 text-4xl font-black text-amber-700">{{ formatCurrency(summary.custo_total) }}</p>
+                    </article>
+                </section>
+
+                <section class="rounded-[32px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <div class="grid gap-4 md:grid-cols-[1.2fr_0.8fr_0.8fr_1fr]">
+                        <div>
+                            <InputLabel value="Pesquisar" />
+                            <TextInput v-model="filterState.search" class="mt-2 block w-full rounded-2xl border-slate-200" placeholder="Ano ou cultura" />
                         </div>
-
-                        <!-- Summary Cards -->
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                            <div class="bg-blue-50 p-4 rounded-lg">
-                                <div class="text-2xl font-bold text-blue-600">{{ summary.total }}</div>
-                                <div class="text-sm text-blue-600">Total de Campanhas</div>
-                            </div>
-                            <div class="bg-green-50 p-4 rounded-lg">
-                                <div class="text-2xl font-bold text-green-600">{{ summary.concluidas }}</div>
-                                <div class="text-sm text-green-600">Campanhas Concluídas</div>
-                            </div>
-                            <div class="bg-yellow-50 p-4 rounded-lg">
-                                <div class="text-2xl font-bold text-yellow-600">{{ formatCurrency(summary.custo_total) }}</div>
-                                <div class="text-sm text-yellow-600">Custo Total</div>
-                            </div>
+                        <div>
+                            <InputLabel value="Estado" />
+                            <select v-model="filterState.status" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                <option value="">Todos</option>
+                                <option v-for="status in statusOptions" :key="status" :value="status">{{ statusLabel(status) }}</option>
+                            </select>
                         </div>
-
-                        <!-- Filters -->
-                        <div class="mb-6">
-                            <form class="flex flex-wrap gap-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Pesquisar</label>
-                                    <input
-                                        v-model="filters.search"
-                                        type="text"
-                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                        placeholder="Ano ou cultura..."
-                                    />
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Status</label>
-                                    <select
-                                        v-model="filters.status"
-                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                    >
-                                        <option value="">Todos</option>
-                                        <option v-for="status in statusOptions" :key="status" :value="status">
-                                            {{ status }}
-                                        </option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Ano</label>
-                                    <select
-                                        v-model="filters.ano"
-                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                    >
-                                        <option value="">Todos</option>
-                                        <option v-for="ano in anos" :key="ano" :value="ano">
-                                            {{ ano }}
-                                        </option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Cultura</label>
-                                    <select
-                                        v-model="filters.cultura_id"
-                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                    >
-                                        <option value="">Todas</option>
-                                        <option v-for="cultura in culturas" :key="cultura.id" :value="cultura.id">
-                                            {{ cultura.nome }}
-                                        </option>
-                                    </select>
-                                </div>
-                            </form>
+                        <div>
+                            <InputLabel value="Ano" />
+                            <select v-model="filterState.ano" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                <option value="">Todos</option>
+                                <option v-for="ano in anos" :key="ano" :value="ano">{{ ano }}</option>
+                            </select>
                         </div>
-
-                        <!-- Table -->
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Cultura
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Ano
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Status
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Produção Real
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Custo Real
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Custo por kg
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Operações
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Colheitas
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-                                    <tr v-for="campanha in campanhas.data" :key="campanha.id" class="hover:bg-gray-50">
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            {{ campanha.cultura_nome }}
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {{ campanha.ano }}
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span
-                                                class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
-                                                :class="{
-                                                    'bg-yellow-100 text-yellow-800': campanha.status === 'planejada',
-                                                    'bg-blue-100 text-blue-800': campanha.status === 'em_curso',
-                                                    'bg-green-100 text-green-800': campanha.status === 'concluida',
-                                                    'bg-red-100 text-red-800': campanha.status === 'cancelada',
-                                                }"
-                                            >
-                                                {{ campanha.status }}
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {{ formatNumber(campanha.producao_real) }} kg
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {{ formatCurrency(campanha.custo_real) }}
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            {{ formatCurrency(campanha.custo_por_kg) }}
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {{ campanha.operacoes_count }}
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {{ campanha.colheitas_count }}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <!-- Pagination -->
-                        <div class="mt-6" v-if="campanhas.last_page > 1">
-                            <div class="flex justify-between items-center">
-                                <div class="text-sm text-gray-700">
-                                    Mostrando {{ campanhas.from }} a {{ campanhas.to }} de {{ campanhas.total }} resultados
-                                </div>
-                                <div class="flex space-x-1">
-                                    <Link
-                                        v-if="campanhas.prev_page_url"
-                                        :href="campanhas.prev_page_url"
-                                        class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-                                    >
-                                        Anterior
-                                    </Link>
-                                    <Link
-                                        v-if="campanhas.next_page_url"
-                                        :href="campanhas.next_page_url"
-                                        class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-                                    >
-                                        Próximo
-                                    </Link>
-                                </div>
-                            </div>
+                        <div>
+                            <InputLabel value="Cultura" />
+                            <select v-model="filterState.cultura_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                <option value="">Todas</option>
+                                <option v-for="cultura in culturas" :key="cultura.id" :value="cultura.id">{{ cultura.nome }}</option>
+                            </select>
                         </div>
                     </div>
-                </div>
+                </section>
+
+                <section class="grid gap-5">
+                    <article
+                        v-for="campanha in campanhas.data"
+                        :key="campanha.id"
+                        class="rounded-[32px] border border-white/80 bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]"
+                    >
+                        <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                            <div>
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <h2 class="text-2xl font-black text-slate-900">{{ campanha.cultura_nome }} · {{ campanha.ano }}</h2>
+                                    <span class="rounded-full px-3 py-1 text-xs font-semibold" :class="statusBadgeClass(campanha.status)">
+                                        {{ statusLabel(campanha.status) }}
+                                    </span>
+                                </div>
+                                <p class="mt-2 text-sm text-slate-500">
+                                    {{ campanha.data_inicio || 'Sem início' }} até {{ campanha.data_fim || 'Sem fim' }}
+                                </p>
+                            </div>
+
+                            <Link
+                                :href="route('app.campanhas.exportar', campanha.id)"
+                                class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100"
+                            >
+                                Exportar relatório
+                            </Link>
+                        </div>
+
+                        <div class="mt-6 grid gap-4 md:grid-cols-4">
+                            <div class="rounded-3xl bg-slate-50 p-4">
+                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Produção real</p>
+                                <p class="mt-2 text-lg font-bold text-slate-900">{{ formatNumber(campanha.producao_real) }} kg</p>
+                            </div>
+                            <div class="rounded-3xl bg-slate-50 p-4">
+                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Custo real</p>
+                                <p class="mt-2 text-lg font-bold text-slate-900">{{ formatCurrency(campanha.custo_real) }}</p>
+                            </div>
+                            <div class="rounded-3xl bg-slate-50 p-4">
+                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Custo por kg</p>
+                                <p class="mt-2 text-lg font-bold text-slate-900">{{ formatCurrency(campanha.custo_por_kg) }}</p>
+                            </div>
+                            <div class="rounded-3xl bg-slate-50 p-4">
+                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Registos</p>
+                                <p class="mt-2 text-lg font-bold text-slate-900">{{ campanha.operacoes_count }} operações · {{ campanha.colheitas_count }} colheitas</p>
+                            </div>
+                        </div>
+                    </article>
+                </section>
+
+                <section v-if="!campanhas.data.length" class="rounded-[32px] border border-dashed border-slate-300 bg-white/70 px-6 py-12 text-center text-sm leading-7 text-slate-600">
+                    Nenhuma campanha encontrada com os filtros atuais.
+                </section>
+
+                <Pagination v-if="campanhas.links?.length > 3" :links="campanhas.links" />
             </div>
         </div>
     </AuthenticatedLayout>

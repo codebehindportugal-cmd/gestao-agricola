@@ -21,6 +21,7 @@ class Funcionario extends Model
         'data_admissao',
         'data_saida',
         'tipo_contrato',
+        'valor_hora',
         'status',
         'observacoes',
     ];
@@ -28,6 +29,7 @@ class Funcionario extends Model
     protected $casts = [
         'data_admissao' => 'date',
         'data_saida' => 'date',
+        'valor_hora' => 'decimal:2',
     ];
 
     // Relacionamentos

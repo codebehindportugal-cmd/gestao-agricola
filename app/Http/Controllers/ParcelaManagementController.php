@@ -21,7 +21,7 @@ class ParcelaManagementController extends Controller
 
         $parcelas = Parcela::query()
             ->with('terreno:id,nome')
-            ->withCount(['culturas', 'operacoes'])
+            ->withCount(['operacoes'])
             ->when($filters['search'] ?? null, function ($query, $search) {
                 $query->where(function ($subQuery) use ($search) {
                     $subQuery
@@ -52,7 +52,6 @@ class ParcelaManagementController extends Controller
                 'latitude' => $parcela->latitude,
                 'longitude' => $parcela->longitude,
                 'poligono' => $parcela->poligono,
-                'culturas_count' => $parcela->culturas_count,
                 'operacoes_count' => $parcela->operacoes_count,
                 'updated_at' => optional($parcela->updated_at)?->format('d/m/Y H:i'),
             ]);

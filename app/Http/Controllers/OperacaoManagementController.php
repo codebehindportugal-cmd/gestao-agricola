@@ -187,6 +187,23 @@ class OperacaoManagementController extends Controller
                     'ano' => $campanha->ano,
                     'status' => $campanha->status,
                 ]),
+            'stockResumo' => Produto::query()
+                ->withSum('stocks as stock_atual', 'quantidade')
+                ->orderBy('nome')
+                ->get(['id', 'nome', 'tipo', 'unidade_medida', 'custo_unitario', 'stock_minimo'])
+                ->map(fn (Produto $produto) => [
+                    'id' => $produto->id,
+                    'nome' => $produto->nome,
+                    'tipo' => $produto->tipo,
+                    'unidade_medida' => $produto->unidade_medida,
+                    'custo_unitario' => $produto->custo_unitario,
+                    'stock_minimo' => (float) ($produto->stock_minimo ?? 0),
+                    'stock_atual' => (float) ($produto->stock_atual ?? 0),
+                    'abaixo_minimo' => (float) ($produto->stock_atual ?? 0) <= (float) ($produto->stock_minimo ?? 0),
+                    'valor_stock' => $produto->custo_unitario === null
+                        ? null
+                        : round((float) ($produto->stock_atual ?? 0) * (float) $produto->custo_unitario, 2),
+                ]),
             'cadernoCampo' => $this->cadernoCampoResumo(),
         ]);
     }
@@ -323,13 +340,20 @@ class OperacaoManagementController extends Controller
 
     private function extractProdutosPayload(Request $request): array
     {
-        return collect($request->input('produtos', []))
+        $produtosSelecionados = collect($request->input('produtos', []))
             ->filter(fn (array $produto) => !empty($produto['produto_id']))
-            ->mapWithKeys(function (array $produto) {
+            ->values();
+
+        $custosUnitarios = Produto::query()
+            ->whereIn('id', $produtosSelecionados->pluck('produto_id')->filter()->all())
+            ->pluck('custo_unitario', 'id');
+
+        return $produtosSelecionados
+            ->mapWithKeys(function (array $produto) use ($custosUnitarios) {
                 $quantidade = (float) ($produto['quantidade'] ?? 0);
-                $custoUnitario = ($produto['custo_unitario'] ?? null) === '' || ($produto['custo_unitario'] ?? null) === null
+                $custoUnitario = ($custosUnitarios[$produto['produto_id']] ?? null) === null
                     ? null
-                    : (float) $produto['custo_unitario'];
+                    : (float) $custosUnitarios[$produto['produto_id']];
 
                 return [
                     $produto['produto_id'] => [

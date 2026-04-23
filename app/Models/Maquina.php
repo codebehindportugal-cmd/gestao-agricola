@@ -22,6 +22,8 @@ class Maquina extends Model
         'ano_aquisicao',
         'horas_uso',
         'horas_manutencao',
+        'consumo_agua_ha',
+        'consumo_combustivel',
         'estado',
         'observacoes',
     ];
@@ -29,6 +31,8 @@ class Maquina extends Model
     protected $casts = [
         'horas_uso' => 'decimal:2',
         'horas_manutencao' => 'decimal:2',
+        'consumo_agua_ha' => 'decimal:2',
+        'consumo_combustivel' => 'decimal:2',
     ];
 
     // Relacionamentos

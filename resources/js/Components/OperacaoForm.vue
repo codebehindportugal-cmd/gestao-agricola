@@ -1,7 +1,7 @@
 <script setup>
+import DangerButton from '@/Components/DangerButton.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
-import DangerButton from '@/Components/DangerButton.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
@@ -35,7 +35,7 @@ const productTypeConfig = {
     'tratamento fitossanitario': {
         title: 'Produtos fitofarmacêuticos',
         empty: 'Adiciona pelo menos um produto fitofarmacêutico para este tratamento.',
-        tipos: ['fitofarmaco', 'fitofarmaco', 'fitofarmaceutico', 'produto fitofarmaceutico'],
+        tipos: ['fitofarmaco', 'fitofarmacêutico', 'fitofarmaceutico', 'produto fitofarmaceutico'],
         required: true,
     },
     fertilizacao: {
@@ -57,17 +57,19 @@ const productTypeConfig = {
         required: false,
     },
 };
-const normaliseText = (value) => String(value ?? '')
+
+const normalizeText = (value) => String(value ?? '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
 
-const productConfigFor = (tipo) => productTypeConfig[normaliseText(tipo)] ?? null;
-const isTratamentoFitossanitario = (tipo) => normaliseText(tipo) === 'tratamento fitossanitario';
+const productConfigFor = (tipo) => productTypeConfig[normalizeText(tipo)] ?? null;
 const usesProducts = (form) => !!productConfigFor(form.tipo);
+const isTratamentoFitossanitario = (tipo) => normalizeText(tipo) === 'tratamento fitossanitario';
 const productTitle = (form) => productConfigFor(form.tipo)?.title ?? 'Produtos';
 const productEmptyText = (form) => productConfigFor(form.tipo)?.empty ?? 'Adiciona os produtos usados nesta operação.';
 const productRequired = (form) => productConfigFor(form.tipo)?.required ?? false;
+
 const estadoLabel = (estado) => ({
     planejada: 'planeada',
     em_curso: 'em curso',
@@ -82,9 +84,8 @@ const productOptionsFor = (form) => {
         return props.produtos;
     }
 
-    const allowedTypes = config.tipos.map(normaliseText);
-
-    return props.produtos.filter((produto) => allowedTypes.includes(normaliseText(produto.tipo)));
+    const allowedTypes = config.tipos.map(normalizeText);
+    return props.produtos.filter((produto) => allowedTypes.includes(normalizeText(produto.tipo)));
 };
 
 const productFormBase = () => ({
@@ -131,7 +132,7 @@ const updateProductDefaults = (form, index) => {
     }
 
     row.unidade_medida = row.unidade_medida || produto.unidade_medida || 'kg';
-    row.custo_unitario = row.custo_unitario || produto.custo_unitario?.toString() || '';
+    row.custo_unitario = produto.custo_unitario?.toString() || '';
 };
 
 const filteredCulturas = computed(() => {
@@ -154,13 +155,11 @@ const filteredCampanhas = computed(() => {
     return props.campanhas.filter((campanha) => String(campanha.cultura_id) === culturaId);
 });
 
-const totalCustoProdutos = computed(() => {
-    return props.form.produtos?.reduce((total, produto) => {
-        const quantidade = parseFloat(produto.quantidade) || 0;
-        const custoUnitario = parseFloat(produto.custo_unitario) || 0;
-        return total + (quantidade * custoUnitario);
-    }, 0) || 0;
-});
+const totalCustoProdutos = computed(() => props.form.produtos?.reduce((total, produto) => {
+    const quantidade = parseFloat(produto.quantidade) || 0;
+    const custoUnitario = parseFloat(produto.custo_unitario) || 0;
+    return total + (quantidade * custoUnitario);
+}, 0) || 0);
 
 const formatCurrency = (value) => new Intl.NumberFormat('pt-PT', {
     minimumFractionDigits: 2,
@@ -178,6 +177,7 @@ const visibleTabs = computed(() => tabs.value.filter((tab) => tab.visible));
 
 watch(() => props.form.tipo, () => {
     ensureProductRows(props.form);
+
     if (!usesProducts(props.form) && activeTab.value === 'produtos') {
         activeTab.value = 'geral';
     }
@@ -185,6 +185,7 @@ watch(() => props.form.tipo, () => {
 
 onMounted(() => {
     activeTab.value = 'geral';
+    ensureProductRows(props.form);
 });
 
 const setActiveTab = (tabId) => {
@@ -194,7 +195,6 @@ const setActiveTab = (tabId) => {
 
 <template>
     <div>
-        <!-- Tabs -->
         <div class="border-b border-slate-200 bg-white">
             <nav class="flex gap-1 overflow-x-auto px-2 sm:px-6" aria-label="Tabs">
                 <button
@@ -205,21 +205,22 @@ const setActiveTab = (tabId) => {
                         'flex min-w-0 items-center gap-2 border-b-2 px-3 py-4 text-sm font-medium transition',
                         activeTab === tab.id
                             ? 'border-emerald-600 bg-emerald-50/50 text-emerald-700'
-                            : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'
+                            : 'border-transparent text-slate-500 hover:text-slate-700'
                     ]"
                     @click="setActiveTab(tab.id)"
                 >
-                    <svg v-if="tab.icon === 'calendar'" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    <svg v-if="tab.icon === 'calendar'" class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    <svg v-else-if="tab.icon === 'user'" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    <svg v-else-if="tab.icon === 'user'" class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
-                    <svg v-else-if="tab.icon === 'flask'" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                    <svg v-else-if="tab.icon === 'flask'" class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 3h6m-5 0v6.172a2 2 0 01-.586 1.414l-4.95 4.95A2 2 0 005.879 19h12.242a2 2 0 001.415-3.414l-4.95-4.95A2 2 0 0114 9.172V3" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 14c1.333.667 2.667 1 4 1s2.667-.333 4-1" />
                     </svg>
-                    <svg v-else-if="tab.icon === 'euro'" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 15.536c-1.171 1.952-3.07 1.952-4.242 0-1.172-1.953-1.172-5.119 0-7.072 1.171-1.952 3.07-1.952 4.242 0M8 10.5h4m-4 3h4m9-1.5a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <svg v-else-if="tab.icon === 'euro'" class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15.5 7.5a4.5 4.5 0 10.001 9M7 10h7M7 14h7" />
                     </svg>
                     <span class="sm:hidden">{{ tab.shortLabel }}</span>
                     <span class="hidden sm:inline">{{ tab.label }}</span>
@@ -227,9 +228,7 @@ const setActiveTab = (tabId) => {
             </nav>
         </div>
 
-        <!-- Tab Content -->
         <form class="p-6" @submit.prevent="emit('submit')">
-            <!-- Geral Tab -->
             <div v-show="activeTab === 'geral'" class="grid gap-4 sm:grid-cols-2">
                 <div class="sm:col-span-2">
                     <InputLabel value="Parcela" />
@@ -241,6 +240,7 @@ const setActiveTab = (tabId) => {
                     </select>
                     <InputError class="mt-2" :message="form.errors.parcela_id" />
                 </div>
+
                 <div>
                     <InputLabel value="Tipo" />
                     <select v-model="form.tipo" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
@@ -249,6 +249,7 @@ const setActiveTab = (tabId) => {
                     </select>
                     <InputError class="mt-2" :message="form.errors.tipo" />
                 </div>
+
                 <div>
                     <InputLabel value="Estado" />
                     <select v-model="form.estado" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
@@ -256,6 +257,7 @@ const setActiveTab = (tabId) => {
                     </select>
                     <InputError class="mt-2" :message="form.errors.estado" />
                 </div>
+
                 <div>
                     <InputLabel value="Cultura" />
                     <select v-model="form.cultura_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
@@ -264,6 +266,7 @@ const setActiveTab = (tabId) => {
                     </select>
                     <InputError class="mt-2" :message="form.errors.cultura_id" />
                 </div>
+
                 <div>
                     <InputLabel value="Campanha" />
                     <select v-model="form.campanha_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
@@ -272,24 +275,26 @@ const setActiveTab = (tabId) => {
                     </select>
                     <InputError class="mt-2" :message="form.errors.campanha_id" />
                 </div>
+
                 <div>
                     <InputLabel value="Data e hora de início" />
                     <TextInput v-model="form.data_hora_inicio" type="datetime-local" class="mt-2 block w-full rounded-2xl" />
                     <InputError class="mt-2" :message="form.errors.data_hora_inicio" />
                 </div>
+
                 <div>
                     <InputLabel value="Data e hora de fim" />
                     <TextInput v-model="form.data_hora_fim" type="datetime-local" class="mt-2 block w-full rounded-2xl" />
                     <InputError class="mt-2" :message="form.errors.data_hora_fim" />
                 </div>
+
                 <div class="sm:col-span-2">
                     <InputLabel value="Observações" />
-                    <textarea v-model="form.observacoes" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500" rows="4" />
+                    <textarea v-model="form.observacoes" rows="4" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500" />
                     <InputError class="mt-2" :message="form.errors.observacoes" />
                 </div>
             </div>
 
-            <!-- Recursos Tab -->
             <div v-show="activeTab === 'recursos'" class="grid gap-4 sm:grid-cols-2">
                 <div>
                     <InputLabel value="Trabalhador" />
@@ -301,6 +306,7 @@ const setActiveTab = (tabId) => {
                     </select>
                     <InputError class="mt-2" :message="form.errors.funcionario_id" />
                 </div>
+
                 <div>
                     <InputLabel value="Equipa" />
                     <select v-model="form.equipa_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
@@ -309,6 +315,7 @@ const setActiveTab = (tabId) => {
                     </select>
                     <InputError class="mt-2" :message="form.errors.equipa_id" />
                 </div>
+
                 <div>
                     <InputLabel value="Máquina" />
                     <select v-model="form.maquina_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
@@ -317,6 +324,7 @@ const setActiveTab = (tabId) => {
                     </select>
                     <InputError class="mt-2" :message="form.errors.maquina_id" />
                 </div>
+
                 <div>
                     <InputLabel value="Alfaia" />
                     <select v-model="form.alfaia_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
@@ -325,47 +333,53 @@ const setActiveTab = (tabId) => {
                     </select>
                     <InputError class="mt-2" :message="form.errors.alfaia_id" />
                 </div>
+
                 <div>
                     <InputLabel value="Duração (h)" />
                     <TextInput v-model="form.duracao_horas" class="mt-2 block w-full rounded-2xl" />
                     <InputError class="mt-2" :message="form.errors.duracao_horas" />
                 </div>
+
                 <div>
                     <InputLabel value="Operador sistema" />
                     <select v-model="form.operador_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
                         <option value="">Sem operador</option>
-                        <option v-for="operador in operadores" :key="operador.id" :value="String(operador.id)">{{ operador.nome }}</option>
+                        <option v-for="operador in operadores" :key="operador.id" :value="String(operador.id)">
+                            {{ operador.name ?? operador.nome }}
+                        </option>
                     </select>
                     <InputError class="mt-2" :message="form.errors.operador_id" />
                 </div>
             </div>
 
-            <!-- Produtos Tab -->
             <div v-show="activeTab === 'produtos'" class="space-y-4">
-                <!-- DGAV Fields -->
-                <div v-if="isTratamentoFitossanitario(form.tipo)" class="rounded-3xl border border-sky-100 bg-sky-50/60 p-4">
-                    <h3 class="text-lg font-semibold text-sky-900 mb-4">Dados da aplicação (Caderno de Campo DGAV)</h3>
+                <div v-if="isTratamentoFitossanitario(form.tipo)" class="rounded-3xl border border-sky-100 bg-sky-50 p-4">
+                    <h3 class="mb-4 text-lg font-semibold text-sky-900">Dados da aplicação (Caderno de Campo DGAV)</h3>
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div>
                             <InputLabel value="Produtor" />
                             <TextInput v-model="form.produtor_nome" class="mt-2 block w-full rounded-2xl" />
                             <InputError class="mt-2" :message="form.errors.produtor_nome" />
                         </div>
+
                         <div>
                             <InputLabel value="Aplicador / entidade" />
                             <TextInput v-model="form.aplicador_nome" class="mt-2 block w-full rounded-2xl" />
                             <InputError class="mt-2" :message="form.errors.aplicador_nome" />
                         </div>
+
                         <div>
-                            <InputLabel value="N.º aplicador / entidade" />
+                            <InputLabel value="N.º autorização do aplicador" />
                             <TextInput v-model="form.aplicador_numero_autorizacao" class="mt-2 block w-full rounded-2xl" />
                             <InputError class="mt-2" :message="form.errors.aplicador_numero_autorizacao" />
                         </div>
+
                         <div>
                             <InputLabel value="Concelho" />
                             <TextInput v-model="form.exploracao_concelho" class="mt-2 block w-full rounded-2xl" />
                             <InputError class="mt-2" :message="form.errors.exploracao_concelho" />
                         </div>
+
                         <div>
                             <InputLabel value="Freguesia" />
                             <TextInput v-model="form.exploracao_freguesia" class="mt-2 block w-full rounded-2xl" />
@@ -374,7 +388,6 @@ const setActiveTab = (tabId) => {
                     </div>
                 </div>
 
-                <!-- Products Section -->
                 <div class="rounded-3xl border border-emerald-100 bg-emerald-50/60 p-4">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
@@ -384,124 +397,166 @@ const setActiveTab = (tabId) => {
                                 <span v-if="productRequired(form)" class="font-semibold text-red-700">Obrigatório.</span>
                             </p>
                         </div>
+
                         <SecondaryButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="addProductRow(form)">
                             Adicionar produto
                         </SecondaryButton>
                     </div>
+
                     <InputError class="mt-2" :message="form.errors.produtos" />
+
                     <div v-if="!productOptionsFor(form).length" class="mt-3 rounded-2xl border border-dashed border-emerald-200 bg-white/70 p-4 text-sm text-slate-600">
                         Não existem produtos deste tipo na lista.
-                        <button type="button" class="font-semibold text-emerald-700 underline" @click="emit('openProductModal', isTratamentoFitossanitario(form.tipo) ? 'fitofarmaco' : normaliseText(form.tipo))">
+                        <button
+                            type="button"
+                            class="font-semibold text-emerald-700 underline"
+                            @click="emit('openProductModal', isTratamentoFitossanitario(form.tipo) ? 'fitofarmaco' : normalizeText(form.tipo))"
+                        >
                             Criar produto
                         </button>
                     </div>
+
                     <div class="mt-4 space-y-4">
                         <div v-for="(produto, index) in form.produtos" :key="`produto-${index}`" class="grid gap-3 rounded-2xl bg-white p-4 sm:grid-cols-2">
                             <div class="sm:col-span-2">
                                 <InputLabel value="Produto" />
-                                <select v-model="produto.produto_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500" @change="updateProductDefaults(form, index)">
+                                <select
+                                    v-model="produto.produto_id"
+                                    class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                                    @change="updateProductDefaults(form, index)"
+                                >
                                     <option value="">Selecionar produto</option>
-                                    <option v-for="item in productOptionsFor(form)" :key="item.id" :value="String(item.id)">{{ item.nome }} - {{ item.tipo }}</option>
+                                    <option v-for="item in productOptionsFor(form)" :key="item.id" :value="String(item.id)">
+                                        {{ item.nome }} - {{ item.tipo }}
+                                    </option>
                                 </select>
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.produto_id`]" />
                             </div>
+
                             <div>
                                 <InputLabel value="Quantidade" />
                                 <TextInput v-model="produto.quantidade" type="number" step="0.01" min="0.01" class="mt-2 block w-full rounded-2xl" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.quantidade`]" />
                             </div>
+
                             <div>
                                 <InputLabel value="Unidade" />
                                 <TextInput v-model="produto.unidade_medida" class="mt-2 block w-full rounded-2xl" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.unidade_medida`]" />
                             </div>
+
                             <div v-if="isTratamentoFitossanitario(form.tipo)">
                                 <InputLabel value="Dose" />
                                 <TextInput v-model="produto.dose" type="number" step="0.001" min="0" class="mt-2 block w-full rounded-2xl" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.dose`]" />
                             </div>
+
                             <div v-if="isTratamentoFitossanitario(form.tipo)">
                                 <InputLabel value="Unidade da dose" />
                                 <TextInput v-model="produto.dose_unidade" class="mt-2 block w-full rounded-2xl" placeholder="L/ha, kg/ha" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.dose_unidade`]" />
                             </div>
+
                             <div v-if="isTratamentoFitossanitario(form.tipo)">
                                 <InputLabel value="Área tratada (ha)" />
                                 <TextInput v-model="produto.area_tratada" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.area_tratada`]" />
                             </div>
+
                             <div v-if="isTratamentoFitossanitario(form.tipo)">
                                 <InputLabel value="Volume de calda (L)" />
                                 <TextInput v-model="produto.volume_calda" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.volume_calda`]" />
                             </div>
+
                             <div v-if="isTratamentoFitossanitario(form.tipo)">
                                 <InputLabel value="Finalidade / inimigo" />
                                 <TextInput v-model="produto.finalidade" class="mt-2 block w-full rounded-2xl" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.finalidade`]" />
                             </div>
+
                             <div v-if="isTratamentoFitossanitario(form.tipo)">
                                 <InputLabel value="Intervalo de segurança (dias)" />
                                 <TextInput v-model="produto.intervalo_seguranca_dias" type="number" min="0" class="mt-2 block w-full rounded-2xl" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.intervalo_seguranca_dias`]" />
                             </div>
+
                             <div v-if="isTratamentoFitossanitario(form.tipo)">
                                 <InputLabel value="Estabelecimento de venda" />
                                 <TextInput v-model="produto.estabelecimento_venda_nome" class="mt-2 block w-full rounded-2xl" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.estabelecimento_venda_nome`]" />
                             </div>
+
                             <div v-if="isTratamentoFitossanitario(form.tipo)">
                                 <InputLabel value="N.º autorização do estabelecimento" />
                                 <TextInput v-model="produto.estabelecimento_venda_autorizacao" class="mt-2 block w-full rounded-2xl" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.estabelecimento_venda_autorizacao`]" />
                             </div>
+
                             <div>
                                 <InputLabel value="Custo unitário" />
-                                <TextInput v-model="produto.custo_unitario" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                                <TextInput
+                                    v-model="produto.custo_unitario"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    readonly
+                                    class="mt-2 block w-full rounded-2xl bg-slate-50 text-slate-600"
+                                />
+                                <p class="mt-2 text-xs leading-5 text-slate-500">
+                                    Preço automático do produto. Atualiza o valor no produto quando muda a fatura.
+                                </p>
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.custo_unitario`]" />
                             </div>
+
                             <div class="flex items-end">
-                                <DangerButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="removeProductRow(form, index)">Remover</DangerButton>
+                                <DangerButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="removeProductRow(form, index)">
+                                    Remover
+                                </DangerButton>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Custos Tab -->
             <div v-show="activeTab === 'custos'" class="space-y-4">
                 <div class="rounded-2xl bg-amber-50 p-4 text-sm text-slate-600">
                     Os custos de produtos são calculados automaticamente a partir das quantidades e preços unitários.
                     Aqui podes registar o custo total estimado e o custo real da operação (mão de obra, máquinas, etc.).
                 </div>
+
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
                         <InputLabel value="Custo estimado (€)" />
                         <div class="relative mt-2">
                             <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">€</span>
-                            <TextInput v-model="form.custo_estimado" type="number" step="0.01" min="0" class="pl-8 block w-full rounded-2xl" />
+                            <TextInput v-model="form.custo_estimado" type="number" step="0.01" min="0" class="block w-full rounded-2xl pl-8" />
                         </div>
                         <InputError class="mt-2" :message="form.errors.custo_estimado" />
                     </div>
+
                     <div>
                         <InputLabel value="Custo real (€)" />
                         <div class="relative mt-2">
                             <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">€</span>
-                            <TextInput v-model="form.custo_real" type="number" step="0.01" min="0" class="pl-8 block w-full rounded-2xl" />
+                            <TextInput v-model="form.custo_real" type="number" step="0.01" min="0" class="block w-full rounded-2xl pl-8" />
                         </div>
                         <InputError class="mt-2" :message="form.errors.custo_real" />
                     </div>
-                    <div v-if="totalCustoProdutos > 0" class="sm:col-span-2 rounded-2xl bg-emerald-50 p-4">
-                        <p class="text-sm font-medium text-emerald-800">
-                            Custo total de produtos: {{ formatCurrency(totalCustoProdutos) }} €
+
+                    <div v-if="form.produtos?.length" class="sm:col-span-2 rounded-2xl bg-emerald-50 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Calculado automaticamente</p>
+                        <p class="mt-2 text-sm font-medium text-emerald-900">
+                            Custo total de produtos: € {{ formatCurrency(totalCustoProdutos) }}
                         </p>
                     </div>
                 </div>
             </div>
 
-            <!-- Form Actions -->
             <div class="mt-6 flex justify-end gap-3">
-                <SecondaryButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="emit('cancel')">Cancelar</SecondaryButton>
+                <SecondaryButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="emit('cancel')">
+                    Cancelar
+                </SecondaryButton>
                 <PrimaryButton class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" :class="submitButtonClass" :disabled="form.processing">
                     {{ submitLabel }}
                 </PrimaryButton>

@@ -6,17 +6,11 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateMaquinaRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     */
     public function rules(): array
     {
         return [
@@ -29,6 +23,8 @@ class UpdateMaquinaRequest extends FormRequest
             'ano_aquisicao' => 'nullable|integer|min:1901|max:' . date('Y'),
             'horas_uso' => 'nullable|numeric|min:0',
             'horas_manutencao' => 'nullable|numeric|min:0',
+            'consumo_agua_ha' => 'nullable|numeric|min:0',
+            'consumo_combustivel' => 'nullable|numeric|min:0',
             'estado' => 'in:operacional,em_manutencao,danificada,retirada',
             'observacoes' => 'nullable|string',
         ];

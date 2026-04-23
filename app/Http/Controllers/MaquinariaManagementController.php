@@ -55,6 +55,8 @@ class MaquinariaManagementController extends Controller
                 'ano_aquisicao' => $maquina->ano_aquisicao,
                 'horas_uso' => $maquina->horas_uso,
                 'horas_manutencao' => $maquina->horas_manutencao,
+                'consumo_agua_ha' => $maquina->consumo_agua_ha,
+                'consumo_combustivel' => $maquina->consumo_combustivel,
                 'estado' => $maquina->estado,
                 'observacoes' => $maquina->observacoes,
                 'alfaias_count' => $maquina->alfaias_count,
@@ -91,6 +93,7 @@ class MaquinariaManagementController extends Controller
                 'descricao' => $alfaia->descricao,
                 'comprimento' => $alfaia->comprimento,
                 'largura' => $alfaia->largura,
+                'consumo_agua_ha' => $alfaia->consumo_agua_ha,
                 'estado' => $alfaia->estado,
                 'observacoes' => $alfaia->observacoes,
                 'operacoes_count' => $alfaia->operacoes_count,
@@ -337,7 +340,7 @@ class MaquinariaManagementController extends Controller
     {
         $data = $request->validated();
 
-        foreach (['marca', 'modelo', 'matricula', 'numero_serie', 'ano_aquisicao', 'horas_uso', 'horas_manutencao', 'observacoes'] as $field) {
+        foreach (['marca', 'modelo', 'matricula', 'numero_serie', 'ano_aquisicao', 'horas_uso', 'horas_manutencao', 'consumo_agua_ha', 'consumo_combustivel', 'observacoes'] as $field) {
             if (array_key_exists($field, $data) && $data[$field] === '') {
                 $data[$field] = null;
             }
@@ -354,7 +357,7 @@ class MaquinariaManagementController extends Controller
     {
         $data = $request->validated();
 
-        foreach (['maquina_id', 'descricao', 'comprimento', 'largura', 'observacoes'] as $field) {
+        foreach (['maquina_id', 'descricao', 'comprimento', 'largura', 'consumo_agua_ha', 'observacoes'] as $field) {
             if (array_key_exists($field, $data) && $data[$field] === '') {
                 $data[$field] = null;
             }

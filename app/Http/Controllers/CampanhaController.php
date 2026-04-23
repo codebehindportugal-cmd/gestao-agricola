@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Campanha;
+use App\Models\Cultura;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -22,7 +23,7 @@ class CampanhaController extends Controller
                 $query->where(function ($subQuery) use ($search) {
                     $subQuery
                         ->where('ano', 'like', "%{$search}%")
-                        ->orWhereHas('cultura', fn ($q) => $q->where('nome', 'like', "%{$search}%"));
+                        ->orWhereHas('cultura', fn ($culturaQuery) => $culturaQuery->where('nome', 'like', "%{$search}%"));
                 });
             })
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
@@ -61,7 +62,7 @@ class CampanhaController extends Controller
             ],
             'statusOptions' => ['planejada', 'em_curso', 'concluida', 'cancelada'],
             'anos' => Campanha::query()->distinct()->pluck('ano')->sort()->values(),
-            'culturas' => \App\Models\Cultura::query()->orderBy('nome')->get(['id', 'nome']),
+            'culturas' => Cultura::query()->orderBy('nome')->get(['id', 'nome']),
         ]);
     }
 
@@ -69,36 +70,32 @@ class CampanhaController extends Controller
     {
         $this->authorize('view', $campanha);
 
-        // Carregar relacionamentos necessários
         $campanha->load([
             'cultura.parcela.terreno',
             'operacoes' => function ($query) {
-                $query->with(['operacaoProdutos.produto', 'custos']);
+                $query->with(['produtos', 'custos']);
             },
             'colheitas',
-            'custos'
+            'custos',
         ]);
 
-        // Dados para o relatório
-        $exploracao = $campanha->cultura->parcela->terreno->nome ?? 'N/A';
-        $cultura = $campanha->cultura->nome ?? 'N/A';
+        $exploracao = $campanha->cultura?->parcela?->terreno?->nome ?? 'N/A';
+        $cultura = $campanha->cultura?->nome ?? 'N/A';
         $periodo = (optional($campanha->data_inicio)->format('d/m/Y') ?? 'N/A') . ' - ' . (optional($campanha->data_fim)->format('d/m/Y') ?? 'N/A');
 
-        // Resumo de produção
         $producao = [
             'quantidade_colhida' => $campanha->colheitas->sum('quantidade_total'),
             'perdas' => $campanha->colheitas->sum('quantidade_perdas'),
-            'qualidade' => $campanha->colheitas->pluck('qualidade')->filter()->first() ?? 'N/A', // primeira qualidade não null
+            'qualidade' => $campanha->colheitas->pluck('qualidade')->filter()->first() ?? 'N/A',
         ];
 
-        // Resumo financeiro
-        $custosPorCategoria = $campanha->custos->groupBy('tipo')->map(function ($custos) {
-            return $custos->sum('valor');
-        });
+        $custosPorCategoria = $campanha->custos
+            ->groupBy('tipo')
+            ->map(fn ($custos) => $custos->sum('valor'));
 
-        $custoTotal = $campanha->custos->sum('valor') + $campanha->operacoes->sum('custo_real');
+        $custoTotal = (float) $campanha->custos->sum('valor') + (float) $campanha->operacoes->sum('custo_real');
         $custoPorKg = $campanha->custo_por_kg;
-        $areaTotal = $campanha->cultura->parcela->area_util ?? 0;
+        $areaTotal = $campanha->cultura?->parcela?->area_util ?? 0;
         $custoPorHa = $areaTotal > 0 ? round($custoTotal / $areaTotal, 2) : 0;
 
         $financeiro = [
@@ -108,28 +105,28 @@ class CampanhaController extends Controller
             'custo_por_ha' => $custoPorHa,
         ];
 
-        // Lista de operações
         $operacoes = $campanha->operacoes->map(function ($operacao) {
             return [
-                'data' => optional($operacao->data)->format('d/m/Y') ?? 'N/A',
+                'data' => optional($operacao->data_hora_inicio)?->format('d/m/Y') ?? 'N/A',
                 'tipo' => $operacao->tipo ?? 'N/A',
                 'custo' => $operacao->custo_real,
             ];
         });
 
-        // Lista de produtos fitofarmacêuticos
         $produtosFitofarmaceuticos = $campanha->operacoes->flatMap(function ($operacao) {
-            return $operacao->operacaoProdutos->filter(function ($op) {
-                return $op->produto && $op->produto->tipo === 'fitofarmaceutico';
-            })->map(function ($op) use ($operacao) {
-                return [
-                    'nome' => $op->produto->nome,
-                    'numero_autorizacao' => $op->produto->numero_autorizacao_dgav ?? 'N/A',
-                    'dose' => $op->dose . ' ' . ($op->dose_unidade ?? ''),
-                    'area_tratada' => $op->area_tratada,
-                    'data_aplicacao' => optional($operacao->data)->format('d/m/Y') ?? 'N/A',
-                ];
-            });
+            return $operacao->produtos
+                ->filter(function ($produto) {
+                    return in_array($produto->tipo, ['fitofarmaco', 'fitofarmaceutico', 'produto fitofarmaceutico'], true);
+                })
+                ->map(function ($produto) use ($operacao) {
+                    return [
+                        'nome' => $produto->nome,
+                        'numero_autorizacao' => $produto->numero_autorizacao_dgav ?? 'N/A',
+                        'dose' => trim(($produto->pivot->dose ?? '') . ' ' . ($produto->pivot->dose_unidade ?? '')),
+                        'area_tratada' => $produto->pivot->area_tratada,
+                        'data_aplicacao' => optional($operacao->data_hora_inicio)?->format('d/m/Y') ?? 'N/A',
+                    ];
+                });
         });
 
         $dataGeracao = now()->format('d/m/Y H:i');

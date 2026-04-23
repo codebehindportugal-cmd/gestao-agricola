@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Alfaia;
+use App\Models\Campanha;
 use App\Models\Cultura;
 use App\Models\Maquina;
 use App\Models\Operacao;
@@ -29,24 +30,24 @@ class DashboardController extends Controller
     {
         return [
             [
-                'label' => 'Terrenos',
-                'value' => $this->safeCount('terrenos', Terreno::class),
-                'description' => 'Unidades produtivas registadas',
-            ],
-            [
                 'label' => 'Parcelas',
                 'value' => $this->safeCount('parcelas', Parcela::class),
-                'description' => 'Divisões prontas para planeamento',
+                'description' => 'Base física pronta para registar operações.',
             ],
             [
                 'label' => 'Culturas',
                 'value' => $this->safeCount('culturas', Cultura::class),
-                'description' => 'Culturas com acompanhamento ativo',
+                'description' => 'Culturas associadas às parcelas.',
+            ],
+            [
+                'label' => 'Campanhas',
+                'value' => $this->safeCount('campanhas', Campanha::class),
+                'description' => 'Ano agrícola com custos e produção.',
             ],
             [
                 'label' => 'Operações',
                 'value' => $this->safeCount('operacoes', Operacao::class),
-                'description' => 'Registos operacionais acumulados',
+                'description' => 'Registos do caderno de campo.',
             ],
         ];
     }
@@ -55,22 +56,22 @@ class DashboardController extends Controller
     {
         return [
             [
+                'label' => 'Operações planeadas',
+                'value' => $this->safeWhereCount('operacoes', Operacao::class, 'estado', 'planejada'),
+                'total' => $this->safeCount('operacoes', Operacao::class),
+                'tone' => 'sky',
+            ],
+            [
                 'label' => 'Máquinas ativas',
                 'value' => $this->safeWhereCount('maquinas', Maquina::class, 'estado', 'ativo'),
                 'total' => $this->safeCount('maquinas', Maquina::class),
                 'tone' => 'emerald',
             ],
             [
-                'label' => 'Alfaias operacionais',
+                'label' => 'Alfaias ativas',
                 'value' => $this->safeWhereCount('alfaias', Alfaia::class, 'estado', 'ativo'),
                 'total' => $this->safeCount('alfaias', Alfaia::class),
                 'tone' => 'amber',
-            ],
-            [
-                'label' => 'Operações pendentes',
-                'value' => $this->safeWhereCount('operacoes', Operacao::class, 'estado', 'pendente'),
-                'total' => $this->safeCount('operacoes', Operacao::class),
-                'tone' => 'sky',
             ],
         ];
     }
@@ -104,16 +105,16 @@ class DashboardController extends Controller
     {
         return [
             [
-                'title' => 'Planeamento agrícola',
-                'description' => 'Organize terrenos, parcelas e culturas com base no ciclo produtivo.',
+                'title' => 'Registar trabalho diário',
+                'description' => 'Entrar rapidamente em operações com datas, recursos, produtos e observações.',
             ],
             [
-                'title' => 'Execução no terreno',
-                'description' => 'Acompanhe operações, máquinas e equipas sem depender de folhas soltas.',
+                'title' => 'Fechar o caderno de campo',
+                'description' => 'Guardar tratamentos fitossanitários com os dados DGAV necessários para certificação.',
             ],
             [
-                'title' => 'Próxima fase',
-                'description' => 'A base está pronta para avançar com colheitas, stock e relatórios.',
+                'title' => 'Perceber custos',
+                'description' => 'Ligar operação, campanha e produtos para calcular custo real por campanha.',
             ],
         ];
     }
@@ -152,7 +153,11 @@ class DashboardController extends Controller
                         'tipo' => 'parcela',
                         'nome' => $parcela->nome,
                         'area_total' => $parcela->area_total,
-                        'extra' => trim(($parcela->terreno?->nome ? "Terreno: {$parcela->terreno->nome}" : '').($parcela->tipo_ocupacao ? " | {$parcela->tipo_ocupacao}" : '').($parcela->numero_arvores ? " | {$parcela->numero_arvores} arvores" : '')),
+                        'extra' => trim(
+                            ($parcela->terreno?->nome ? "Terreno: {$parcela->terreno->nome}" : '') .
+                            ($parcela->tipo_ocupacao ? " | {$parcela->tipo_ocupacao}" : '') .
+                            ($parcela->numero_arvores ? " | {$parcela->numero_arvores} árvores" : '')
+                        ),
                         'poligono' => $parcela->poligono,
                     ])
                     ->all()

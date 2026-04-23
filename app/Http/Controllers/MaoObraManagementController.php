@@ -49,6 +49,7 @@ class MaoObraManagementController extends Controller
                 'data_admissao' => optional($funcionario->data_admissao)?->format('Y-m-d'),
                 'data_saida' => optional($funcionario->data_saida)?->format('Y-m-d'),
                 'tipo_contrato' => $funcionario->tipo_contrato,
+                'valor_hora' => $funcionario->valor_hora,
                 'status' => $funcionario->status,
                 'observacoes' => $funcionario->observacoes,
                 'jornadas_count' => $funcionario->jornadas_count,

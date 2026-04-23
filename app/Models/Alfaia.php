@@ -20,6 +20,7 @@ class Alfaia extends Model
         'descricao',
         'comprimento',
         'largura',
+        'consumo_agua_ha',
         'estado',
         'observacoes',
     ];
@@ -27,6 +28,7 @@ class Alfaia extends Model
     protected $casts = [
         'comprimento' => 'decimal:2',
         'largura' => 'decimal:2',
+        'consumo_agua_ha' => 'decimal:2',
     ];
 
     // Relacionamentos

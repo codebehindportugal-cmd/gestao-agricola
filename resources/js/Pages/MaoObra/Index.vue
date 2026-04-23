@@ -45,6 +45,7 @@ const funcionarioBase = {
     data_admissao: '',
     data_saida: '',
     tipo_contrato: 'permanente',
+    valor_hora: '',
     status: 'ativo',
     observacoes: '',
 };
@@ -111,6 +112,7 @@ const openEditFuncionario = (funcionario) => {
         data_admissao: funcionario.data_admissao ?? '',
         data_saida: funcionario.data_saida ?? '',
         tipo_contrato: funcionario.tipo_contrato ?? 'permanente',
+        valor_hora: funcionario.valor_hora?.toString() ?? '',
         status: funcionario.status ?? 'ativo',
         observacoes: funcionario.observacoes ?? '',
     });
@@ -200,6 +202,17 @@ const cleanFilters = () => {
     filterState.status = '';
     filterState.tipo_contrato = '';
     filterState.equipa_status = '';
+};
+
+const formatCurrency = (value) => {
+    if (value === null || value === undefined || value === '') {
+        return '-';
+    }
+
+    return new Intl.NumberFormat('pt-PT', {
+        style: 'currency',
+        currency: 'EUR',
+    }).format(Number(value));
 };
 </script>
 
@@ -325,7 +338,7 @@ const cleanFilters = () => {
                                 </div>
                             </div>
 
-                            <div class="mt-5 grid gap-3 sm:grid-cols-3">
+                            <div class="mt-5 grid gap-3 sm:grid-cols-4">
                                 <div class="rounded-3xl bg-slate-50 p-4">
                                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Equipas</p>
                                     <p class="mt-2 text-xl font-black text-slate-900">{{ funcionario.equipas_count }}</p>
@@ -337,6 +350,10 @@ const cleanFilters = () => {
                                 <div class="rounded-3xl bg-slate-50 p-4">
                                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Saida</p>
                                     <p class="mt-2 text-sm text-slate-700">{{ funcionario.data_saida || 'Sem data' }}</p>
+                                </div>
+                                <div class="rounded-3xl bg-emerald-50 p-4">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Valor hora</p>
+                                    <p class="mt-2 text-sm font-bold text-emerald-900">{{ formatCurrency(funcionario.valor_hora) }}</p>
                                 </div>
                             </div>
 
@@ -491,6 +508,11 @@ const cleanFilters = () => {
                             <option v-for="contrato in contratoOptions" :key="contrato" :value="contrato">{{ labelize(contrato) }}</option>
                         </select>
                         <InputError class="mt-2" :message="funcionarioForm.errors.tipo_contrato" />
+                    </div>
+                    <div>
+                        <InputLabel value="Valor por hora (€)" />
+                        <TextInput v-model="funcionarioForm.valor_hora" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                        <InputError class="mt-2" :message="funcionarioForm.errors.valor_hora" />
                     </div>
                     <div>
                         <InputLabel value="Estado" />

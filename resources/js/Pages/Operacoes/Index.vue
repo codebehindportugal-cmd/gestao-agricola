@@ -5,6 +5,7 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import Modal from '@/Components/Modal.vue';
 import OperacaoForm from '@/Components/OperacaoForm.vue';
+import Pagination from '@/Components/Pagination.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
@@ -28,6 +29,7 @@ const props = defineProps({
     campanhas: { type: Array, default: () => [] },
     cadernoCampo: { type: Array, default: () => [] },
     produtos: { type: Array, default: () => [] },
+    stockResumo: { type: Array, default: () => [] },
 });
 
 const page = usePage();
@@ -76,88 +78,13 @@ const productForm = useForm({
     unidade_medida: 'L',
     custo_unitario: '',
     codigo_interno: '',
+    numero_autorizacao_dgav: '',
     descricao: '',
 });
+
 const createErrorMessages = computed(() => Object.values(createForm.errors));
 const editErrorMessages = computed(() => Object.values(editForm.errors));
 const productErrorMessages = computed(() => Object.values(productForm.errors));
-
-const productTypeConfig = {
-    'tratamento fitossanitario': {
-        title: 'Produtos fitofarmacêuticos',
-        empty: 'Adiciona pelo menos um produto fitofarmacêutico para este tratamento.',
-        tipos: ['fitofarmaco', 'fitofarmaco', 'fitofarmaceutico', 'produto fitofarmaceutico'],
-        required: true,
-    },
-    fertilizacao: {
-        title: 'Fertilizantes',
-        empty: 'Adiciona os fertilizantes usados nesta operação.',
-        tipos: ['fertilizante'],
-        required: false,
-    },
-    sementeira: {
-        title: 'Sementes',
-        empty: 'Adiciona as sementes usadas nesta operação.',
-        tipos: ['semente'],
-        required: false,
-    },
-    plantacao: {
-        title: 'Plantas ou sementes',
-        empty: 'Adiciona os produtos vegetais usados nesta operação.',
-        tipos: ['semente', 'planta'],
-        required: false,
-    },
-};
-const normaliseText = (value) => String(value ?? '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
-
-const productConfigFor = (tipo) => productTypeConfig[normaliseText(tipo)] ?? null;
-const isTratamentoFitossanitario = (tipo) => normaliseText(tipo) === 'tratamento fitossanitario';
-const usesProducts = (form) => !!productConfigFor(form.tipo);
-const productTitle = (form) => productConfigFor(form.tipo)?.title ?? 'Produtos';
-const productEmptyText = (form) => productConfigFor(form.tipo)?.empty ?? 'Adiciona os produtos usados nesta operaÃ§Ã£o.';
-const productRequired = (form) => productConfigFor(form.tipo)?.required ?? false;
-
-const productOptionsFor = (form) => {
-    const config = productConfigFor(form.tipo);
-
-    if (!config) {
-        return props.produtos;
-    }
-
-    const allowedTypes = config.tipos.map(normaliseText);
-
-    return props.produtos.filter((produto) => allowedTypes.includes(normaliseText(produto.tipo)));
-};
-
-const productFormBase = () => ({
-    produto_id: '',
-    quantidade: '',
-    unidade_medida: '',
-    dose: '',
-    dose_unidade: '',
-    area_tratada: '',
-    volume_calda: '',
-    finalidade: '',
-    intervalo_seguranca_dias: '',
-    estabelecimento_venda_nome: '',
-    estabelecimento_venda_autorizacao: '',
-    custo_unitario: '',
-    observacoes: '',
-});
-
-const ensureProductRows = (form) => {
-    if (usesProducts(form) && !form.produtos.length) {
-        form.produtos = [productFormBase()];
-        return;
-    }
-
-    if (!usesProducts(form)) {
-        form.produtos = [];
-    }
-};
 
 const currentQuery = computed(() => ({
     search: filterState.search || undefined,
@@ -177,26 +104,6 @@ watch(
     },
 );
 
-const filteredCulturas = computed(() => {
-    const parcelaId = String(editingOperacao.value ? editForm.parcela_id : createForm.parcela_id || '');
-
-    if (!parcelaId) {
-        return props.culturas;
-    }
-
-    return props.culturas.filter((cultura) => String(cultura.parcela_id) === parcelaId);
-});
-
-const filteredCampanhas = computed(() => {
-    const culturaId = String(editingOperacao.value ? editForm.cultura_id : createForm.cultura_id || '');
-
-    if (!culturaId) {
-        return props.campanhas;
-    }
-
-    return props.campanhas.filter((campanha) => String(campanha.cultura_id) === culturaId);
-});
-
 const openCreateModal = () => {
     createForm.reset();
     createForm.clearErrors();
@@ -204,26 +111,6 @@ const openCreateModal = () => {
     createForm.parcela_id = filterState.parcela_id || '';
     createForm.produtos = [];
     createModalOpen.value = true;
-};
-
-const openProductModal = (type = 'fitofarmaco') => {
-    productForm.defaults({
-        nome: '',
-        tipo: type,
-        unidade_medida: type === 'fitofarmaco' ? 'L' : 'kg',
-        custo_unitario: '',
-        codigo_interno: '',
-        numero_autorizacao_dgav: '',
-        descricao: '',
-    });
-    productForm.reset();
-    productForm.clearErrors();
-    productModalOpen.value = true;
-};
-
-const closeProductModal = () => {
-    productModalOpen.value = false;
-    productForm.clearErrors();
 };
 
 const closeCreateModal = () => {
@@ -271,12 +158,31 @@ const openEditModal = (operacao) => {
         custo_unitario: produto.custo_unitario?.toString() ?? '',
         observacoes: produto.observacoes ?? '',
     }));
-    ensureProductRows(editForm);
 };
 
 const closeEditModal = () => {
     editingOperacao.value = null;
     editForm.clearErrors();
+};
+
+const openProductModal = (type = 'fitofarmaco') => {
+    productForm.defaults({
+        nome: '',
+        tipo: type,
+        unidade_medida: type === 'fitofarmaco' ? 'L' : 'kg',
+        custo_unitario: '',
+        codigo_interno: '',
+        numero_autorizacao_dgav: '',
+        descricao: '',
+    });
+    productForm.reset();
+    productForm.clearErrors();
+    productModalOpen.value = true;
+};
+
+const closeProductModal = () => {
+    productModalOpen.value = false;
+    productForm.clearErrors();
 };
 
 const normalizePayload = (form) => form.transform((data) => ({
@@ -310,6 +216,29 @@ const normalizePayload = (form) => form.transform((data) => ({
     })),
 }));
 
+const submitCreate = () => {
+    normalizePayload(createForm).post(route('app.operacoes.store', currentQuery.value), {
+        preserveScroll: true,
+        onSuccess: () => closeCreateModal(),
+        onFinish: () => createForm.transform((data) => data),
+    });
+};
+
+const submitEdit = () => {
+    if (!editingOperacao.value) {
+        return;
+    }
+
+    normalizePayload(editForm).patch(route('app.operacoes.update', {
+        operacao: editingOperacao.value.id,
+        ...currentQuery.value,
+    }), {
+        preserveScroll: true,
+        onSuccess: () => closeEditModal(),
+        onFinish: () => editForm.transform((data) => data),
+    });
+};
+
 const submitProduct = () => {
     productForm
         .transform((data) => ({
@@ -325,55 +254,15 @@ const submitProduct = () => {
         });
 };
 
-const addProductRow = (form) => {
-    form.produtos = [...form.produtos, productFormBase()];
-};
-
-const removeProductRow = (form, index) => {
-    form.produtos = form.produtos.filter((_, rowIndex) => rowIndex !== index);
-};
-
-const updateProductDefaults = (form, index) => {
-    const row = form.produtos[index];
-    const produto = props.produtos.find((item) => String(item.id) === String(row.produto_id));
-
-    if (!produto) {
-        return;
-    }
-
-    row.unidade_medida = row.unidade_medida || produto.unidade_medida || 'kg';
-    row.custo_unitario = row.custo_unitario || produto.custo_unitario?.toString() || '';
-};
-
-watch(() => createForm.tipo, () => ensureProductRows(createForm));
-watch(() => editForm.tipo, () => ensureProductRows(editForm));
-
-const submitCreate = () => {
-    normalizePayload(createForm).post(route('app.operacoes.store', currentQuery.value), {
-        preserveScroll: true,
-        onSuccess: () => closeCreateModal(),
-        onFinish: () => createForm.transform((data) => data),
-    });
-};
-
-const submitEdit = () => {
-    if (!editingOperacao.value) {
-        return;
-    }
-
-    normalizePayload(editForm).patch(route('app.operacoes.update', { operacao: editingOperacao.value.id, ...currentQuery.value }), {
-        preserveScroll: true,
-        onSuccess: () => closeEditModal(),
-        onFinish: () => editForm.transform((data) => data),
-    });
-};
-
 const deleteOperacao = (operacao) => {
-    if (!window.confirm(`Remover a operaÃ§Ã£o "${operacao.tipo}"?`)) {
+    if (!window.confirm(`Remover a operação "${operacao.tipo}"?`)) {
         return;
     }
 
-    router.delete(route('app.operacoes.destroy', { operacao: operacao.id, ...currentQuery.value }), {
+    router.delete(route('app.operacoes.destroy', {
+        operacao: operacao.id,
+        ...currentQuery.value,
+    }), {
         preserveScroll: true,
     });
 };
@@ -388,7 +277,7 @@ const estadoBadgeClass = (estado) => ({
 const estadoLabel = (estado) => ({
     planejada: 'planeada',
     em_curso: 'em curso',
-    concluida: 'concluÃ­da',
+    concluida: 'concluída',
     cancelada: 'cancelada',
 }[estado] ?? estado);
 
@@ -399,71 +288,65 @@ const productFieldSummary = (operacao) => {
         return null;
     }
 
-    return `${product.finalidade} Â· IS ${product.intervalo_seguranca_dias ?? '-'} dias`;
+    return `${product.finalidade} · IS ${product.intervalo_seguranca_dias ?? '-'} dias`;
 };
 
 const formatNumber = (value) => {
-    const number = Number(value ?? 0);
-    return new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(number);
+    return new Intl.NumberFormat('pt-PT', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+    }).format(Number(value ?? 0));
 };
+
+const stockStats = computed(() => ({
+    totalProdutos: props.stockResumo.length,
+    abaixoMinimo: props.stockResumo.filter((produto) => produto.abaixo_minimo).length,
+    valorTotal: props.stockResumo.reduce((total, produto) => total + Number(produto.valor_stock ?? 0), 0),
+}));
 </script>
 
 <template>
-    <Head title="OperaÃ§Ãµes" />
+    <Head title="Operações" />
 
     <AuthenticatedLayout>
         <template #header>
             <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <div>
-                    <div class="flex items-center gap-3">
-                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
-                            <svg viewBox="0 0 24 24" class="h-7 w-7" fill="none" stroke="currentColor" stroke-width="1.8">
-                                <path d="M4 18c3-3 5.5-4.5 8-4.5S17 15 20 18" stroke-linecap="round" />
-                                <path d="M12 13V5" stroke-linecap="round" />
-                                <path d="M9 9h6" stroke-linecap="round" opacity="0.7" />
-                            </svg>
-                        </div>
-                        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700">
-                            OperaÃ§Ã£o DiÃ¡ria
-                        </p>
-                    </div>
-                    <h1 class="mt-2 text-3xl font-black text-slate-900">OperaÃ§Ãµes</h1>
-                    <p class="mt-2 max-w-2xl text-sm text-slate-600">
-                        Registo do trabalho no terreno com datas, responsÃ¡veis, mÃ¡quinas e estado de execuÃ§Ã£o.
+                    <p class="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700">Caderno de campo</p>
+                    <h1 class="mt-2 text-3xl font-black text-slate-900">Operações</h1>
+                    <p class="mt-2 max-w-3xl text-sm text-slate-600">
+                        Regista o trabalho no campo, os produtos aplicados, os responsáveis e os custos da operação.
                     </p>
                 </div>
 
                 <div class="flex flex-wrap gap-3">
-                <PrimaryButton
-                    v-if="can.create"
-                    class="justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600"
-                    @click="openCreateModal"
-                >
-                    Nova operaÃ§Ã£o
-                </PrimaryButton>
-                <SecondaryButton
-                    v-if="can.create"
-                    class="justify-center rounded-full px-5 py-3 text-sm normal-case tracking-normal"
-                    @click="openProductModal()"
-                >
-                    Novo produto
-                </SecondaryButton>
+                    <PrimaryButton
+                        v-if="can.create"
+                        class="justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600"
+                        @click="openCreateModal"
+                    >
+                        Nova operação
+                    </PrimaryButton>
+                    <SecondaryButton
+                        v-if="can.create"
+                        class="justify-center rounded-full px-5 py-3 text-sm normal-case tracking-normal"
+                        @click="openProductModal()"
+                    >
+                        Novo produto
+                    </SecondaryButton>
                 </div>
             </div>
         </template>
 
         <div class="bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.16),_transparent_28%),linear-gradient(180deg,_#f8fafc_0%,_#eef6f1_100%)] py-10">
             <div class="mx-auto flex max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
-                <div
-                    v-if="flashSuccess"
-                    class="rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-800"
-                >
+                <div v-if="flashSuccess" class="rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-800">
                     {{ flashSuccess }}
                 </div>
 
                 <section class="grid gap-4 md:grid-cols-4">
                     <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                        <p class="text-sm font-medium text-slate-500">OperaÃ§Ãµes registadas</p>
+                        <p class="text-sm font-medium text-slate-500">Operações registadas</p>
                         <p class="mt-3 text-4xl font-black text-slate-900">{{ summary.total }}</p>
                     </article>
                     <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
@@ -475,7 +358,7 @@ const formatNumber = (value) => {
                         <p class="mt-3 text-4xl font-black text-amber-700">{{ summary.em_curso }}</p>
                     </article>
                     <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                        <p class="text-sm font-medium text-slate-500">ConcluÃ­das</p>
+                        <p class="text-sm font-medium text-slate-500">Concluídas</p>
                         <p class="mt-3 text-4xl font-black text-emerald-700">{{ summary.concluidas }}</p>
                     </article>
                 </section>
@@ -484,7 +367,7 @@ const formatNumber = (value) => {
                     <div class="grid gap-4 md:grid-cols-[1fr_0.85fr_0.85fr_0.85fr_auto]">
                         <div>
                             <InputLabel value="Pesquisar" />
-                            <TextInput v-model="filterState.search" class="mt-2 block w-full rounded-2xl border-slate-200" placeholder="Tipo, estado ou observaÃ§Ãµes" />
+                            <TextInput v-model="filterState.search" class="mt-2 block w-full rounded-2xl border-slate-200" placeholder="Tipo, estado ou observações" />
                         </div>
                         <div>
                             <InputLabel value="Estado" />
@@ -497,9 +380,7 @@ const formatNumber = (value) => {
                             <InputLabel value="Parcela" />
                             <select v-model="filterState.parcela_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
                                 <option value="">Todas</option>
-                                <option v-for="parcela in parcelas" :key="parcela.id" :value="String(parcela.id)">
-                                    {{ parcela.nome }}
-                                </option>
+                                <option v-for="parcela in parcelas" :key="parcela.id" :value="String(parcela.id)">{{ parcela.nome }}</option>
                             </select>
                         </div>
                         <div>
@@ -520,8 +401,8 @@ const formatNumber = (value) => {
                 <section v-if="cadernoCampo.length" class="rounded-[32px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                         <div>
-                            <h2 class="text-xl font-black text-slate-900">Caderno de campo por campanha</h2>
-                            <p class="mt-1 text-sm text-slate-500">Resumo dos tratamentos fitofarmacÃªuticos e preÃ§o de custo dos produtos.</p>
+                            <h2 class="text-xl font-black text-slate-900">Resumo por campanha</h2>
+                            <p class="mt-1 text-sm text-slate-500">Visão rápida dos tratamentos fitofarmacêuticos e do custo de produtos.</p>
                         </div>
                     </div>
                     <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -529,10 +410,84 @@ const formatNumber = (value) => {
                             <p class="text-sm font-semibold text-slate-900">{{ campanha.nome }}</p>
                             <p class="mt-3 text-3xl font-black text-emerald-700">{{ campanha.tratamentos }}</p>
                             <p class="text-xs uppercase tracking-[0.2em] text-emerald-700">tratamentos</p>
-                            <p class="mt-3 text-sm font-semibold text-slate-700">Custo total: {{ formatNumber(campanha.custo_total) }} â‚¬</p>
-                            <p class="mt-1 text-xs text-slate-500">Produtos: {{ formatNumber(campanha.custo_produtos) }} â‚¬</p>
+                            <p class="mt-3 text-sm font-semibold text-slate-700">Custo total: {{ formatNumber(campanha.custo_total) }} €</p>
+                            <p class="mt-1 text-xs text-slate-500">Produtos: {{ formatNumber(campanha.custo_produtos) }} €</p>
                             <p v-if="campanha.custo_por_unidade" class="mt-1 text-xs font-semibold text-emerald-700">
-                                {{ formatNumber(campanha.custo_por_unidade) }} â‚¬/unidade produzida
+                                {{ formatNumber(campanha.custo_por_unidade) }} €/unidade produzida
+                            </p>
+                        </article>
+                    </div>
+                </section>
+
+                <section v-if="stockResumo.length" class="rounded-[32px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                        <div>
+                            <h2 class="text-xl font-black text-slate-900">Stock de produtos</h2>
+                            <p class="mt-1 text-sm text-slate-500">Visão rápida do que tens disponível, do mínimo definido e do valor em stock.</p>
+                        </div>
+
+                        <div class="grid gap-3 sm:grid-cols-3">
+                            <div class="rounded-2xl bg-slate-50 px-4 py-3">
+                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Produtos</p>
+                                <p class="mt-2 text-2xl font-black text-slate-900">{{ stockStats.totalProdutos }}</p>
+                            </div>
+                            <div class="rounded-2xl bg-amber-50 px-4 py-3">
+                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">A rever</p>
+                                <p class="mt-2 text-2xl font-black text-amber-700">{{ stockStats.abaixoMinimo }}</p>
+                            </div>
+                            <div class="rounded-2xl bg-emerald-50 px-4 py-3">
+                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Valor stock</p>
+                                <p class="mt-2 text-2xl font-black text-emerald-700">{{ formatNumber(stockStats.valorTotal) }} €</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        <article
+                            v-for="produto in stockResumo"
+                            :key="produto.id"
+                            class="rounded-3xl border p-4"
+                            :class="produto.abaixo_minimo ? 'border-amber-200 bg-amber-50/70' : 'border-emerald-100 bg-emerald-50/50'"
+                        >
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-900">{{ produto.nome }}</p>
+                                    <p class="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">{{ produto.tipo }}</p>
+                                </div>
+                                <span
+                                    class="rounded-full px-3 py-1 text-xs font-semibold"
+                                    :class="produto.abaixo_minimo ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'"
+                                >
+                                    {{ produto.abaixo_minimo ? 'baixo' : 'ok' }}
+                                </span>
+                            </div>
+
+                            <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                                <div class="rounded-2xl bg-white/80 p-3">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Atual</p>
+                                    <p class="mt-2 text-sm font-bold text-slate-900">
+                                        {{ formatNumber(produto.stock_atual) }} {{ produto.unidade_medida }}
+                                    </p>
+                                </div>
+                                <div class="rounded-2xl bg-white/80 p-3">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Mínimo</p>
+                                    <p class="mt-2 text-sm font-bold text-slate-900">
+                                        {{ formatNumber(produto.stock_minimo) }} {{ produto.unidade_medida }}
+                                    </p>
+                                </div>
+                                <div class="rounded-2xl bg-white/80 p-3">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Preço</p>
+                                    <p class="mt-2 text-sm font-bold text-slate-900">
+                                        {{ produto.custo_unitario !== null ? `${formatNumber(produto.custo_unitario)} €` : '-' }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <p class="mt-4 text-sm text-slate-600">
+                                Valor em stock:
+                                <span class="font-semibold text-slate-900">
+                                    {{ produto.valor_stock !== null ? `${formatNumber(produto.valor_stock)} €` : '-' }}
+                                </span>
                             </p>
                         </article>
                     </div>
@@ -556,17 +511,17 @@ const formatNumber = (value) => {
                                     </span>
                                 </div>
                                 <p class="mt-2 text-sm text-slate-500">
-                                    {{ operacao.terreno_nome || 'Sem terreno' }} Â· {{ operacao.parcela_nome || 'Sem parcela' }}
+                                    {{ operacao.terreno_nome || 'Sem terreno' }} · {{ operacao.parcela_nome || 'Sem parcela' }}
                                 </p>
                             </div>
                             <p class="text-right text-sm font-medium text-slate-500">
-                                {{ operacao.updated_at || 'Sem atualizaÃ§Ã£o' }}
+                                {{ operacao.updated_at || 'Sem atualização' }}
                             </p>
                         </div>
 
                         <div class="mt-6 grid gap-4 sm:grid-cols-2">
                             <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">InÃ­cio</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Início</p>
                                 <p class="mt-2 text-sm text-slate-700">{{ operacao.data_hora_inicio?.replace('T', ' ') || 'Sem data' }}</p>
                             </div>
                             <div class="rounded-3xl bg-slate-50 p-4">
@@ -578,7 +533,7 @@ const formatNumber = (value) => {
                                 <p class="mt-2 text-sm text-slate-700">{{ operacao.cultura_nome || 'Sem cultura' }}</p>
                             </div>
                             <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">ResponsÃ¡vel</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Responsável</p>
                                 <p class="mt-2 text-sm text-slate-700">{{ operacao.operador_nome || 'Sem operador' }}</p>
                             </div>
                             <div class="rounded-3xl bg-slate-50 p-4">
@@ -590,12 +545,12 @@ const formatNumber = (value) => {
                                 <p class="mt-2 text-sm text-slate-700">{{ operacao.campanha_nome || 'Sem campanha' }}</p>
                             </div>
                             <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">MÃ¡quina</p>
-                                <p class="mt-2 text-sm text-slate-700">{{ operacao.maquina_nome || 'Sem mÃ¡quina' }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Máquina</p>
+                                <p class="mt-2 text-sm text-slate-700">{{ operacao.maquina_nome || 'Sem máquina' }}</p>
                             </div>
                             <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">DuraÃ§Ã£o</p>
-                                <p class="mt-2 text-sm text-slate-700">{{ operacao.duracao_horas ? `${formatNumber(operacao.duracao_horas)} h` : 'Sem duraÃ§Ã£o' }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Duração</p>
+                                <p class="mt-2 text-sm text-slate-700">{{ operacao.duracao_horas ? `${formatNumber(operacao.duracao_horas)} h` : 'Sem duração' }}</p>
                             </div>
                         </div>
 
@@ -606,7 +561,7 @@ const formatNumber = (value) => {
                                     <span class="font-semibold">{{ produto.nome }}</span>
                                     <span>
                                         {{ formatNumber(produto.quantidade) }} {{ produto.unidade_medida }}
-                                        <span v-if="produto.custo_total"> Â· {{ formatNumber(produto.custo_total) }} â‚¬</span>
+                                        <span v-if="produto.custo_total"> · {{ formatNumber(produto.custo_total) }} €</span>
                                     </span>
                                 </div>
                             </div>
@@ -614,13 +569,13 @@ const formatNumber = (value) => {
 
                         <div class="mt-5 rounded-3xl bg-amber-50/50 p-4">
                             <p class="text-sm leading-7 text-slate-600">
-                                {{ operacao.observacoes || 'Sem observaÃ§Ãµes para esta operaÃ§Ã£o.' }}
+                                {{ operacao.observacoes || 'Sem observações para esta operação.' }}
                             </p>
                         </div>
 
                         <div class="mt-6 flex flex-wrap gap-3">
                             <Link
-                                :href="route('app.parcelas.index', { terreno_id: operacao.parcela_id ? undefined : undefined, search: operacao.parcela_nome || undefined })"
+                                :href="route('app.parcelas.index', { search: operacao.parcela_nome || undefined })"
                                 class="inline-flex items-center rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                             >
                                 Ver parcela
@@ -643,34 +598,18 @@ const formatNumber = (value) => {
                     </article>
                 </section>
 
-                <section
-                    v-if="!operacoes.data.length"
-                    class="rounded-[32px] border border-dashed border-slate-300 bg-white/70 px-6 py-12 text-center text-sm leading-7 text-slate-600"
-                >
-                    Nenhuma operaÃ§Ã£o encontrada com os filtros atuais.
+                <section v-if="!operacoes.data.length" class="rounded-[32px] border border-dashed border-slate-300 bg-white/70 px-6 py-12 text-center text-sm leading-7 text-slate-600">
+                    Nenhuma operação encontrada com os filtros atuais.
                 </section>
 
-                <section
-                    v-if="operacoes.links?.length > 3"
-                    class="flex flex-wrap items-center gap-2"
-                >
-                    <component
-                        :is="link.url ? Link : 'span'"
-                        v-for="link in operacoes.links"
-                        :key="`${link.label}-${link.url}`"
-                        :href="link.url || undefined"
-                        class="rounded-full px-4 py-2 text-sm transition"
-                        :class="link.active ? 'bg-emerald-700 text-white' : 'bg-white text-slate-600 shadow hover:bg-slate-50'"
-                        v-html="link.label"
-                    />
-                </section>
+                <Pagination v-if="operacoes.links?.length > 3" :links="operacoes.links" />
             </div>
         </div>
 
         <Modal :show="createModalOpen" max-width="2xl" @close="closeCreateModal">
             <div class="p-6 sm:p-8">
-                <h2 class="text-2xl font-black text-slate-900">Nova operaÃ§Ã£o</h2>
-                <p class="mt-2 text-sm text-slate-500">Regista uma atividade agrÃ­cola com recursos e calendÃ¡rio associados.</p>
+                <h2 class="text-2xl font-black text-slate-900">Nova operação</h2>
+                <p class="mt-2 text-sm text-slate-500">Regista uma atividade agrícola com recursos, produtos e custos associados.</p>
 
                 <div class="mt-6 space-y-5">
                     <div v-if="createErrorMessages.length" class="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -681,6 +620,7 @@ const formatNumber = (value) => {
                     </div>
 
                     <OperacaoForm
+                        :key="createModalOpen ? 'create-open' : 'create-closed'"
                         :form="createForm"
                         :parcelas="parcelas"
                         :culturas="culturas"
@@ -703,7 +643,7 @@ const formatNumber = (value) => {
 
         <Modal :show="!!editingOperacao" max-width="2xl" @close="closeEditModal">
             <div class="p-6 sm:p-8">
-                <h2 class="text-2xl font-black text-slate-900">Editar operaÃ§Ã£o</h2>
+                <h2 class="text-2xl font-black text-slate-900">Editar operação</h2>
                 <p class="mt-2 text-sm text-slate-500">Atualiza os dados operacionais desta atividade.</p>
 
                 <div class="mt-6 space-y-5">
@@ -715,6 +655,7 @@ const formatNumber = (value) => {
                     </div>
 
                     <OperacaoForm
+                        :key="editingOperacao ? `edit-${editingOperacao.id}` : 'edit-empty'"
                         :form="editForm"
                         :parcelas="parcelas"
                         :culturas="culturas"
@@ -740,59 +681,69 @@ const formatNumber = (value) => {
         <Modal :show="productModalOpen" max-width="2xl" @close="closeProductModal">
             <div class="p-6 sm:p-8">
                 <h2 class="text-2xl font-black text-slate-900">Novo produto</h2>
-                <p class="mt-2 text-sm text-slate-500">Cria produtos para usar nas operaÃ§Ãµes, como fitofÃ¡rmacos, fertilizantes e sementes.</p>
+                <p class="mt-2 text-sm text-slate-500">Cria produtos para usar nas operações, como fitofármacos, fertilizantes e sementes.</p>
 
                 <form class="mt-6 grid gap-4 sm:grid-cols-2" @submit.prevent="submitProduct">
                     <div v-if="productErrorMessages.length" class="sm:col-span-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                        <p class="font-semibold">NÃ£o foi possÃ­vel guardar o produto. RevÃª estes pontos:</p>
+                        <p class="font-semibold">Não foi possível guardar o produto. Revê estes pontos:</p>
                         <ul class="mt-2 list-disc space-y-1 pl-5">
                             <li v-for="message in productErrorMessages" :key="message">{{ message }}</li>
                         </ul>
                     </div>
+
                     <div>
                         <InputLabel value="Nome" />
                         <TextInput v-model="productForm.nome" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="productForm.errors.nome" />
                     </div>
+
                     <div>
                         <InputLabel value="Tipo" />
                         <select v-model="productForm.tipo" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
-                            <option value="fitofarmaco">FitofÃ¡rmaco</option>
+                            <option value="fitofarmaco">Fitofármaco</option>
                             <option value="fertilizante">Fertilizante</option>
                             <option value="semente">Semente</option>
                             <option value="planta">Planta</option>
-                            <option value="combustivel">CombustÃ­vel</option>
+                            <option value="combustivel">Combustível</option>
                             <option value="outro">Outro</option>
                         </select>
                         <InputError class="mt-2" :message="productForm.errors.tipo" />
                     </div>
+
                     <div>
                         <InputLabel value="Unidade" />
                         <TextInput v-model="productForm.unidade_medida" class="mt-2 block w-full rounded-2xl" placeholder="kg, L, un" />
                         <InputError class="mt-2" :message="productForm.errors.unidade_medida" />
                     </div>
+
                     <div>
-                        <InputLabel value="Custo unitÃ¡rio" />
+                        <InputLabel value="Custo unitário" />
                         <TextInput v-model="productForm.custo_unitario" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="productForm.errors.custo_unitario" />
                     </div>
+
                     <div class="sm:col-span-2">
-                        <InputLabel value="CÃ³digo interno" />
+                        <InputLabel value="Código interno" />
                         <TextInput v-model="productForm.codigo_interno" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="productForm.errors.codigo_interno" />
                     </div>
+
                     <div class="sm:col-span-2">
-                        <InputLabel value="N.Âº AV/APV/ACP/AE" />
+                        <InputLabel value="N.º AV/APV/ACP/AE" />
                         <TextInput v-model="productForm.numero_autorizacao_dgav" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="productForm.errors.numero_autorizacao_dgav" />
                     </div>
+
                     <div class="sm:col-span-2">
-                        <InputLabel value="DescriÃ§Ã£o" />
+                        <InputLabel value="Descrição" />
                         <textarea v-model="productForm.descricao" rows="3" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500" />
                         <InputError class="mt-2" :message="productForm.errors.descricao" />
                     </div>
+
                     <div class="sm:col-span-2 flex justify-end gap-3">
-                        <SecondaryButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="closeProductModal">Cancelar</SecondaryButton>
+                        <SecondaryButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="closeProductModal">
+                            Cancelar
+                        </SecondaryButton>
                         <PrimaryButton class="rounded-full bg-emerald-700 px-4 py-2 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600" :disabled="productForm.processing">
                             Guardar produto
                         </PrimaryButton>

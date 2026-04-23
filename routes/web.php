@@ -12,6 +12,7 @@ use App\Http\Controllers\CampanhaController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\StockManagementController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -63,6 +64,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/maquinaria/revisoes', [MaquinariaManagementController::class, 'storeRevisao'])->name('app.revisoes.store');
     Route::patch('/maquinaria/revisoes/{revisao}', [MaquinariaManagementController::class, 'updateRevisao'])->name('app.revisoes.update');
     Route::delete('/maquinaria/revisoes/{revisao}', [MaquinariaManagementController::class, 'destroyRevisao'])->name('app.revisoes.destroy');
+    Route::get('/stock', [StockManagementController::class, 'index'])->name('app.stock.index');
+    Route::post('/stock/produtos', [StockManagementController::class, 'storeProduto'])->name('app.stock.produtos.store');
+    Route::patch('/stock/produtos/{produto}', [StockManagementController::class, 'update'])->name('app.stock.update');
     Route::get('/mao-obra', [MaoObraManagementController::class, 'index'])->name('app.mao-obra.index');
     Route::post('/mao-obra/operarios', [MaoObraManagementController::class, 'storeFuncionario'])->name('app.funcionarios.store');
     Route::patch('/mao-obra/operarios/{funcionario}', [MaoObraManagementController::class, 'updateFuncionario'])->name('app.funcionarios.update');

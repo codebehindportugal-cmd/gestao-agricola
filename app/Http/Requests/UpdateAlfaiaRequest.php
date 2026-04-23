@@ -6,17 +6,11 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateAlfaiaRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     */
     public function rules(): array
     {
         return [
@@ -26,6 +20,7 @@ class UpdateAlfaiaRequest extends FormRequest
             'descricao' => 'nullable|string',
             'comprimento' => 'nullable|numeric|min:0.01',
             'largura' => 'nullable|numeric|min:0.01',
+            'consumo_agua_ha' => 'nullable|numeric|min:0',
             'estado' => 'in:operacional,danificada,retirada',
             'observacoes' => 'nullable|string',
         ];
