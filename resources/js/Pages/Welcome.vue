@@ -52,13 +52,6 @@ defineProps({
                         >
                             Entrar
                         </Link>
-                        <Link
-                            v-if="canRegister"
-                            :href="route('register')"
-                            class="rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-slate-950/10 transition hover:bg-emerald-50"
-                        >
-                            Criar conta
-                        </Link>
                     </template>
                 </nav>
             </header>
