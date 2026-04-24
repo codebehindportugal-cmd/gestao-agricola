@@ -15,11 +15,13 @@ const props = defineProps({
     filters: { type: Object, default: () => ({}) },
     summary: { type: Object, required: true },
     tipoOptions: { type: Array, default: () => [] },
+    estabelecimentos: { type: Array, default: () => [] },
 });
 
 const page = usePage();
 const flashSuccess = computed(() => page.props.flash?.success);
 const productModalOpen = ref(false);
+const estabelecimentoModalOpen = ref(false);
 const stockModalOpen = ref(false);
 const editingProduto = ref(null);
 const productTypeOptions = computed(() => {
@@ -66,9 +68,15 @@ const productForm = useForm({
     quantidade_inicial: '',
     codigo_interno: '',
     numero_autorizacao_dgav: '',
+    estabelecimento_venda_id: '',
     estabelecimento_venda_nome: '',
     estabelecimento_venda_autorizacao: '',
     descricao: '',
+});
+
+const estabelecimentoForm = useForm({
+    nome: '',
+    numero_autorizacao: '',
 });
 
 const stockForm = useForm({
@@ -82,15 +90,35 @@ const stockForm = useForm({
 
 const productErrors = computed(() => Object.values(productForm.errors));
 const stockErrors = computed(() => Object.values(stockForm.errors));
+const estabelecimentoErrors = computed(() => Object.values(estabelecimentoForm.errors));
 
 const openProductModal = () => {
     productForm.reset();
     productForm.clearErrors();
     productForm.tipo = 'fitofarmaco';
     productForm.unidade_medida = 'L';
+    productForm.estabelecimento_venda_id = '';
     productForm.estabelecimento_venda_nome = '';
     productForm.estabelecimento_venda_autorizacao = '';
     productModalOpen.value = true;
+};
+
+const openEstabelecimentoModal = () => {
+    estabelecimentoForm.reset();
+    estabelecimentoForm.clearErrors();
+    estabelecimentoModalOpen.value = true;
+};
+
+const closeEstabelecimentoModal = () => {
+    estabelecimentoModalOpen.value = false;
+    estabelecimentoForm.clearErrors();
+};
+
+const submitEstabelecimento = () => {
+    estabelecimentoForm.post(route('app.stock.estabelecimentos.store', currentQuery.value), {
+        preserveScroll: true,
+        onSuccess: () => closeEstabelecimentoModal(),
+    });
 };
 
 watch(() => productForm.tipo, (tipo) => {
@@ -168,6 +196,12 @@ const formatNumber = (value) => new Intl.NumberFormat('pt-PT', {
                 >
                     Novo produto
                 </PrimaryButton>
+                <SecondaryButton
+                    class="justify-center rounded-full px-5 py-3 text-sm normal-case tracking-normal"
+                    @click="openEstabelecimentoModal"
+                >
+                    Novo estabelecimento
+                </SecondaryButton>
             </div>
         </template>
 
@@ -336,13 +370,13 @@ const formatNumber = (value) => new Intl.NumberFormat('pt-PT', {
                     </div>
                     <div v-if="productForm.tipo === 'fitofarmaco'" class="sm:col-span-2">
                         <InputLabel value="Estabelecimento de venda" />
-                        <TextInput v-model="productForm.estabelecimento_venda_nome" class="mt-2 block w-full rounded-2xl" />
-                        <InputError class="mt-2" :message="productForm.errors.estabelecimento_venda_nome" />
-                    </div>
-                    <div v-if="productForm.tipo === 'fitofarmaco'" class="sm:col-span-2">
-                        <InputLabel value="N.º autorização do estabelecimento" />
-                        <TextInput v-model="productForm.estabelecimento_venda_autorizacao" class="mt-2 block w-full rounded-2xl" />
-                        <InputError class="mt-2" :message="productForm.errors.estabelecimento_venda_autorizacao" />
+                        <select v-model="productForm.estabelecimento_venda_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                            <option value="">Selecionar estabelecimento</option>
+                            <option v-for="estabelecimento in estabelecimentos" :key="estabelecimento.id" :value="String(estabelecimento.id)">
+                                {{ estabelecimento.nome }}{{ estabelecimento.numero_autorizacao ? ` - ${estabelecimento.numero_autorizacao}` : '' }}
+                            </option>
+                        </select>
+                        <InputError class="mt-2" :message="productForm.errors.estabelecimento_venda_id" />
                     </div>
                     <div class="sm:col-span-2">
                         <InputLabel value="Descrição" />
@@ -353,6 +387,37 @@ const formatNumber = (value) => new Intl.NumberFormat('pt-PT', {
                         <SecondaryButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="closeProductModal">Cancelar</SecondaryButton>
                         <PrimaryButton class="rounded-full bg-emerald-700 px-4 py-2 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600" :disabled="productForm.processing">
                             Guardar produto
+                        </PrimaryButton>
+                    </div>
+                </form>
+            </div>
+        </Modal>
+
+        <Modal :show="estabelecimentoModalOpen" max-width="lg" @close="closeEstabelecimentoModal">
+            <div class="p-6 sm:p-8">
+                <h2 class="text-2xl font-black text-slate-900">Novo estabelecimento</h2>
+
+                <form class="mt-6 grid gap-4" @submit.prevent="submitEstabelecimento">
+                    <div v-if="estabelecimentoErrors.length" class="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                        <ul class="list-disc space-y-1 pl-5">
+                            <li v-for="message in estabelecimentoErrors" :key="message">{{ message }}</li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <InputLabel value="Nome" />
+                        <TextInput v-model="estabelecimentoForm.nome" class="mt-2 block w-full rounded-2xl" />
+                        <InputError class="mt-2" :message="estabelecimentoForm.errors.nome" />
+                    </div>
+                    <div>
+                        <InputLabel value="N.º autorização" />
+                        <TextInput v-model="estabelecimentoForm.numero_autorizacao" class="mt-2 block w-full rounded-2xl" />
+                        <InputError class="mt-2" :message="estabelecimentoForm.errors.numero_autorizacao" />
+                    </div>
+                    <div class="flex justify-end gap-3">
+                        <SecondaryButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="closeEstabelecimentoModal">Cancelar</SecondaryButton>
+                        <PrimaryButton class="rounded-full bg-emerald-700 px-4 py-2 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600" :disabled="estabelecimentoForm.processing">
+                            Guardar
                         </PrimaryButton>
                     </div>
                 </form>

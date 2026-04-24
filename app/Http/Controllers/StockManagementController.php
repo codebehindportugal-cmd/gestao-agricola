@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Produto;
+use App\Models\EstabelecimentoVenda;
 use App\Models\Stock;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -88,6 +89,10 @@ class StockManagementController extends Controller
                 ->unique()
                 ->sort()
                 ->values(),
+            'estabelecimentos' => EstabelecimentoVenda::query()
+                ->where('ativo', true)
+                ->orderBy('nome')
+                ->get(['id', 'nome', 'numero_autorizacao']),
         ]);
     }
 
@@ -102,12 +107,17 @@ class StockManagementController extends Controller
             'quantidade_inicial' => ['nullable', 'numeric', 'min:0'],
             'codigo_interno' => ['nullable', 'string', 'max:255', 'unique:produtos,codigo_interno'],
             'numero_autorizacao_dgav' => ['nullable', 'string', 'max:255'],
+            'estabelecimento_venda_id' => ['nullable', 'exists:estabelecimentos_venda,id'],
             'estabelecimento_venda_nome' => ['nullable', 'string', 'max:255'],
             'estabelecimento_venda_autorizacao' => ['nullable', 'string', 'max:255'],
             'descricao' => ['nullable', 'string'],
         ]);
 
         DB::transaction(function () use ($data) {
+            $estabelecimento = empty($data['estabelecimento_venda_id'])
+                ? null
+                : EstabelecimentoVenda::query()->find($data['estabelecimento_venda_id']);
+
             $produto = Produto::query()->create([
                 'nome' => $data['nome'],
                 'tipo' => $this->normalizeTipo($data['tipo']),
@@ -116,8 +126,9 @@ class StockManagementController extends Controller
                 'stock_minimo' => $data['stock_minimo'] === '' ? 0 : (int) round((float) ($data['stock_minimo'] ?? 0)),
                 'codigo_interno' => $data['codigo_interno'] ?? null,
                 'numero_autorizacao_dgav' => $data['numero_autorizacao_dgav'] ?? null,
-                'estabelecimento_venda_nome' => $data['estabelecimento_venda_nome'] ?? null,
-                'estabelecimento_venda_autorizacao' => $data['estabelecimento_venda_autorizacao'] ?? null,
+                'estabelecimento_venda_id' => $estabelecimento?->id,
+                'estabelecimento_venda_nome' => $estabelecimento?->nome ?? ($data['estabelecimento_venda_nome'] ?? null),
+                'estabelecimento_venda_autorizacao' => $estabelecimento?->numero_autorizacao ?? ($data['estabelecimento_venda_autorizacao'] ?? null),
                 'descricao' => $data['descricao'] ?? null,
             ]);
 
@@ -136,6 +147,23 @@ class StockManagementController extends Controller
         return redirect()
             ->route('app.stock.index', $this->redirectFilters($request))
             ->with('success', 'Produto criado no stock com sucesso.');
+    }
+
+    public function storeEstabelecimento(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'nome' => ['required', 'string', 'max:255'],
+            'numero_autorizacao' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        EstabelecimentoVenda::query()->firstOrCreate(
+            ['nome' => $data['nome']],
+            ['numero_autorizacao' => $data['numero_autorizacao'] ?? null, 'ativo' => true],
+        );
+
+        return redirect()
+            ->route('app.stock.index', $this->redirectFilters($request))
+            ->with('success', 'Estabelecimento guardado com sucesso.');
     }
 
     public function update(Request $request, Produto $produto): RedirectResponse

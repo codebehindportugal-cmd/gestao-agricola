@@ -18,6 +18,7 @@ class Funcionario extends Model
         'email',
         'telefone',
         'cargo',
+        'aplicador_numero_autorizacao',
         'data_admissao',
         'data_saida',
         'tipo_contrato',

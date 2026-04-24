@@ -21,6 +21,7 @@ class Produto extends Model
         'numero_autorizacao_dgav',
         'estabelecimento_venda_nome',
         'estabelecimento_venda_autorizacao',
+        'estabelecimento_venda_id',
         'fornecedor_id',
         'custo_unitario',
         'unidade_medida',
@@ -60,6 +61,11 @@ class Produto extends Model
                 'observacoes',
             )
             ->withTimestamps();
+    }
+
+    public function estabelecimentoVenda(): BelongsTo
+    {
+        return $this->belongsTo(EstabelecimentoVenda::class, 'estabelecimento_venda_id');
     }
 
     public function stocks(): HasMany

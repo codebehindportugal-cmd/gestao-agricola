@@ -42,6 +42,7 @@ const funcionarioBase = {
     email: '',
     telefone: '',
     cargo: '',
+    aplicador_numero_autorizacao: '',
     data_admissao: '',
     data_saida: '',
     tipo_contrato: 'permanente',
@@ -109,6 +110,7 @@ const openEditFuncionario = (funcionario) => {
         email: funcionario.email ?? '',
         telefone: funcionario.telefone ?? '',
         cargo: funcionario.cargo ?? '',
+        aplicador_numero_autorizacao: funcionario.aplicador_numero_autorizacao ?? '',
         data_admissao: funcionario.data_admissao ?? '',
         data_saida: funcionario.data_saida ?? '',
         tipo_contrato: funcionario.tipo_contrato ?? 'permanente',
@@ -481,6 +483,11 @@ const formatCurrency = (value) => {
                         <InputLabel value="Cargo / funÃ§Ã£o" />
                         <TextInput v-model="funcionarioForm.cargo" class="mt-2 block w-full rounded-2xl" placeholder="Ex: Podador, Tratorista" />
                         <InputError class="mt-2" :message="funcionarioForm.errors.cargo" />
+                    </div>
+                    <div>
+                        <InputLabel value="N.º autorização do aplicador" />
+                        <TextInput v-model="funcionarioForm.aplicador_numero_autorizacao" class="mt-2 block w-full rounded-2xl" />
+                        <InputError class="mt-2" :message="funcionarioForm.errors.aplicador_numero_autorizacao" />
                     </div>
                     <div>
                         <InputLabel value="Email" />

@@ -46,6 +46,7 @@ class MaoObraManagementController extends Controller
                 'email' => $funcionario->email,
                 'telefone' => $funcionario->telefone,
                 'cargo' => $funcionario->cargo,
+                'aplicador_numero_autorizacao' => $funcionario->aplicador_numero_autorizacao,
                 'data_admissao' => optional($funcionario->data_admissao)?->format('Y-m-d'),
                 'data_saida' => optional($funcionario->data_saida)?->format('Y-m-d'),
                 'tipo_contrato' => $funcionario->tipo_contrato,
@@ -117,12 +118,13 @@ class MaoObraManagementController extends Controller
             'equipaStatusOptions' => ['ativa', 'inativa'],
             'funcionarioOptions' => Funcionario::query()
                 ->orderBy('nome')
-                ->get(['id', 'nome', 'cargo', 'status'])
+                ->get(['id', 'nome', 'cargo', 'status', 'aplicador_numero_autorizacao'])
                 ->map(fn (Funcionario $funcionario) => [
                     'id' => $funcionario->id,
                     'nome' => $funcionario->nome,
                     'cargo' => $funcionario->cargo,
                     'status' => $funcionario->status,
+                    'aplicador_numero_autorizacao' => $funcionario->aplicador_numero_autorizacao,
                 ]),
         ]);
     }

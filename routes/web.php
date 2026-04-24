@@ -53,6 +53,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/campanhas/{campanha}/exportar', [CampanhaController::class, 'exportar'])->name('app.campanhas.exportar');
     Route::get('/operacoes', [OperacaoManagementController::class, 'index'])->name('app.operacoes.index');
     Route::post('/operacoes', [OperacaoManagementController::class, 'store'])->name('app.operacoes.store');
+    Route::post('/operacoes/exploracao-dados', [OperacaoManagementController::class, 'updateExploracaoDados'])->name('app.operacoes.exploracao-dados.update');
     Route::post('/operacoes/produtos', [OperacaoManagementController::class, 'storeProduto'])->name('app.operacoes.produtos.store');
     Route::patch('/operacoes/{operacao}', [OperacaoManagementController::class, 'update'])->name('app.operacoes.update');
     Route::delete('/operacoes/{operacao}', [OperacaoManagementController::class, 'destroy'])->name('app.operacoes.destroy');
@@ -68,6 +69,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/maquinaria/revisoes/{revisao}', [MaquinariaManagementController::class, 'destroyRevisao'])->name('app.revisoes.destroy');
     Route::get('/stock', [StockManagementController::class, 'index'])->name('app.stock.index');
     Route::post('/stock/produtos', [StockManagementController::class, 'storeProduto'])->name('app.stock.produtos.store');
+    Route::post('/stock/estabelecimentos', [StockManagementController::class, 'storeEstabelecimento'])->name('app.stock.estabelecimentos.store');
     Route::patch('/stock/produtos/{produto}', [StockManagementController::class, 'update'])->name('app.stock.update');
     Route::get('/mao-obra', [MaoObraManagementController::class, 'index'])->name('app.mao-obra.index');
     Route::post('/mao-obra/operarios', [MaoObraManagementController::class, 'storeFuncionario'])->name('app.funcionarios.store');

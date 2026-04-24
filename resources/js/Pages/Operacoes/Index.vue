@@ -30,12 +30,14 @@ const props = defineProps({
     cadernoCampo: { type: Array, default: () => [] },
     produtos: { type: Array, default: () => [] },
     stockResumo: { type: Array, default: () => [] },
+    exploracaoDados: { type: Object, default: () => ({}) },
 });
 
 const page = usePage();
 const flashSuccess = computed(() => page.props.flash?.success);
 const createModalOpen = ref(false);
 const productModalOpen = ref(false);
+const exploracaoModalOpen = ref(false);
 const editingOperacao = ref(null);
 
 const filterState = reactive({
@@ -86,10 +88,16 @@ const productForm = useForm({
     estabelecimento_venda_autorizacao: '',
     descricao: '',
 });
+const exploracaoForm = useForm({
+    produtor_nome: props.exploracaoDados.produtor_nome ?? '',
+    concelho: props.exploracaoDados.concelho ?? '',
+    freguesia: props.exploracaoDados.freguesia ?? '',
+});
 
 const createErrorMessages = computed(() => Object.values(createForm.errors));
 const editErrorMessages = computed(() => Object.values(editForm.errors));
 const productErrorMessages = computed(() => Object.values(productForm.errors));
+const exploracaoErrorMessages = computed(() => Object.values(exploracaoForm.errors));
 
 const currentQuery = computed(() => ({
     search: filterState.search || undefined,
@@ -194,6 +202,29 @@ const openProductModal = (type = 'fitofarmaco') => {
 const closeProductModal = () => {
     productModalOpen.value = false;
     productForm.clearErrors();
+};
+
+const openExploracaoModal = () => {
+    exploracaoForm.defaults({
+        produtor_nome: props.exploracaoDados.produtor_nome ?? '',
+        concelho: props.exploracaoDados.concelho ?? '',
+        freguesia: props.exploracaoDados.freguesia ?? '',
+    });
+    exploracaoForm.reset();
+    exploracaoForm.clearErrors();
+    exploracaoModalOpen.value = true;
+};
+
+const closeExploracaoModal = () => {
+    exploracaoModalOpen.value = false;
+    exploracaoForm.clearErrors();
+};
+
+const submitExploracao = () => {
+    exploracaoForm.post(route('app.operacoes.exploracao-dados.update', currentQuery.value), {
+        preserveScroll: true,
+        onSuccess: () => closeExploracaoModal(),
+    });
 };
 
 const normalizePayload = (form) => form.transform((data) => ({
@@ -350,6 +381,13 @@ const stockStats = computed(() => ({
                         @click="openProductModal()"
                     >
                         Novo produto
+                    </SecondaryButton>
+                    <SecondaryButton
+                        v-if="can.create"
+                        class="justify-center rounded-full px-5 py-3 text-sm normal-case tracking-normal"
+                        @click="openExploracaoModal"
+                    >
+                        Dados exploração
                     </SecondaryButton>
                 </div>
             </div>
@@ -645,6 +683,7 @@ const stockStats = computed(() => ({
                         :funcionarios="funcionarios"
                         :equipas="equipas"
                         :produtos="produtos"
+                        :exploracao-dados="exploracaoDados"
                         :tipo-options="tipoOptions"
                         :estado-options="estadoOptions"
                         allow-multiple-parcelas
@@ -681,6 +720,7 @@ const stockStats = computed(() => ({
                         :funcionarios="funcionarios"
                         :equipas="equipas"
                         :produtos="produtos"
+                        :exploracao-dados="exploracaoDados"
                         :tipo-options="tipoOptions"
                         :estado-options="estadoOptions"
                         submit-label="Atualizar operação"
@@ -690,6 +730,42 @@ const stockStats = computed(() => ({
                         @open-product-modal="openProductModal"
                     />
                 </div>
+            </div>
+        </Modal>
+
+        <Modal :show="exploracaoModalOpen" max-width="lg" @close="closeExploracaoModal">
+            <div class="p-6 sm:p-8">
+                <h2 class="text-2xl font-black text-slate-900">Dados da exploração</h2>
+
+                <form class="mt-6 grid gap-4" @submit.prevent="submitExploracao">
+                    <div v-if="exploracaoErrorMessages.length" class="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                        <ul class="list-disc space-y-1 pl-5">
+                            <li v-for="message in exploracaoErrorMessages" :key="message">{{ message }}</li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <InputLabel value="Produtor / dono da exploração" />
+                        <TextInput v-model="exploracaoForm.produtor_nome" class="mt-2 block w-full rounded-2xl" />
+                        <InputError class="mt-2" :message="exploracaoForm.errors.produtor_nome" />
+                    </div>
+                    <div>
+                        <InputLabel value="Concelho" />
+                        <TextInput v-model="exploracaoForm.concelho" class="mt-2 block w-full rounded-2xl" />
+                        <InputError class="mt-2" :message="exploracaoForm.errors.concelho" />
+                    </div>
+                    <div>
+                        <InputLabel value="Freguesia" />
+                        <TextInput v-model="exploracaoForm.freguesia" class="mt-2 block w-full rounded-2xl" />
+                        <InputError class="mt-2" :message="exploracaoForm.errors.freguesia" />
+                    </div>
+                    <div class="flex justify-end gap-3">
+                        <SecondaryButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="closeExploracaoModal">Cancelar</SecondaryButton>
+                        <PrimaryButton class="rounded-full bg-emerald-700 px-4 py-2 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600" :disabled="exploracaoForm.processing">
+                            Guardar
+                        </PrimaryButton>
+                    </div>
+                </form>
             </div>
         </Modal>
 

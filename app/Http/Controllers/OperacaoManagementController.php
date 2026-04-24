@@ -9,6 +9,7 @@ use App\Models\Campanha;
 use App\Models\Cultura;
 use App\Models\Funcionario;
 use App\Models\Equipa;
+use App\Models\ExploracaoSetting;
 use App\Models\Maquina;
 use App\Models\Operacao;
 use App\Models\Parcela;
@@ -40,7 +41,7 @@ class OperacaoManagementController extends Controller
                 'maquina:id,nome,tipo,consumo_combustivel',
                 'alfaia:id,nome',
                 'operador:id,name',
-                'funcionario:id,nome,cargo,status',
+                'funcionario:id,nome,cargo,status,aplicador_numero_autorizacao',
                 'equipa:id,nome,status',
                 'produtos:id,nome,tipo,unidade_medida,custo_unitario,numero_autorizacao_dgav,estabelecimento_venda_nome,estabelecimento_venda_autorizacao',
             ])
@@ -137,11 +138,13 @@ class OperacaoManagementController extends Controller
             'parcelas' => Parcela::query()
                 ->with('terreno:id,nome')
                 ->orderBy('nome')
-                ->get(['id', 'terreno_id', 'nome'])
+                ->get(['id', 'terreno_id', 'nome', 'area_total', 'area_util'])
                 ->map(fn (Parcela $parcela) => [
                     'id' => $parcela->id,
                     'nome' => $parcela->nome,
                     'terreno_nome' => $parcela->terreno?->nome,
+                    'area_total' => $parcela->area_total,
+                    'area_util' => $parcela->area_util,
                 ]),
             'culturas' => Cultura::query()
                 ->orderBy('nome')
@@ -163,11 +166,12 @@ class OperacaoManagementController extends Controller
             'funcionarios' => Funcionario::query()
                 ->where('status', 'ativo')
                 ->orderBy('nome')
-                ->get(['id', 'nome', 'cargo'])
+                ->get(['id', 'nome', 'cargo', 'aplicador_numero_autorizacao'])
                 ->map(fn (Funcionario $funcionario) => [
                     'id' => $funcionario->id,
                     'nome' => $funcionario->nome,
                     'cargo' => $funcionario->cargo,
+                    'aplicador_numero_autorizacao' => $funcionario->aplicador_numero_autorizacao,
                 ]),
             'produtos' => Produto::query()
                 ->orderBy('nome')
@@ -215,6 +219,7 @@ class OperacaoManagementController extends Controller
                         : round((float) ($produto->stock_atual ?? 0) * (float) $produto->custo_unitario, 2),
                 ]),
             'cadernoCampo' => $this->cadernoCampoResumo(),
+            'exploracaoDados' => $this->exploracaoDados(),
         ]);
     }
 
@@ -332,6 +337,23 @@ class OperacaoManagementController extends Controller
             ->with('success', 'Produto criado com sucesso.');
     }
 
+    public function updateExploracaoDados(Request $request): RedirectResponse
+    {
+        $this->authorize('create', Operacao::class);
+
+        $data = $request->validate([
+            'produtor_nome' => ['nullable', 'string', 'max:255'],
+            'concelho' => ['nullable', 'string', 'max:255'],
+            'freguesia' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        ExploracaoSetting::current()->update($data);
+
+        return redirect()
+            ->route('app.operacoes.index', $this->redirectFilters($request))
+            ->with('success', 'Dados da exploração atualizados.');
+    }
+
     private function redirectFilters(Request $request): array
     {
         return array_filter($request->only(['search', 'estado', 'parcela_id', 'tipo']));
@@ -374,8 +396,37 @@ class OperacaoManagementController extends Controller
             $data['data_hora_fim'] ?? null,
         );
         $data['combustivel_gasto_l'] = $this->calculateFuelUsage($data);
+        $data = $this->fillDgavDefaults($data);
 
         return $data;
+    }
+
+    private function fillDgavDefaults(array $data): array
+    {
+        $exploracao = ExploracaoSetting::current();
+
+        $data['produtor_nome'] = $data['produtor_nome'] ?: $exploracao->produtor_nome;
+        $data['exploracao_concelho'] = $data['exploracao_concelho'] ?: $exploracao->concelho;
+        $data['exploracao_freguesia'] = $data['exploracao_freguesia'] ?: $exploracao->freguesia;
+
+        if (! empty($data['funcionario_id'])) {
+            $funcionario = Funcionario::query()->find($data['funcionario_id'], ['id', 'nome', 'aplicador_numero_autorizacao']);
+            $data['aplicador_nome'] = $data['aplicador_nome'] ?: $funcionario?->nome;
+            $data['aplicador_numero_autorizacao'] = $data['aplicador_numero_autorizacao'] ?: $funcionario?->aplicador_numero_autorizacao;
+        }
+
+        return $data;
+    }
+
+    private function exploracaoDados(): array
+    {
+        $exploracao = ExploracaoSetting::current();
+
+        return [
+            'produtor_nome' => $exploracao->produtor_nome,
+            'concelho' => $exploracao->concelho,
+            'freguesia' => $exploracao->freguesia,
+        ];
     }
 
     private function calculateFuelUsage(array $data): ?float

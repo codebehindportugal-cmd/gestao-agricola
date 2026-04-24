@@ -18,6 +18,7 @@ const props = defineProps({
     funcionarios: { type: Array, default: () => [] },
     equipas: { type: Array, default: () => [] },
     produtos: { type: Array, default: () => [] },
+    exploracaoDados: { type: Object, default: () => ({}) },
     tipoOptions: { type: Array, default: () => [] },
     estadoOptions: { type: Array, default: () => [] },
     allowMultipleParcelas: { type: Boolean, default: false },
@@ -139,11 +140,24 @@ const updateProductDefaults = (form, index) => {
     row.custo_unitario = produto.custo_unitario?.toString() || '';
     row.estabelecimento_venda_nome = produto.estabelecimento_venda_nome || '';
     row.estabelecimento_venda_autorizacao = produto.estabelecimento_venda_autorizacao || '';
+
+    if (isTratamentoFitossanitario(form.tipo) && !row.area_tratada && selectedParcelaArea.value) {
+        row.area_tratada = selectedParcelaArea.value.toString();
+    }
 };
 
 const selectedProduct = (produtoId) => props.produtos.find((item) => String(item.id) === String(produtoId)) ?? null;
 const selectedMachine = computed(() => props.maquinas.find((item) => String(item.id) === String(props.form.maquina_id)) ?? null);
 const selectedMachineIsVehicle = computed(() => vehicleTypes.includes(normalizeText(selectedMachine.value?.tipo)));
+const selectedFuncionario = computed(() => props.funcionarios.find((item) => String(item.id) === String(props.form.funcionario_id)) ?? null);
+const selectedParcela = computed(() => {
+    const parcelaId = props.allowMultipleParcelas
+        ? (props.form.parcela_ids ?? []).filter(Boolean)[0]
+        : props.form.parcela_id;
+
+    return props.parcelas.find((item) => String(item.id) === String(parcelaId)) ?? null;
+});
+const selectedParcelaArea = computed(() => selectedParcela.value?.area_util ?? selectedParcela.value?.area_total ?? '');
 
 const syncCampanhaFromCultura = (form) => {
     const culturaId = String(form.cultura_id || '');
@@ -279,10 +293,33 @@ watch(() => props.form.cultura_id, () => {
     syncCampanhaFromCultura(props.form);
 });
 
+watch(selectedFuncionario, (funcionario) => {
+    if (!funcionario) {
+        return;
+    }
+
+    props.form.aplicador_nome = funcionario.nome ?? '';
+    props.form.aplicador_numero_autorizacao = funcionario.aplicador_numero_autorizacao ?? '';
+}, { immediate: true });
+
+watch([selectedParcelaArea, () => props.form.tipo], ([area]) => {
+    if (!area || !isTratamentoFitossanitario(props.form.tipo)) {
+        return;
+    }
+
+    props.form.produtos = (props.form.produtos ?? []).map((produto) => ({
+        ...produto,
+        area_tratada: produto.area_tratada || area.toString(),
+    }));
+}, { immediate: true });
+
 onMounted(() => {
     activeTab.value = 'geral';
     syncContextFromParcela(props.form);
     ensureProductRows(props.form);
+    props.form.produtor_nome = props.form.produtor_nome || props.exploracaoDados.produtor_nome || '';
+    props.form.exploracao_concelho = props.form.exploracao_concelho || props.exploracaoDados.concelho || '';
+    props.form.exploracao_freguesia = props.form.exploracao_freguesia || props.exploracaoDados.freguesia || '';
 });
 
 const setActiveTab = (tabId) => {

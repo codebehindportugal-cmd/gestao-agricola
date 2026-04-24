@@ -19,6 +19,7 @@ class StoreFuncionarioRequest extends FormRequest
             'email' => ['nullable', 'email', 'max:255', 'unique:funcionarios,email'],
             'telefone' => ['nullable', 'string', 'max:50'],
             'cargo' => ['required', 'string', 'max:255'],
+            'aplicador_numero_autorizacao' => ['nullable', 'string', 'max:255'],
             'data_admissao' => ['required', 'date'],
             'data_saida' => ['nullable', 'date', 'after_or_equal:data_admissao'],
             'tipo_contrato' => ['required', Rule::in(['permanente', 'temporario', 'estagiario'])],

@@ -143,11 +143,6 @@ class StoreOperacaoRequest extends FormRequest
             }
 
             if ($tipo === 'tratamento fitossanitário') {
-                foreach (['aplicador_nome', 'aplicador_numero_autorizacao', 'exploracao_concelho', 'exploracao_freguesia'] as $field) {
-                    if (blank($this->input($field))) {
-                        $validator->errors()->add($field, 'Este campo é obrigatório para o registo DGAV da aplicação fitofarmacêutica.');
-                    }
-                }
 
                 $produtos->each(function ($produto, $index) use ($validator) {
                     foreach (['dose', 'dose_unidade', 'area_tratada', 'volume_calda', 'finalidade', 'intervalo_seguranca_dias'] as $field) {
