@@ -80,7 +80,7 @@ watch(
     () => [filterState.search, filterState.estado, filterState.terreno_id],
     () => {
         router.get(
-            route('app.parcelas.index'),
+            '/parcelas',
             {
                 search: filterState.search || undefined,
                 estado: filterState.estado || undefined,
@@ -139,8 +139,22 @@ const currentQuery = computed(() => ({
     terreno_id: filterState.terreno_id || undefined,
 }));
 
+const pathWithQuery = (path, query = currentQuery.value) => {
+    const params = new URLSearchParams();
+
+    Object.entries(query).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            params.set(key, value);
+        }
+    });
+
+    const queryString = params.toString();
+
+    return queryString ? `${path}?${queryString}` : path;
+};
+
 const submitCreate = () => {
-    createForm.post(route('app.parcelas.store', currentQuery.value), {
+    createForm.post(pathWithQuery('/parcelas'), {
         preserveScroll: true,
         onSuccess: () => closeCreateModal(),
     });
@@ -151,7 +165,7 @@ const submitEdit = () => {
         return;
     }
 
-    editForm.patch(route('app.parcelas.update', { parcela: editingParcela.value.id, ...currentQuery.value }), {
+    editForm.patch(pathWithQuery(`/parcelas/${editingParcela.value.id}`), {
         preserveScroll: true,
         onSuccess: () => closeEditModal(),
     });
@@ -162,7 +176,7 @@ const deleteParcela = (parcela) => {
         return;
     }
 
-    router.delete(route('app.parcelas.destroy', { parcela: parcela.id, ...currentQuery.value }), {
+    router.delete(pathWithQuery(`/parcelas/${parcela.id}`), {
         preserveScroll: true,
     });
 };
@@ -179,7 +193,7 @@ const submitImport = (event) => {
     }
 
     importForm.ficheiro = file;
-    importForm.post(route('app.terrenos.import'), {
+    importForm.post('/terrenos/importar', {
         forceFormData: true,
         preserveScroll: true,
         onSuccess: () => {
@@ -273,7 +287,7 @@ const updateEditPolygonArea = (area) => {
 
                 <div class="flex flex-wrap gap-3">
                     <a
-                        :href="route('app.terrenos.export')"
+                        href="/terrenos/exportar"
                         class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                     >
                         Exportar
@@ -296,7 +310,7 @@ const updateEditPolygonArea = (area) => {
                     >
                     <Link
                         v-if="can.create"
-                        :href="route('app.parcelas.create', currentQuery)"
+                        :href="pathWithQuery('/parcelas/criar')"
                         class="justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600"
                     >
                         Nova parcela
@@ -466,14 +480,14 @@ const updateEditPolygonArea = (area) => {
                         <div class="mt-6 flex flex-wrap gap-3">
 
                             <Link
-                                :href="route('app.terrenos.index', { search: parcela.terreno_nome || undefined })"
+                                :href="pathWithQuery('/terrenos', { search: parcela.terreno_nome || undefined })"
                                 class="inline-flex items-center rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                             >
                                 Ver terreno
                             </Link>
                             <Link
                                 v-if="can.create"
-                                :href="route('app.parcelas.edit', { parcela: parcela.id, ...currentQuery })"
+                                :href="pathWithQuery(`/parcelas/${parcela.id}/editar`)"
                                 class="rounded-full bg-slate-900 px-4 py-2 text-sm normal-case tracking-normal hover:bg-slate-800 focus:bg-slate-800"
                             >
                                 Editar

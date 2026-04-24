@@ -70,6 +70,20 @@ const currentQuery = computed(() => ({
     terreno_id: props.filters.terreno_id || undefined,
 }));
 
+const pathWithQuery = (path, query = currentQuery.value) => {
+    const params = new URLSearchParams();
+
+    Object.entries(query).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            params.set(key, value);
+        }
+    });
+
+    const queryString = params.toString();
+
+    return queryString ? `${path}?${queryString}` : path;
+};
+
 const updatePolygonCenter = ({ latitude, longitude }) => {
     form.latitude = latitude?.toString() ?? '';
     form.longitude = longitude?.toString() ?? '';
@@ -141,11 +155,11 @@ const useSelectedTerrenoPolygon = () => {
 
 const submit = () => {
     if (isEditing.value) {
-        form.patch(route('app.parcelas.update', { parcela: props.parcela.id, ...currentQuery.value }));
+        form.patch(pathWithQuery(`/parcelas/${props.parcela.id}`));
         return;
     }
 
-    form.post(route('app.parcelas.store', currentQuery.value));
+    form.post(pathWithQuery('/parcelas'));
 };
 </script>
 
@@ -162,7 +176,7 @@ const submit = () => {
                         Desenha a parcela sobre a imagem satélite. Quando selecionas um terreno, o seu contorno aparece como referência.
                     </p>
                 </div>
-                <Link :href="route('app.parcelas.index', currentQuery)">
+                <Link :href="pathWithQuery('/parcelas')">
                     <SecondaryButton class="rounded-full px-5 py-3 text-sm normal-case tracking-normal">Voltar</SecondaryButton>
                 </Link>
             </div>
@@ -262,7 +276,7 @@ const submit = () => {
                     </div>
 
                     <div class="mt-6 flex justify-end gap-3">
-                        <Link :href="route('app.parcelas.index', currentQuery)">
+                        <Link :href="pathWithQuery('/parcelas')">
                             <SecondaryButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal">Cancelar</SecondaryButton>
                         </Link>
                         <PrimaryButton class="rounded-full bg-emerald-700 px-5 py-2 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600" :disabled="form.processing">

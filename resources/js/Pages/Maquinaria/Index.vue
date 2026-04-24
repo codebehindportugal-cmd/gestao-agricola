@@ -131,6 +131,9 @@ const isPulverizador = (tipo) => String(tipo ?? '').toLowerCase() === 'pulveriza
 const isVeiculo = (tipo) => ['carro', 'carrinha', 'camião', 'camiao', 'moto_4'].includes(String(tipo ?? '').toLowerCase());
 const usesFuelConsumption = (tipo) => ['trator', 'ceifeira', 'carregador', 'carro', 'carrinha', 'camião', 'camiao', 'moto_4'].includes(String(tipo ?? '').toLowerCase());
 const fuelConsumptionLabel = computed(() => (isVeiculo(maquinaForm.tipo) ? 'Consumo de combustível (L/100 km)' : 'Consumo de combustível (L/h)'));
+const usageLabel = (tipo) => (isVeiculo(tipo) ? 'Quilómetros' : 'Horas');
+const usageUnit = (tipo) => (isVeiculo(tipo) ? 'km' : 'h');
+const maintenanceLabel = computed(() => (isVeiculo(maquinaForm.tipo) ? 'Próxima manutenção (km)' : 'Próxima manutenção (h)'));
 
 const formatNumber = (value) => {
     if (value === null || value === undefined || value === '') {
@@ -566,12 +569,14 @@ const cleanFilters = () => {
 
                             <div class="mt-5 grid gap-3 sm:grid-cols-4">
                                 <div class="rounded-3xl bg-slate-50 p-4">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Horas</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{{ usageLabel(maquina.tipo) }}</p>
                                     <p class="mt-2 text-xl font-black text-slate-900">{{ formatNumber(maquina.horas_uso) }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">{{ usageUnit(maquina.tipo) }}</p>
                                 </div>
                                 <div class="rounded-3xl bg-slate-50 p-4">
                                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Próx. manut.</p>
                                     <p class="mt-2 text-xl font-black text-amber-700">{{ formatNumber(maquina.horas_manutencao) }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">{{ usageUnit(maquina.tipo) }}</p>
                                 </div>
                                 <div class="rounded-3xl bg-slate-50 p-4">
                                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Alfaias</p>
@@ -847,12 +852,12 @@ const cleanFilters = () => {
                         <InputError class="mt-2" :message="maquinaForm.errors.estado" />
                     </div>
                     <div>
-                        <InputLabel value="Horas de uso" />
+                        <InputLabel :value="isVeiculo(maquinaForm.tipo) ? 'Quilómetros atuais' : 'Horas de uso'" />
                         <TextInput v-model="maquinaForm.horas_uso" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="maquinaForm.errors.horas_uso" />
                     </div>
                     <div>
-                        <InputLabel value="Próxima manutenção (h)" />
+                        <InputLabel :value="maintenanceLabel" />
                         <TextInput v-model="maquinaForm.horas_manutencao" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="maquinaForm.errors.horas_manutencao" />
                     </div>
