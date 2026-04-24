@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Role;
 use App\Models\Permission;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 
 class RolePermissionSeeder extends Seeder
@@ -124,5 +125,13 @@ class RolePermissionSeeder extends Seeder
             'relatorios.view',
         ])->pluck('id');
         $consultorRole->permissions()->sync($consultorPermissions);
+
+        if (! User::whereHas('roles', fn ($query) => $query->where('name', 'admin'))->exists()) {
+            $firstUser = User::query()->orderBy('id')->first();
+
+            if ($firstUser) {
+                $firstUser->roles()->syncWithoutDetaching($adminRole);
+            }
+        }
     }
 }

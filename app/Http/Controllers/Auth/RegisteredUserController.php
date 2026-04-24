@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
@@ -37,11 +38,21 @@ class RegisteredUserController extends Controller
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
+        $isFirstUser = User::query()->doesntExist();
+
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
         ]);
+
+        $roleName = $isFirstUser ? 'admin' : 'gestor_agricola';
+        $role = Role::query()->firstOrCreate(
+            ['name' => $roleName],
+            ['description' => $isFirstUser ? 'Administrador - Acesso total ao sistema' : 'Gestor Agricola - Planeamento e gestao operacional'],
+        );
+
+        $user->roles()->syncWithoutDetaching($role);
 
         event(new Registered($user));
 
