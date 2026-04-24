@@ -28,7 +28,7 @@ class TerrenoPolicy
      */
     public function create(User $user): bool
     {
-        return $user->hasRole(['admin', 'gestor_agricola']);
+        return $user->hasPermission('terrenos.create') || $user->hasRole(['admin', 'gestor_agricola']);
     }
 
     /**
@@ -36,7 +36,7 @@ class TerrenoPolicy
      */
     public function update(User $user, Terreno $terreno): bool
     {
-        return $user->hasRole(['admin', 'gestor_agricola']);
+        return $user->hasPermission('terrenos.edit') || $user->hasRole(['admin', 'gestor_agricola']);
     }
 
     /**
@@ -44,7 +44,7 @@ class TerrenoPolicy
      */
     public function delete(User $user, Terreno $terreno): bool
     {
-        return $user->hasRole('admin');
+        return $user->hasPermission('terrenos.delete') || $user->hasRole('admin');
     }
 
     /**

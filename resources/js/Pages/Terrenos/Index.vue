@@ -70,7 +70,7 @@ watch(
     () => [filterState.search, filterState.estado],
     () => {
         router.get(
-            route('app.terrenos.index'),
+            '/terrenos',
             {
                 search: filterState.search || undefined,
                 estado: filterState.estado || undefined,
@@ -118,7 +118,7 @@ const closeEditModal = () => {
 };
 
 const submitCreate = () => {
-    createForm.post(route('app.terrenos.store'), {
+    createForm.post('/terrenos', {
         preserveScroll: true,
         onSuccess: () => closeCreateModal(),
     });
@@ -129,7 +129,7 @@ const submitEdit = () => {
         return;
     }
 
-    editForm.patch(route('app.terrenos.update', editingTerreno.value.id), {
+    editForm.patch(`/terrenos/${editingTerreno.value.id}`, {
         preserveScroll: true,
         onSuccess: () => closeEditModal(),
     });
@@ -140,7 +140,7 @@ const deleteTerreno = (terreno) => {
         return;
     }
 
-    router.delete(route('app.terrenos.destroy', terreno.id), {
+    router.delete(`/terrenos/${terreno.id}`, {
         preserveScroll: true,
     });
 };
@@ -263,7 +263,7 @@ const updateEditPolygonArea = (area) => {
                     >
                     <Link
                         v-if="can.create"
-                        :href="route('app.terrenos.create')"
+                        href="/terrenos/criar"
                         class="justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600"
                     >
                         Novo terreno
@@ -413,7 +413,7 @@ const updateEditPolygonArea = (area) => {
                             </Link>
                             <Link
                                 v-if="can.create"
-                                :href="route('app.terrenos.edit', terreno.id)"
+                                :href="`/terrenos/${terreno.id}/editar`"
                                 class="rounded-full bg-slate-900 px-4 py-2 text-sm normal-case tracking-normal hover:bg-slate-800 focus:bg-slate-800"
                             >
                                 Editar

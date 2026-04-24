@@ -28,7 +28,7 @@ class ParcelaPolicy
      */
     public function create(User $user): bool
     {
-        return $user->hasRole(['admin', 'gestor_agricola']);
+        return $user->hasPermission('parcelas.create') || $user->hasRole(['admin', 'gestor_agricola']);
     }
 
     /**
@@ -36,7 +36,7 @@ class ParcelaPolicy
      */
     public function update(User $user, Parcela $parcela): bool
     {
-        return $user->hasRole(['admin', 'gestor_agricola']);
+        return $user->hasPermission('parcelas.edit') || $user->hasRole(['admin', 'gestor_agricola']);
     }
 
     /**
@@ -44,6 +44,6 @@ class ParcelaPolicy
      */
     public function delete(User $user, Parcela $parcela): bool
     {
-        return $user->hasRole('admin');
+        return $user->hasPermission('parcelas.delete') || $user->hasRole('admin');
     }
 }

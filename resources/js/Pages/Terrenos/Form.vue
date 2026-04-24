@@ -57,11 +57,11 @@ const updatePolygonArea = (area) => {
 
 const submit = () => {
     if (isEditing.value) {
-        form.patch(route('app.terrenos.update', props.terreno.id));
+        form.patch(`/terrenos/${props.terreno.id}`);
         return;
     }
 
-    form.post(route('app.terrenos.store'));
+    form.post('/terrenos');
 };
 </script>
 
@@ -78,7 +78,7 @@ const submit = () => {
                         Usa a vista satélite para desenhar o perímetro com mais detalhe. A área e o centro são atualizados automaticamente.
                     </p>
                 </div>
-                <Link :href="route('app.terrenos.index')">
+                <Link href="/terrenos">
                     <SecondaryButton class="rounded-full px-5 py-3 text-sm normal-case tracking-normal">Voltar</SecondaryButton>
                 </Link>
             </div>
@@ -140,7 +140,7 @@ const submit = () => {
                     </div>
 
                     <div class="mt-6 flex justify-end gap-3">
-                        <Link :href="route('app.terrenos.index')">
+                        <Link href="/terrenos">
                             <SecondaryButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal">Cancelar</SecondaryButton>
                         </Link>
                         <PrimaryButton class="rounded-full bg-emerald-700 px-5 py-2 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600" :disabled="form.processing">

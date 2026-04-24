@@ -60,7 +60,7 @@ class TerrenoManagementController extends Controller
             ],
             'can' => [
                 'create' => $request->user()->can('create', Terreno::class),
-                'delete' => $request->user()->hasRole('admin'),
+                'delete' => $request->user()->can('delete', new Terreno()),
             ],
             'estadoOptions' => $this->estadoOptions(),
         ]);
