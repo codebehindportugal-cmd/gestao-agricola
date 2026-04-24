@@ -16,6 +16,7 @@ use App\Models\Produto;
 use App\Models\User;
 use App\Models\Custo;
 use App\Support\OperacaoDuration;
+use App\Support\StockConsumption;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -237,6 +238,7 @@ class OperacaoManagementController extends Controller
                     ]);
 
                     $operacao->produtos()->sync($produtos);
+                    StockConsumption::syncOperation($operacao->fresh(), [], $produtos);
                 }
             });
         } catch (\Throwable $exception) {
@@ -256,9 +258,12 @@ class OperacaoManagementController extends Controller
             DB::transaction(function () use ($request, $operacao) {
                 $data = $this->normalizePayload($request);
                 $produtos = $this->extractProdutosPayload($request);
+                $previousProducts = StockConsumption::productsFromOperation($operacao);
+                $previousFuel = $operacao->combustivel_gasto_l === null ? null : (float) $operacao->combustivel_gasto_l;
 
                 $operacao->update($data);
                 $operacao->produtos()->sync($produtos);
+                StockConsumption::syncOperation($operacao->fresh(), $previousProducts, $produtos, $previousFuel);
             });
         } catch (\Throwable $exception) {
             return $this->backWithError('Não foi possível atualizar a operação. Verifique os dados e tente novamente.', $exception);
@@ -274,7 +279,10 @@ class OperacaoManagementController extends Controller
         $this->authorize('delete', $operacao);
 
         try {
-            $operacao->delete();
+            DB::transaction(function () use ($operacao) {
+                StockConsumption::restoreOperation($operacao);
+                $operacao->delete();
+            });
         } catch (\Throwable $exception) {
             return $this->backWithError('Não foi possível remover a operação. Confirme se não existem custos ou produtos associados.', $exception);
         }
@@ -310,6 +318,8 @@ class OperacaoManagementController extends Controller
         if (($data['custo_unitario'] ?? '') === '') {
             $data['custo_unitario'] = null;
         }
+
+        $data['tipo'] = $this->normalizeProdutoTipo($data['tipo']);
 
         try {
             Produto::query()->create($data);
@@ -473,6 +483,34 @@ class OperacaoManagementController extends Controller
         }
 
         return (float) $value;
+    }
+
+    private function normalizeProdutoTipo(?string $tipo): string
+    {
+        $normalized = strtolower(trim((string) $tipo));
+        $normalized = strtr($normalized, [
+            'á' => 'a',
+            'à' => 'a',
+            'â' => 'a',
+            'ã' => 'a',
+            'ç' => 'c',
+            'é' => 'e',
+            'ê' => 'e',
+            'í' => 'i',
+            'ó' => 'o',
+            'ô' => 'o',
+            'õ' => 'o',
+            'ú' => 'u',
+        ]);
+
+        return match ($normalized) {
+            'combustivel', 'combustiveis', 'gasoleo', 'diesel' => 'combustivel',
+            'fitofarmaceutico', 'fitofarmaco', 'produto fitofarmaceutico' => 'fitofarmaco',
+            'fertilizacao', 'fertilizante', 'adubo' => 'fertilizante',
+            'sementes', 'semente' => 'semente',
+            'plantas', 'planta' => 'planta',
+            default => $normalized ?: 'outro',
+        };
     }
 
     private function cadernoCampoResumo()

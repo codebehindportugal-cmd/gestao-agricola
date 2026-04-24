@@ -27,7 +27,15 @@ class StockManagementController extends Controller
                         ->orWhere('codigo_interno', 'like', "%{$search}%");
                 });
             })
-            ->when($filters['tipo'] ?? null, fn ($query, $tipo) => $query->where('tipo', $tipo))
+            ->when($filters['tipo'] ?? null, function ($query, $tipo) {
+                $normalized = $this->normalizeTipo($tipo);
+
+                $query->when(
+                    $normalized === 'combustivel',
+                    fn ($subQuery) => $subQuery->where('tipo', 'like', 'combust%'),
+                    fn ($subQuery) => $subQuery->where('tipo', $normalized),
+                );
+            })
             ->orderBy('nome')
             ->paginate(12)
             ->withQueryString()
@@ -74,9 +82,11 @@ class StockManagementController extends Controller
             ],
             'tipoOptions' => Produto::query()
                 ->whereNotNull('tipo')
-                ->distinct()
-                ->orderBy('tipo')
                 ->pluck('tipo')
+                ->merge($this->tipoOptions())
+                ->map(fn ($tipo) => $this->normalizeTipo($tipo))
+                ->unique()
+                ->sort()
                 ->values(),
         ]);
     }
@@ -100,7 +110,7 @@ class StockManagementController extends Controller
         DB::transaction(function () use ($data) {
             $produto = Produto::query()->create([
                 'nome' => $data['nome'],
-                'tipo' => $data['tipo'],
+                'tipo' => $this->normalizeTipo($data['tipo']),
                 'unidade_medida' => $data['unidade_medida'],
                 'custo_unitario' => $data['custo_unitario'] === '' ? null : ($data['custo_unitario'] ?? null),
                 'stock_minimo' => $data['stock_minimo'] === '' ? 0 : (int) round((float) ($data['stock_minimo'] ?? 0)),
@@ -173,5 +183,46 @@ class StockManagementController extends Controller
     private function redirectFilters(Request $request): array
     {
         return array_filter($request->only(['search', 'tipo', 'estado']));
+    }
+
+    private function tipoOptions(): array
+    {
+        return [
+            'combustivel',
+            'fertilizante',
+            'fitofarmaco',
+            'planta',
+            'semente',
+            'corretivo',
+            'outro',
+        ];
+    }
+
+    private function normalizeTipo(?string $tipo): string
+    {
+        $normalized = strtolower(trim((string) $tipo));
+        $normalized = strtr($normalized, [
+            'á' => 'a',
+            'à' => 'a',
+            'â' => 'a',
+            'ã' => 'a',
+            'ç' => 'c',
+            'é' => 'e',
+            'ê' => 'e',
+            'í' => 'i',
+            'ó' => 'o',
+            'ô' => 'o',
+            'õ' => 'o',
+            'ú' => 'u',
+        ]);
+
+        return match ($normalized) {
+            'combustivel', 'combustiveis', 'gasoleo', 'diesel' => 'combustivel',
+            'fitofarmaceutico', 'fitofarmaco', 'produto fitofarmaceutico' => 'fitofarmaco',
+            'fertilizacao', 'fertilizante', 'adubo' => 'fertilizante',
+            'sementes', 'semente' => 'semente',
+            'plantas', 'planta' => 'planta',
+            default => $normalized ?: 'outro',
+        };
     }
 }

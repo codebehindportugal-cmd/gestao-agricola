@@ -7,7 +7,9 @@ use App\Http\Requests\UpdateOperacaoRequest;
 use App\Models\Maquina;
 use App\Models\Operacao;
 use App\Support\OperacaoDuration;
+use App\Support\StockConsumption;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class OperacaoController extends Controller
 {
@@ -32,19 +34,25 @@ class OperacaoController extends Controller
         $parcelaIds = $this->selectedParcelaIds($data);
         unset($data['produtos'], $data['parcela_ids']);
 
-        $operacoes = collect($parcelaIds)->map(function (int $parcelaId) use ($data, $produtos, $parcelaIds) {
-            $operacao = Operacao::create([
-                ...$data,
-                'parcela_id' => $parcelaId,
-                'cultura_id' => count($parcelaIds) > 1 ? null : ($data['cultura_id'] ?? null),
-                'campanha_id' => count($parcelaIds) > 1 ? null : ($data['campanha_id'] ?? null),
-            ]);
+        $operacoes = DB::transaction(function () use ($data, $produtos, $parcelaIds) {
+            return collect($parcelaIds)->map(function (int $parcelaId) use ($data, $produtos, $parcelaIds) {
+                $operacao = Operacao::create([
+                    ...$data,
+                    'parcela_id' => $parcelaId,
+                    'cultura_id' => count($parcelaIds) > 1 ? null : ($data['cultura_id'] ?? null),
+                    'campanha_id' => count($parcelaIds) > 1 ? null : ($data['campanha_id'] ?? null),
+                ]);
 
-            if (count($produtos)) {
-                $operacao->produtos()->sync($this->formatProdutos($produtos));
-            }
+                $formattedProdutos = $this->formatProdutos($produtos);
 
-            return $operacao->load('parcela', 'cultura', 'maquina', 'produtos');
+                if (count($formattedProdutos)) {
+                    $operacao->produtos()->sync($formattedProdutos);
+                }
+
+                StockConsumption::syncOperation($operacao->fresh(), [], $formattedProdutos);
+
+                return $operacao->load('parcela', 'cultura', 'maquina', 'produtos');
+            });
         });
 
         return response()->json([
@@ -75,8 +83,15 @@ class OperacaoController extends Controller
         $produtos = $data['produtos'] ?? [];
         unset($data['produtos'], $data['parcela_ids']);
 
-        $operacao->update($data);
-        $operacao->produtos()->sync($this->formatProdutos($produtos));
+        DB::transaction(function () use ($operacao, $data, $produtos) {
+            $previousProducts = StockConsumption::productsFromOperation($operacao);
+            $previousFuel = $operacao->combustivel_gasto_l === null ? null : (float) $operacao->combustivel_gasto_l;
+            $formattedProdutos = $this->formatProdutos($produtos);
+
+            $operacao->update($data);
+            $operacao->produtos()->sync($formattedProdutos);
+            StockConsumption::syncOperation($operacao->fresh(), $previousProducts, $formattedProdutos, $previousFuel);
+        });
 
         return response()->json([
             'message' => 'Operação atualizada com sucesso',
@@ -86,7 +101,10 @@ class OperacaoController extends Controller
 
     public function destroy(Operacao $operacao): JsonResponse
     {
-        $operacao->delete();
+        DB::transaction(function () use ($operacao) {
+            StockConsumption::restoreOperation($operacao);
+            $operacao->delete();
+        });
 
         return response()->json([
             'message' => 'Operação eliminada com sucesso',

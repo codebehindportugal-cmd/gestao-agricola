@@ -22,6 +22,19 @@ const flashSuccess = computed(() => page.props.flash?.success);
 const productModalOpen = ref(false);
 const stockModalOpen = ref(false);
 const editingProduto = ref(null);
+const productTypeOptions = computed(() => {
+    const defaults = ['combustivel', 'fertilizante', 'fitofarmaco', 'planta', 'semente', 'corretivo', 'outro'];
+    return [...new Set([...defaults, ...props.tipoOptions])].sort();
+});
+
+const unitForType = (tipo) => ({
+    combustivel: 'L',
+    fertilizante: 'kg',
+    fitofarmaco: 'L',
+    planta: 'un',
+    semente: 'kg',
+    corretivo: 'kg',
+}[tipo] ?? 'un');
 
 const filterState = reactive({
     search: props.filters.search ?? '',
@@ -79,6 +92,10 @@ const openProductModal = () => {
     productForm.estabelecimento_venda_autorizacao = '';
     productModalOpen.value = true;
 };
+
+watch(() => productForm.tipo, (tipo) => {
+    productForm.unidade_medida = unitForType(tipo);
+});
 
 const closeProductModal = () => {
     productModalOpen.value = false;
@@ -282,7 +299,9 @@ const formatNumber = (value) => new Intl.NumberFormat('pt-PT', {
                     </div>
                     <div>
                         <InputLabel value="Tipo" />
-                        <TextInput v-model="productForm.tipo" class="mt-2 block w-full rounded-2xl" />
+                        <select v-model="productForm.tipo" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                            <option v-for="tipo in productTypeOptions" :key="tipo" :value="tipo">{{ tipo }}</option>
+                        </select>
                         <InputError class="mt-2" :message="productForm.errors.tipo" />
                     </div>
                     <div>
