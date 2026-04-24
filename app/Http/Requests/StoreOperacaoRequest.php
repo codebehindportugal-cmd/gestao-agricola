@@ -52,6 +52,8 @@ class StoreOperacaoRequest extends FormRequest
             'exploracao_concelho' => 'nullable|string|max:255',
             'exploracao_freguesia' => 'nullable|string|max:255',
             'duracao_horas' => 'nullable|numeric|min:0',
+            'distancia_km' => 'nullable|numeric|min:0',
+            'combustivel_gasto_l' => 'nullable|numeric|min:0',
             'custo_estimado' => 'nullable|numeric|min:0',
             'custo_real' => 'nullable|numeric|min:0',
             'estado' => 'required|in:planejada,em_curso,concluida,cancelada',

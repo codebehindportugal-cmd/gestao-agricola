@@ -36,7 +36,7 @@ class OperacaoManagementController extends Controller
                 'parcela.terreno:id,nome',
                 'cultura:id,nome',
                 'campanha:id,cultura_id,ano,data_inicio,data_fim,status',
-                'maquina:id,nome',
+                'maquina:id,nome,tipo,consumo_combustivel',
                 'alfaia:id,nome',
                 'operador:id,name',
                 'funcionario:id,nome,cargo,status',
@@ -86,6 +86,10 @@ class OperacaoManagementController extends Controller
                 'data_hora_inicio' => optional($operacao->data_hora_inicio)?->format('Y-m-d\TH:i'),
                 'data_hora_fim' => optional($operacao->data_hora_fim)?->format('Y-m-d\TH:i'),
                 'duracao_horas' => $operacao->duracao_horas,
+                'distancia_km' => $operacao->distancia_km,
+                'combustivel_gasto_l' => $operacao->combustivel_gasto_l,
+                'maquina_tipo' => $operacao->maquina?->tipo,
+                'maquina_consumo_combustivel' => $operacao->maquina?->consumo_combustivel,
                 'custo_estimado' => $operacao->custo_estimado,
                 'custo_real' => $operacao->custo_real,
                 'produtos' => $operacao->produtos->map(fn (Produto $produto) => [
@@ -148,7 +152,7 @@ class OperacaoManagementController extends Controller
                 ]),
             'maquinas' => Maquina::query()
                 ->orderBy('nome')
-                ->get(['id', 'nome']),
+                ->get(['id', 'nome', 'tipo', 'consumo_combustivel']),
             'alfaias' => Alfaia::query()
                 ->orderBy('nome')
                 ->get(['id', 'nome']),
@@ -336,6 +340,8 @@ class OperacaoManagementController extends Controller
             'funcionario_id',
             'equipa_id',
             'duracao_horas',
+            'distancia_km',
+            'combustivel_gasto_l',
             'custo_estimado',
             'custo_real',
             'data_hora_fim',
@@ -357,8 +363,35 @@ class OperacaoManagementController extends Controller
             $data['data_hora_inicio'] ?? null,
             $data['data_hora_fim'] ?? null,
         );
+        $data['combustivel_gasto_l'] = $this->calculateFuelUsage($data);
 
         return $data;
+    }
+
+    private function calculateFuelUsage(array $data): ?float
+    {
+        if (empty($data['maquina_id'])) {
+            return null;
+        }
+
+        $maquina = Maquina::query()->find($data['maquina_id'], ['id', 'tipo', 'consumo_combustivel']);
+
+        if (! $maquina || $maquina->consumo_combustivel === null) {
+            return null;
+        }
+
+        $consumo = (float) $maquina->consumo_combustivel;
+        $tipo = strtolower((string) $maquina->tipo);
+
+        if (in_array($tipo, ['carro', 'carrinha', 'camião', 'camiao', 'moto_4'], true)) {
+            $distancia = (float) ($data['distancia_km'] ?? 0);
+
+            return $distancia > 0 ? round(($distancia * $consumo) / 100, 2) : null;
+        }
+
+        $horas = (float) ($data['duracao_horas'] ?? 0);
+
+        return $horas > 0 ? round($horas * $consumo, 2) : null;
     }
 
     private function selectedParcelaIds(Request $request): array

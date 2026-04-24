@@ -64,6 +64,8 @@ const baseFormData = {
     exploracao_concelho: '',
     exploracao_freguesia: '',
     duracao_horas: '',
+    distancia_km: '',
+    combustivel_gasto_l: '',
     custo_estimado: '',
     custo_real: '',
     estado: 'planejada',
@@ -144,6 +146,8 @@ const openEditModal = (operacao) => {
     editForm.exploracao_concelho = operacao.exploracao_concelho ?? '';
     editForm.exploracao_freguesia = operacao.exploracao_freguesia ?? '';
     editForm.duracao_horas = operacao.duracao_horas?.toString() ?? '';
+    editForm.distancia_km = operacao.distancia_km?.toString() ?? '';
+    editForm.combustivel_gasto_l = operacao.combustivel_gasto_l?.toString() ?? '';
     editForm.custo_estimado = operacao.custo_estimado?.toString() ?? '';
     editForm.custo_real = operacao.custo_real?.toString() ?? '';
     editForm.estado = operacao.estado ?? 'planejada';
@@ -204,6 +208,8 @@ const normalizePayload = (form) => form.transform((data) => ({
     funcionario_id: data.funcionario_id || null,
     equipa_id: data.equipa_id || null,
     duracao_horas: null,
+    distancia_km: data.distancia_km || null,
+    combustivel_gasto_l: null,
     custo_estimado: data.custo_estimado || null,
     custo_real: data.custo_real || null,
     data_hora_inicio: data.data_hora_inicio ? data.data_hora_inicio.replace('T', ' ') : '',
@@ -554,6 +560,11 @@ const stockStats = computed(() => ({
                             <div class="rounded-3xl bg-slate-50 p-4">
                                 <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Duração</p>
                                 <p class="mt-2 text-sm text-slate-700">{{ operacao.duracao_horas ? `${formatNumber(operacao.duracao_horas)} h` : 'Sem duração' }}</p>
+                            </div>
+                            <div class="rounded-3xl bg-amber-50 p-4">
+                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-amber-600">Combustível</p>
+                                <p class="mt-2 text-sm text-slate-700">{{ operacao.combustivel_gasto_l ? `${formatNumber(operacao.combustivel_gasto_l)} L` : 'Sem cálculo' }}</p>
+                                <p v-if="operacao.distancia_km" class="mt-1 text-xs text-slate-500">{{ formatNumber(operacao.distancia_km) }} km</p>
                             </div>
                         </div>
 

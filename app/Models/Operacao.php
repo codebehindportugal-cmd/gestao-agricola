@@ -32,6 +32,8 @@ class Operacao extends Model
         'exploracao_concelho',
         'exploracao_freguesia',
         'duracao_horas',
+        'distancia_km',
+        'combustivel_gasto_l',
         'custo_estimado',
         'custo_real',
         'estado',
@@ -43,6 +45,8 @@ class Operacao extends Model
         'data_hora_inicio' => 'datetime',
         'data_hora_fim' => 'datetime',
         'duracao_horas' => 'decimal:2',
+        'distancia_km' => 'decimal:2',
+        'combustivel_gasto_l' => 'decimal:2',
         'custo_estimado' => 'decimal:2',
         'custo_real' => 'decimal:2',
     ];

@@ -33,6 +33,7 @@ const emit = defineEmits(['submit', 'cancel', 'openProductModal']);
 const activeTab = ref('geral');
 
 const MAX_HOURS_PER_DAY = 8;
+const vehicleTypes = ['carro', 'carrinha', 'camião', 'camiao', 'moto_4'];
 
 const productTypeConfig = {
     'tratamento fitossanitario': {
@@ -141,6 +142,8 @@ const updateProductDefaults = (form, index) => {
 };
 
 const selectedProduct = (produtoId) => props.produtos.find((item) => String(item.id) === String(produtoId)) ?? null;
+const selectedMachine = computed(() => props.maquinas.find((item) => String(item.id) === String(props.form.maquina_id)) ?? null);
+const selectedMachineIsVehicle = computed(() => vehicleTypes.includes(normalizeText(selectedMachine.value?.tipo)));
 
 const syncCampanhaFromCultura = (form) => {
     const culturaId = String(form.cultura_id || '');
@@ -216,6 +219,24 @@ const calculatedDuration = computed(() => {
     return Number(total.toFixed(2)).toString();
 });
 
+const calculatedFuelUsage = computed(() => {
+    const consumo = parseFloat(selectedMachine.value?.consumo_combustivel) || 0;
+
+    if (!consumo) {
+        return '';
+    }
+
+    if (selectedMachineIsVehicle.value) {
+        const distancia = parseFloat(props.form.distancia_km) || 0;
+
+        return distancia > 0 ? Number(((distancia * consumo) / 100).toFixed(2)).toString() : '';
+    }
+
+    const horas = parseFloat(props.form.duracao_horas) || 0;
+
+    return horas > 0 ? Number((horas * consumo).toFixed(2)).toString() : '';
+});
+
 const formatCurrency = (value) => new Intl.NumberFormat('pt-PT', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -248,6 +269,10 @@ watch(() => props.form.parcela_ids, () => {
 
 watch(calculatedDuration, (duration) => {
     props.form.duracao_horas = duration;
+}, { immediate: true });
+
+watch(calculatedFuelUsage, (fuelUsage) => {
+    props.form.combustivel_gasto_l = fuelUsage;
 }, { immediate: true });
 
 watch(() => props.form.cultura_id, () => {
@@ -404,6 +429,21 @@ const setActiveTab = (tabId) => {
                     <InputLabel value="Duração (h)" />
                     <TextInput v-model="form.duracao_horas" readonly class="mt-2 block w-full rounded-2xl bg-slate-50 text-slate-600" placeholder="Calculada pela hora de inicio/fim" />
                     <InputError class="mt-2" :message="form.errors.duracao_horas" />
+                </div>
+
+                <div v-if="selectedMachineIsVehicle">
+                    <InputLabel value="Distância (km)" />
+                    <TextInput v-model="form.distancia_km" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                    <InputError class="mt-2" :message="form.errors.distancia_km" />
+                </div>
+
+                <div v-if="selectedMachine?.consumo_combustivel">
+                    <InputLabel value="Combustível gasto (L)" />
+                    <TextInput v-model="form.combustivel_gasto_l" readonly class="mt-2 block w-full rounded-2xl bg-amber-50 text-slate-700" />
+                    <p class="mt-2 text-xs text-slate-500">
+                        {{ selectedMachineIsVehicle ? `${selectedMachine.consumo_combustivel} L/100 km` : `${selectedMachine.consumo_combustivel} L/h` }}
+                    </p>
+                    <InputError class="mt-2" :message="form.errors.combustivel_gasto_l" />
                 </div>
 
                 <div>

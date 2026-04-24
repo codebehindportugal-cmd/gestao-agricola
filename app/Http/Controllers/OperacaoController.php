@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreOperacaoRequest;
 use App\Http\Requests\UpdateOperacaoRequest;
+use App\Models\Maquina;
 use App\Models\Operacao;
 use App\Support\OperacaoDuration;
 use Illuminate\Http\JsonResponse;
@@ -157,8 +158,35 @@ class OperacaoController extends Controller
             $data['data_hora_inicio'] ?? null,
             $data['data_hora_fim'] ?? null,
         );
+        $data['combustivel_gasto_l'] = $this->calculateFuelUsage($data);
 
         return $data;
+    }
+
+    private function calculateFuelUsage(array $data): ?float
+    {
+        if (empty($data['maquina_id'])) {
+            return null;
+        }
+
+        $maquina = Maquina::query()->find($data['maquina_id'], ['id', 'tipo', 'consumo_combustivel']);
+
+        if (! $maquina || $maquina->consumo_combustivel === null) {
+            return null;
+        }
+
+        $consumo = (float) $maquina->consumo_combustivel;
+        $tipo = strtolower((string) $maquina->tipo);
+
+        if (in_array($tipo, ['carro', 'carrinha', 'camião', 'camiao', 'moto_4'], true)) {
+            $distancia = (float) ($data['distancia_km'] ?? 0);
+
+            return $distancia > 0 ? round(($distancia * $consumo) / 100, 2) : null;
+        }
+
+        $horas = (float) ($data['duracao_horas'] ?? 0);
+
+        return $horas > 0 ? round($horas * $consumo, 2) : null;
     }
 
     private function selectedParcelaIds(array $data): array

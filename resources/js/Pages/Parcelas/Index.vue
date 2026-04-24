@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import DangerButton from '@/Components/DangerButton.vue';
 import InputError from '@/Components/InputError.vue';
@@ -211,7 +211,7 @@ const estadoBadgeClass = (estado) => ({
 const estadoLabel = (estado) => ({
     livre: 'livre',
     cultivada: 'cultivada',
-    em_preparacao: 'em preparaÃ§Ã£o',
+    em_preparacao: 'em preparação',
     pousio: 'pousio',
 }[estado] ?? estado);
 
@@ -267,7 +267,7 @@ const updateEditPolygonArea = (area) => {
                         Parcelas
                     </h1>
                     <p class="mt-2 max-w-2xl text-sm text-slate-600">
-                        OrganizaÃ§Ã£o das subdivisÃµes dos terrenos com controlo de Ã¡rea, estado e atividade associada.
+                        Organização das subdivisões dos terrenos com controlo de área, estado e atividade associada.
                     </p>
                 </div>
 
@@ -340,12 +340,12 @@ const updateEditPolygonArea = (area) => {
                         <p class="mt-3 text-4xl font-black text-emerald-700">{{ summary.cultivadas }}</p>
                     </article>
                     <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                        <p class="text-sm font-medium text-slate-500">Ãrea total</p>
+                        <p class="text-sm font-medium text-slate-500">Área total</p>
                         <p class="mt-3 text-4xl font-black text-slate-900">{{ formatArea(summary.area_total) }}</p>
                         <p class="mt-1 text-sm text-slate-500">ha</p>
                     </article>
                     <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                        <p class="text-sm font-medium text-slate-500">Ãrea Ãºtil</p>
+                        <p class="text-sm font-medium text-slate-500">Área útil</p>
                         <p class="mt-3 text-4xl font-black text-slate-900">{{ formatArea(summary.area_util) }}</p>
                         <p class="mt-1 text-sm text-slate-500">ha</p>
                     </article>
@@ -358,7 +358,7 @@ const updateEditPolygonArea = (area) => {
                             <TextInput
                                 v-model="filterState.search"
                                 class="mt-2 block w-full rounded-2xl border-slate-200"
-                                placeholder="Nome, cÃ³digo ou descriÃ§Ã£o"
+                                placeholder="Nome, código ou descrição"
                             />
                         </div>
                         <div>
@@ -419,7 +419,7 @@ const updateEditPolygonArea = (area) => {
                                 </div>
                                 <p class="mt-2 text-sm text-slate-500">
                                     {{ parcela.terreno_nome || 'Sem terreno associado' }}
-                                    <span v-if="parcela.numero_parcela">Â· {{ parcela.numero_parcela }}</span>
+                                    <span v-if="parcela.numero_parcela">· {{ parcela.numero_parcela }}</span>
                                 </p>
                             </div>
                             <p class="text-right text-3xl font-black text-slate-900">
@@ -430,15 +430,15 @@ const updateEditPolygonArea = (area) => {
 
                         <div class="mt-6 grid gap-4 sm:grid-cols-2">
                             <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Ãrea Ãºtil</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Área útil</p>
                                 <p class="mt-2 text-sm text-slate-700">{{ formatArea(parcela.area_util) }} ha</p>
                             </div>
                             <div class="rounded-3xl bg-emerald-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-emerald-500">Ocupacao</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-emerald-500">Ocupação</p>
                                 <p class="mt-2 text-sm text-slate-700">{{ parcela.tipo_ocupacao || 'culturas_anuais' }}</p>
                             </div>
                             <div class="rounded-3xl bg-emerald-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-emerald-500">Arvores</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-emerald-500">Árvores</p>
                                 <p class="mt-2 text-sm text-slate-700">
                                     {{ parcela.numero_arvores ?? '-' }}
                                     <span v-if="parcela.compasso_linha_m || parcela.compasso_planta_m">
@@ -448,18 +448,18 @@ const updateEditPolygonArea = (area) => {
                             </div>
 
                             <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">OperaÃ§Ãµes</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Operações</p>
                                 <p class="mt-2 text-sm text-slate-700">{{ parcela.operacoes_count }}</p>
                             </div>
                             <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">AtualizaÃ§Ã£o</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Atualização</p>
                                 <p class="mt-2 text-sm text-slate-700">{{ parcela.updated_at || 'Sem registo' }}</p>
                             </div>
                         </div>
 
                         <div class="mt-5 rounded-3xl bg-sky-50/50 p-4">
                             <p class="text-sm leading-7 text-slate-600">
-                                {{ parcela.descricao || 'Sem descriÃ§Ã£o adicional para esta parcela.' }}
+                                {{ parcela.descricao || 'Sem descrição adicional para esta parcela.' }}
                             </p>
                         </div>
 
@@ -519,12 +519,12 @@ const updateEditPolygonArea = (area) => {
             <div class="p-6 sm:p-8">
                 <h2 class="text-2xl font-black text-slate-900">Nova parcela</h2>
                 <p class="mt-2 text-sm text-slate-500">
-                    Cria uma subdivisÃ£o produtiva associada a um terreno e desenha o perÃ­metro no mapa.
+                    Cria uma subdivisão produtiva associada a um terreno e desenha o perímetro no mapa.
                 </p>
 
                 <form class="mt-6 grid gap-4 sm:grid-cols-2" @submit.prevent="submitCreate">
                     <div v-if="createErrorMessages.length" class="sm:col-span-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                        <p class="font-semibold">NÃ£o foi possÃ­vel guardar a parcela. RevÃª estes pontos:</p>
+                        <p class="font-semibold">Não foi possível guardar a parcela. Revê estes pontos:</p>
                         <ul class="mt-2 list-disc space-y-1 pl-5">
                             <li v-for="message in createErrorMessages" :key="message">{{ message }}</li>
                         </ul>
@@ -549,7 +549,7 @@ const updateEditPolygonArea = (area) => {
                         <InputError class="mt-2" :message="createForm.errors.nome" />
                     </div>
                     <div>
-                        <InputLabel value="Numero da parcela" />
+                        <InputLabel value="Número da parcela" />
                         <TextInput v-model="createForm.numero_parcela" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="createForm.errors.numero_parcela" />
                     </div>
@@ -566,12 +566,12 @@ const updateEditPolygonArea = (area) => {
                         <InputError class="mt-2" :message="createForm.errors.estado" />
                     </div>
                     <div>
-                        <InputLabel value="Ãrea total (ha)" />
+                        <InputLabel value="Área total (ha)" />
                         <TextInput v-model="createForm.area_total" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="createForm.errors.area_total" />
                     </div>
                     <div>
-                        <InputLabel value="Area util (ha)" />
+                        <InputLabel value="Área útil (ha)" />
                         <TextInput v-model="createForm.area_util" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="createForm.errors.area_util" />
                     </div>
@@ -586,9 +586,9 @@ const updateEditPolygonArea = (area) => {
                         <InputError class="mt-2" :message="createForm.errors.longitude" />
                     </div>
                     <div class="sm:col-span-2">
-                        <InputLabel value="PolÃ­gono da parcela" />
+                        <InputLabel value="Polígono da parcela" />
                         <p v-if="selectedCreateTerreno?.poligono?.length" class="mt-2 text-xs leading-6 text-slate-500">
-                            O contorno tracejado mostra o terreno selecionado como referÃªncia visual.
+                            O contorno tracejado mostra o terreno selecionado como referência visual.
                         </p>
                         <div class="mt-2">
                             <TerrenoPolygonMap
@@ -606,7 +606,7 @@ const updateEditPolygonArea = (area) => {
                         <InputError class="mt-2" :message="createForm.errors.poligono" />
                     </div>
                     <div class="sm:col-span-2">
-                        <InputLabel value="DescriÃ§Ã£o" />
+                        <InputLabel value="Descrição" />
                         <textarea
                             v-model="createForm.descricao"
                             class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
@@ -631,12 +631,12 @@ const updateEditPolygonArea = (area) => {
             <div class="p-6 sm:p-8">
                 <h2 class="text-2xl font-black text-slate-900">Editar parcela</h2>
                 <p class="mt-2 text-sm text-slate-500">
-                    Atualiza os dados de {{ editingParcela?.nome }} e ajusta o perÃ­metro no mapa.
+                    Atualiza os dados de {{ editingParcela?.nome }} e ajusta o perímetro no mapa.
                 </p>
 
                 <form class="mt-6 grid gap-4 sm:grid-cols-2" @submit.prevent="submitEdit">
                     <div v-if="editErrorMessages.length" class="sm:col-span-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                        <p class="font-semibold">NÃ£o foi possÃ­vel atualizar a parcela. RevÃª estes pontos:</p>
+                        <p class="font-semibold">Não foi possível atualizar a parcela. Revê estes pontos:</p>
                         <ul class="mt-2 list-disc space-y-1 pl-5">
                             <li v-for="message in editErrorMessages" :key="message">{{ message }}</li>
                         </ul>
@@ -661,7 +661,7 @@ const updateEditPolygonArea = (area) => {
                         <InputError class="mt-2" :message="editForm.errors.nome" />
                     </div>
                     <div>
-                        <InputLabel value="Numero da parcela" />
+                        <InputLabel value="Número da parcela" />
                         <TextInput v-model="editForm.numero_parcela" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="editForm.errors.numero_parcela" />
                     </div>
@@ -678,12 +678,12 @@ const updateEditPolygonArea = (area) => {
                         <InputError class="mt-2" :message="editForm.errors.estado" />
                     </div>
                     <div>
-                        <InputLabel value="Ãrea total (ha)" />
+                        <InputLabel value="Área total (ha)" />
                         <TextInput v-model="editForm.area_total" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="editForm.errors.area_total" />
                     </div>
                     <div>
-                        <InputLabel value="Area util (ha)" />
+                        <InputLabel value="Área útil (ha)" />
                         <TextInput v-model="editForm.area_util" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="editForm.errors.area_util" />
                     </div>
@@ -698,9 +698,9 @@ const updateEditPolygonArea = (area) => {
                         <InputError class="mt-2" :message="editForm.errors.longitude" />
                     </div>
                     <div class="sm:col-span-2">
-                        <InputLabel value="PolÃ­gono da parcela" />
+                        <InputLabel value="Polígono da parcela" />
                         <p v-if="selectedEditTerreno?.poligono?.length" class="mt-2 text-xs leading-6 text-slate-500">
-                            O contorno tracejado mostra o terreno selecionado como referÃªncia visual.
+                            O contorno tracejado mostra o terreno selecionado como referência visual.
                         </p>
                         <div class="mt-2">
                             <TerrenoPolygonMap
@@ -718,7 +718,7 @@ const updateEditPolygonArea = (area) => {
                         <InputError class="mt-2" :message="editForm.errors.poligono" />
                     </div>
                     <div class="sm:col-span-2">
-                        <InputLabel value="DescriÃ§Ã£o" />
+                        <InputLabel value="Descrição" />
                         <textarea
                             v-model="editForm.descricao"
                             class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
@@ -740,5 +740,7 @@ const updateEditPolygonArea = (area) => {
         </Modal>
     </AuthenticatedLayout>
 </template>
+
+
 
 

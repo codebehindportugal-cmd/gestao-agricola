@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
@@ -193,7 +193,7 @@ const submit = () => {
                             <InputError class="mt-2" :message="form.errors.nome" />
                         </div>
                         <div>
-                            <InputLabel value="Numero da parcela" />
+                            <InputLabel value="Número da parcela" />
                             <TextInput v-model="form.numero_parcela" class="mt-2 block w-full rounded-2xl" />
                             <InputError class="mt-2" :message="form.errors.numero_parcela" />
                         </div>
@@ -207,10 +207,10 @@ const submit = () => {
                         <div class="sm:col-span-2 rounded-3xl border border-emerald-100 bg-emerald-50/50 p-4">
                             <div class="grid gap-4 sm:grid-cols-2">
                                 <div>
-                                    <InputLabel value="Tipo de ocupacao" />
+                                    <InputLabel value="Tipo de ocupação" />
                                     <select v-model="form.tipo_ocupacao" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
                                         <option value="culturas_anuais">Culturas anuais</option>
-                                        <option value="pomar">Pomar / arvores</option>
+                                        <option value="pomar">Pomar / árvores</option>
                                         <option value="misto">Misto</option>
                                         <option value="estufa">Estufa</option>
                                         <option value="outro">Outro</option>
@@ -218,7 +218,7 @@ const submit = () => {
                                     <InputError class="mt-2" :message="form.errors.tipo_ocupacao" />
                                 </div>
                                 <div>
-                                    <InputLabel value="Numero de arvores" />
+                                    <InputLabel value="Número de árvores" />
                                     <TextInput v-model="form.numero_arvores" class="mt-2 block w-full rounded-2xl" />
                                     <InputError class="mt-2" :message="form.errors.numero_arvores" />
                                 </div>
@@ -240,7 +240,7 @@ const submit = () => {
                             <InputError class="mt-2" :message="form.errors.area_total" />
                         </div>
                         <div>
-                            <InputLabel value="Area util (ha)" />
+                            <InputLabel value="Área útil (ha)" />
                             <TextInput v-model="form.area_util" class="mt-2 block w-full rounded-2xl" />
                             <InputError class="mt-2" :message="form.errors.area_util" />
                         </div>
@@ -306,3 +306,5 @@ const submit = () => {
         </div>
     </AuthenticatedLayout>
 </template>
+
+
