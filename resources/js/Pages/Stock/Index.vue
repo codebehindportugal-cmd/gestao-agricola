@@ -53,6 +53,8 @@ const productForm = useForm({
     quantidade_inicial: '',
     codigo_interno: '',
     numero_autorizacao_dgav: '',
+    estabelecimento_venda_nome: '',
+    estabelecimento_venda_autorizacao: '',
     descricao: '',
 });
 
@@ -73,6 +75,8 @@ const openProductModal = () => {
     productForm.clearErrors();
     productForm.tipo = 'fitofarmaco';
     productForm.unidade_medida = 'L';
+    productForm.estabelecimento_venda_nome = '';
+    productForm.estabelecimento_venda_autorizacao = '';
     productModalOpen.value = true;
 };
 
@@ -310,6 +314,16 @@ const formatNumber = (value) => new Intl.NumberFormat('pt-PT', {
                         <InputLabel value="N.º DGAV" />
                         <TextInput v-model="productForm.numero_autorizacao_dgav" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="productForm.errors.numero_autorizacao_dgav" />
+                    </div>
+                    <div v-if="productForm.tipo === 'fitofarmaco'" class="sm:col-span-2">
+                        <InputLabel value="Estabelecimento de venda" />
+                        <TextInput v-model="productForm.estabelecimento_venda_nome" class="mt-2 block w-full rounded-2xl" />
+                        <InputError class="mt-2" :message="productForm.errors.estabelecimento_venda_nome" />
+                    </div>
+                    <div v-if="productForm.tipo === 'fitofarmaco'" class="sm:col-span-2">
+                        <InputLabel value="N.º autorização do estabelecimento" />
+                        <TextInput v-model="productForm.estabelecimento_venda_autorizacao" class="mt-2 block w-full rounded-2xl" />
+                        <InputError class="mt-2" :message="productForm.errors.estabelecimento_venda_autorizacao" />
                     </div>
                     <div class="sm:col-span-2">
                         <InputLabel value="Descrição" />

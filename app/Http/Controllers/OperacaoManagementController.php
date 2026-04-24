@@ -15,6 +15,7 @@ use App\Models\Parcela;
 use App\Models\Produto;
 use App\Models\User;
 use App\Models\Custo;
+use App\Support\OperacaoDuration;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -40,7 +41,7 @@ class OperacaoManagementController extends Controller
                 'operador:id,name',
                 'funcionario:id,nome,cargo,status',
                 'equipa:id,nome,status',
-                'produtos:id,nome,tipo,unidade_medida,custo_unitario,numero_autorizacao_dgav',
+                'produtos:id,nome,tipo,unidade_medida,custo_unitario,numero_autorizacao_dgav,estabelecimento_venda_nome,estabelecimento_venda_autorizacao',
             ])
             ->when($filters['search'] ?? null, function ($query, $search) {
                 $query->where(function ($subQuery) use ($search) {
@@ -92,6 +93,8 @@ class OperacaoManagementController extends Controller
                     'nome' => $produto->nome,
                     'tipo' => $produto->tipo,
                     'numero_autorizacao_dgav' => $produto->numero_autorizacao_dgav,
+                    'estabelecimento_venda_nome_produto' => $produto->estabelecimento_venda_nome,
+                    'estabelecimento_venda_autorizacao_produto' => $produto->estabelecimento_venda_autorizacao,
                     'quantidade' => $produto->pivot->quantidade,
                     'unidade_medida' => $produto->pivot->unidade_medida,
                     'dose' => $produto->pivot->dose,
@@ -163,7 +166,7 @@ class OperacaoManagementController extends Controller
                 ]),
             'produtos' => Produto::query()
                 ->orderBy('nome')
-                ->get(['id', 'nome', 'tipo', 'unidade_medida', 'custo_unitario', 'numero_autorizacao_dgav'])
+                ->get(['id', 'nome', 'tipo', 'unidade_medida', 'custo_unitario', 'numero_autorizacao_dgav', 'estabelecimento_venda_nome', 'estabelecimento_venda_autorizacao'])
                 ->map(fn (Produto $produto) => [
                     'id' => $produto->id,
                     'nome' => $produto->nome,
@@ -171,6 +174,8 @@ class OperacaoManagementController extends Controller
                     'unidade_medida' => $produto->unidade_medida,
                     'custo_unitario' => $produto->custo_unitario,
                     'numero_autorizacao_dgav' => $produto->numero_autorizacao_dgav,
+                    'estabelecimento_venda_nome' => $produto->estabelecimento_venda_nome,
+                    'estabelecimento_venda_autorizacao' => $produto->estabelecimento_venda_autorizacao,
                 ]),
             'equipas' => Equipa::query()
                 ->where('status', 'ativa')
@@ -216,9 +221,19 @@ class OperacaoManagementController extends Controller
             DB::transaction(function () use ($request) {
                 $data = $this->normalizePayload($request);
                 $produtos = $this->extractProdutosPayload($request);
-                $operacao = Operacao::query()->create($data);
+                $parcelaIds = $this->selectedParcelaIds($request);
+                $isBulkOperation = count($parcelaIds) > 1;
 
-                $operacao->produtos()->sync($produtos);
+                foreach ($parcelaIds as $parcelaId) {
+                    $operacao = Operacao::query()->create([
+                        ...$data,
+                        'parcela_id' => $parcelaId,
+                        'cultura_id' => $isBulkOperation ? null : ($data['cultura_id'] ?? null),
+                        'campanha_id' => $isBulkOperation ? null : ($data['campanha_id'] ?? null),
+                    ]);
+
+                    $operacao->produtos()->sync($produtos);
+                }
             });
         } catch (\Throwable $exception) {
             return $this->backWithError('Não foi possível criar a operação. Verifique os dados e tente novamente.', $exception);
@@ -276,6 +291,8 @@ class OperacaoManagementController extends Controller
             'custo_unitario' => ['nullable', 'numeric', 'min:0'],
             'codigo_interno' => ['nullable', 'string', 'max:255', 'unique:produtos,codigo_interno'],
             'numero_autorizacao_dgav' => ['nullable', 'string', 'max:255'],
+            'estabelecimento_venda_nome' => ['nullable', 'string', 'max:255'],
+            'estabelecimento_venda_autorizacao' => ['nullable', 'string', 'max:255'],
             'descricao' => ['nullable', 'string'],
         ], [
             'nome.required' => 'O nome do produto é obrigatório.',
@@ -334,8 +351,27 @@ class OperacaoManagementController extends Controller
         }
 
         unset($data['produtos']);
+        unset($data['parcela_ids']);
+
+        $data['duracao_horas'] = OperacaoDuration::calculateFromStrings(
+            $data['data_hora_inicio'] ?? null,
+            $data['data_hora_fim'] ?? null,
+        );
 
         return $data;
+    }
+
+    private function selectedParcelaIds(Request $request): array
+    {
+        $parcelaIds = collect($request->input('parcela_ids', []))
+            ->filter()
+            ->map(fn ($id) => (int) $id);
+
+        if ($parcelaIds->isEmpty() && $request->filled('parcela_id')) {
+            $parcelaIds->push((int) $request->input('parcela_id'));
+        }
+
+        return $parcelaIds->unique()->values()->all();
     }
 
     private function extractProdutosPayload(Request $request): array
@@ -344,16 +380,18 @@ class OperacaoManagementController extends Controller
             ->filter(fn (array $produto) => !empty($produto['produto_id']))
             ->values();
 
-        $custosUnitarios = Produto::query()
+        $produtosCatalogo = Produto::query()
             ->whereIn('id', $produtosSelecionados->pluck('produto_id')->filter()->all())
-            ->pluck('custo_unitario', 'id');
+            ->get(['id', 'custo_unitario', 'estabelecimento_venda_nome', 'estabelecimento_venda_autorizacao'])
+            ->keyBy('id');
 
         return $produtosSelecionados
-            ->mapWithKeys(function (array $produto) use ($custosUnitarios) {
+            ->mapWithKeys(function (array $produto) use ($produtosCatalogo) {
                 $quantidade = (float) ($produto['quantidade'] ?? 0);
-                $custoUnitario = ($custosUnitarios[$produto['produto_id']] ?? null) === null
+                $produtoCatalogo = $produtosCatalogo->get($produto['produto_id']);
+                $custoUnitario = ($produtoCatalogo?->custo_unitario) === null
                     ? null
-                    : (float) $custosUnitarios[$produto['produto_id']];
+                    : (float) $produtoCatalogo->custo_unitario;
 
                 return [
                     $produto['produto_id'] => [
@@ -367,8 +405,8 @@ class OperacaoManagementController extends Controller
                         'intervalo_seguranca_dias' => ($produto['intervalo_seguranca_dias'] ?? null) === '' || ($produto['intervalo_seguranca_dias'] ?? null) === null
                             ? null
                             : (int) $produto['intervalo_seguranca_dias'],
-                        'estabelecimento_venda_nome' => $produto['estabelecimento_venda_nome'] ?? null,
-                        'estabelecimento_venda_autorizacao' => $produto['estabelecimento_venda_autorizacao'] ?? null,
+                        'estabelecimento_venda_nome' => $produtoCatalogo?->estabelecimento_venda_nome,
+                        'estabelecimento_venda_autorizacao' => $produtoCatalogo?->estabelecimento_venda_autorizacao,
                         'custo_unitario' => $custoUnitario,
                         'custo_total' => $custoUnitario === null ? null : round($quantidade * $custoUnitario, 2),
                         'observacoes' => $produto['observacoes'] ?? null,

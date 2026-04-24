@@ -33,7 +33,9 @@ class StoreOperacaoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'parcela_id' => 'required|exists:parcelas,id',
+            'parcela_id' => 'required_without:parcela_ids|nullable|exists:parcelas,id',
+            'parcela_ids' => 'nullable|array|min:1',
+            'parcela_ids.*' => 'required|exists:parcelas,id|distinct',
             'cultura_id' => 'nullable|exists:culturas,id',
             'campanha_id' => 'nullable|exists:campanhas,id',
             'tipo' => ['required', 'string', 'max:255', Rule::in(self::TIPOS)],
@@ -49,7 +51,7 @@ class StoreOperacaoRequest extends FormRequest
             'aplicador_numero_autorizacao' => 'nullable|string|max:255',
             'exploracao_concelho' => 'nullable|string|max:255',
             'exploracao_freguesia' => 'nullable|string|max:255',
-            'duracao_horas' => 'nullable|numeric|min:0.25',
+            'duracao_horas' => 'nullable|numeric|min:0',
             'custo_estimado' => 'nullable|numeric|min:0',
             'custo_real' => 'nullable|numeric|min:0',
             'estado' => 'required|in:planejada,em_curso,concluida,cancelada',
@@ -104,10 +106,22 @@ class StoreOperacaoRequest extends FormRequest
                 }
             }
 
-            if ($this->filled('cultura_id') && $this->filled('parcela_id')) {
+            $selectedParcelIds = collect($this->input('parcela_ids', []))
+                ->filter()
+                ->map(fn ($id) => (string) $id);
+
+            if ($selectedParcelIds->isEmpty() && $this->filled('parcela_id')) {
+                $selectedParcelIds->push((string) $this->input('parcela_id'));
+            }
+
+            if ($selectedParcelIds->count() > 1 && ($this->filled('cultura_id') || $this->filled('campanha_id'))) {
+                $validator->errors()->add('parcela_ids', 'Ao registar em varias parcelas, escolha a cultura e campanha depois em cada operacao, se necessario.');
+            }
+
+            if ($this->filled('cultura_id') && $selectedParcelIds->count() === 1) {
                 $cultureMatchesParcel = Cultura::query()
                     ->where('id', $this->input('cultura_id'))
-                    ->where('parcela_id', $this->input('parcela_id'))
+                    ->where('parcela_id', $selectedParcelIds->first())
                     ->exists();
 
                 if (! $cultureMatchesParcel) {
@@ -134,7 +148,7 @@ class StoreOperacaoRequest extends FormRequest
                 }
 
                 $produtos->each(function ($produto, $index) use ($validator) {
-                    foreach (['dose', 'dose_unidade', 'area_tratada', 'volume_calda', 'finalidade', 'intervalo_seguranca_dias', 'estabelecimento_venda_nome', 'estabelecimento_venda_autorizacao'] as $field) {
+                    foreach (['dose', 'dose_unidade', 'area_tratada', 'volume_calda', 'finalidade', 'intervalo_seguranca_dias'] as $field) {
                         if (blank($produto[$field] ?? null)) {
                             $validator->errors()->add("produtos.{$index}.{$field}", 'Este campo é obrigatório para o caderno de campo fitofarmacêutico.');
                         }
@@ -155,7 +169,11 @@ class StoreOperacaoRequest extends FormRequest
     {
         return [
             'parcela_id.required' => 'A parcela é obrigatória.',
+            'parcela_id.required_without' => 'A parcela é obrigatória.',
             'parcela_id.exists' => 'A parcela selecionada não existe.',
+            'parcela_ids.min' => 'Selecione pelo menos uma parcela.',
+            'parcela_ids.*.exists' => 'Uma das parcelas selecionadas não existe.',
+            'parcela_ids.*.distinct' => 'A mesma parcela não pode ser repetida.',
             'tipo.required' => 'O tipo de operação é obrigatório.',
             'tipo.in' => 'Selecione um tipo de operação válido.',
             'data_hora_inicio.required' => 'A data e hora de início são obrigatórias.',
@@ -166,7 +184,7 @@ class StoreOperacaoRequest extends FormRequest
             'funcionario_id.exists' => 'O trabalhador selecionado não existe.',
             'equipa_id.exists' => 'A equipa selecionada não existe.',
             'campanha_id.exists' => 'A campanha selecionada não existe.',
-            'duracao_horas.min' => 'A duração deve ser pelo menos 0,25 horas.',
+            'duracao_horas.min' => 'A duração não pode ser negativa.',
             'custo_estimado.min' => 'O custo estimado não pode ser negativo.',
             'custo_real.min' => 'O custo real não pode ser negativo.',
             'produtos.*.produto_id.required_with' => 'Selecione o produto.',

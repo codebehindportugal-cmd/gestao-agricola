@@ -19,6 +19,8 @@ class Produto extends Model
         'tipo',
         'codigo_interno',
         'numero_autorizacao_dgav',
+        'estabelecimento_venda_nome',
+        'estabelecimento_venda_autorizacao',
         'fornecedor_id',
         'custo_unitario',
         'unidade_medida',

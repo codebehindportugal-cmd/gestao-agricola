@@ -20,6 +20,7 @@ const props = defineProps({
     produtos: { type: Array, default: () => [] },
     tipoOptions: { type: Array, default: () => [] },
     estadoOptions: { type: Array, default: () => [] },
+    allowMultipleParcelas: { type: Boolean, default: false },
     submitLabel: { type: String, default: 'Guardar operação' },
     submitButtonClass: {
         type: String,
@@ -30,6 +31,8 @@ const props = defineProps({
 const emit = defineEmits(['submit', 'cancel', 'openProductModal']);
 
 const activeTab = ref('geral');
+
+const MAX_HOURS_PER_DAY = 8;
 
 const productTypeConfig = {
     'tratamento fitossanitario': {
@@ -131,35 +134,87 @@ const updateProductDefaults = (form, index) => {
         return;
     }
 
-    row.unidade_medida = row.unidade_medida || produto.unidade_medida || 'kg';
+    row.unidade_medida = produto.unidade_medida || 'kg';
     row.custo_unitario = produto.custo_unitario?.toString() || '';
+    row.estabelecimento_venda_nome = produto.estabelecimento_venda_nome || '';
+    row.estabelecimento_venda_autorizacao = produto.estabelecimento_venda_autorizacao || '';
 };
 
-const filteredCulturas = computed(() => {
-    const parcelaId = String(props.form.parcela_id || '');
+const selectedProduct = (produtoId) => props.produtos.find((item) => String(item.id) === String(produtoId)) ?? null;
 
-    if (!parcelaId) {
-        return props.culturas;
+const syncCampanhaFromCultura = (form) => {
+    const culturaId = String(form.cultura_id || '');
+    const campanhas = props.campanhas.filter((campanha) => String(campanha.cultura_id) === culturaId);
+
+    if (!campanhas.length) {
+        form.campanha_id = '';
+        return;
     }
 
-    return props.culturas.filter((cultura) => String(cultura.parcela_id) === parcelaId);
-});
+    const currentCampanha = campanhas.find((campanha) => String(campanha.id) === String(form.campanha_id));
+    form.campanha_id = String((currentCampanha ?? campanhas[0]).id);
+};
 
-const filteredCampanhas = computed(() => {
-    const culturaId = String(props.form.cultura_id || '');
+const syncContextFromParcela = (form) => {
+    const selectedParcelas = props.allowMultipleParcelas
+        ? (form.parcela_ids ?? []).filter(Boolean)
+        : [form.parcela_id].filter(Boolean);
 
-    if (!culturaId) {
-        return props.campanhas;
+    if (selectedParcelas.length !== 1) {
+        form.parcela_id = selectedParcelas[0] ?? '';
+        form.cultura_id = '';
+        form.campanha_id = '';
+        return;
     }
 
-    return props.campanhas.filter((campanha) => String(campanha.cultura_id) === culturaId);
-});
+    const parcelaId = String(selectedParcelas[0] || '');
+    form.parcela_id = parcelaId;
+    const culturas = props.culturas.filter((cultura) => String(cultura.parcela_id) === parcelaId);
+
+    if (!culturas.length) {
+        form.cultura_id = '';
+        form.campanha_id = '';
+        return;
+    }
+
+    const currentCultura = culturas.find((cultura) => String(cultura.id) === String(form.cultura_id));
+    form.cultura_id = String((currentCultura ?? culturas[0]).id);
+    syncCampanhaFromCultura(form);
+};
 
 const totalCustoProdutos = computed(() => props.form.produtos?.reduce((total, produto) => {
     const quantidade = parseFloat(produto.quantidade) || 0;
     const custoUnitario = parseFloat(produto.custo_unitario) || 0;
     return total + (quantidade * custoUnitario);
 }, 0) || 0);
+
+const calculatedDuration = computed(() => {
+    if (!props.form.data_hora_inicio || !props.form.data_hora_fim) {
+        return '';
+    }
+
+    const start = new Date(props.form.data_hora_inicio);
+    const end = new Date(props.form.data_hora_fim);
+
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+        return '';
+    }
+
+    let cursor = new Date(start);
+    let total = 0;
+
+    while (cursor < end) {
+        const dayEnd = new Date(cursor);
+        dayEnd.setHours(23, 59, 59, 999);
+        const segmentEnd = end < dayEnd ? end : dayEnd;
+        const hours = (segmentEnd.getTime() - cursor.getTime()) / 36e5;
+
+        total += Math.min(hours, MAX_HOURS_PER_DAY);
+        cursor = new Date(segmentEnd.getTime() + 1);
+    }
+
+    return Number(total.toFixed(2)).toString();
+});
 
 const formatCurrency = (value) => new Intl.NumberFormat('pt-PT', {
     minimumFractionDigits: 2,
@@ -183,8 +238,25 @@ watch(() => props.form.tipo, () => {
     }
 });
 
+watch(() => props.form.parcela_id, () => {
+    syncContextFromParcela(props.form);
+});
+
+watch(() => props.form.parcela_ids, () => {
+    syncContextFromParcela(props.form);
+}, { deep: true });
+
+watch(calculatedDuration, (duration) => {
+    props.form.duracao_horas = duration;
+}, { immediate: true });
+
+watch(() => props.form.cultura_id, () => {
+    syncCampanhaFromCultura(props.form);
+});
+
 onMounted(() => {
     activeTab.value = 'geral';
+    syncContextFromParcela(props.form);
     ensureProductRows(props.form);
 });
 
@@ -231,14 +303,26 @@ const setActiveTab = (tabId) => {
         <form class="p-6" @submit.prevent="emit('submit')">
             <div v-show="activeTab === 'geral'" class="grid gap-4 sm:grid-cols-2">
                 <div class="sm:col-span-2">
-                    <InputLabel value="Parcela" />
-                    <select v-model="form.parcela_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                    <InputLabel :value="allowMultipleParcelas ? 'Parcelas' : 'Parcela'" />
+                    <select
+                        v-if="allowMultipleParcelas"
+                        v-model="form.parcela_ids"
+                        multiple
+                        size="6"
+                        class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                    >
+                        <option v-for="parcela in parcelas" :key="parcela.id" :value="String(parcela.id)">
+                            {{ parcela.nome }} - {{ parcela.terreno_nome }}
+                        </option>
+                    </select>
+                    <select v-else v-model="form.parcela_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
                         <option value="">Selecionar parcela</option>
                         <option v-for="parcela in parcelas" :key="parcela.id" :value="String(parcela.id)">
                             {{ parcela.nome }} - {{ parcela.terreno_nome }}
                         </option>
                     </select>
                     <InputError class="mt-2" :message="form.errors.parcela_id" />
+                    <InputError class="mt-2" :message="form.errors.parcela_ids" />
                 </div>
 
                 <div>
@@ -256,24 +340,6 @@ const setActiveTab = (tabId) => {
                         <option v-for="estado in estadoOptions" :key="estado" :value="estado">{{ estadoLabel(estado) }}</option>
                     </select>
                     <InputError class="mt-2" :message="form.errors.estado" />
-                </div>
-
-                <div>
-                    <InputLabel value="Cultura" />
-                    <select v-model="form.cultura_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
-                        <option value="">Sem cultura</option>
-                        <option v-for="cultura in filteredCulturas" :key="cultura.id" :value="String(cultura.id)">{{ cultura.nome }}</option>
-                    </select>
-                    <InputError class="mt-2" :message="form.errors.cultura_id" />
-                </div>
-
-                <div>
-                    <InputLabel value="Campanha" />
-                    <select v-model="form.campanha_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
-                        <option value="">Sem campanha</option>
-                        <option v-for="campanha in filteredCampanhas" :key="campanha.id" :value="String(campanha.id)">{{ campanha.nome }}</option>
-                    </select>
-                    <InputError class="mt-2" :message="form.errors.campanha_id" />
                 </div>
 
                 <div>
@@ -336,7 +402,7 @@ const setActiveTab = (tabId) => {
 
                 <div>
                     <InputLabel value="Duração (h)" />
-                    <TextInput v-model="form.duracao_horas" class="mt-2 block w-full rounded-2xl" />
+                    <TextInput v-model="form.duracao_horas" readonly class="mt-2 block w-full rounded-2xl bg-slate-50 text-slate-600" placeholder="Calculada pela hora de inicio/fim" />
                     <InputError class="mt-2" :message="form.errors.duracao_horas" />
                 </div>
 
@@ -433,6 +499,29 @@ const setActiveTab = (tabId) => {
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.produto_id`]" />
                             </div>
 
+                            <div v-if="isTratamentoFitossanitario(form.tipo) && selectedProduct(produto.produto_id)" class="sm:col-span-2 rounded-2xl bg-slate-50 p-4">
+                                <div class="grid gap-3 sm:grid-cols-3">
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">N.º DGAV</p>
+                                        <p class="mt-2 text-sm font-semibold text-slate-800">
+                                            {{ selectedProduct(produto.produto_id)?.numero_autorizacao_dgav || 'Sem registo' }}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Estabelecimento</p>
+                                        <p class="mt-2 text-sm font-semibold text-slate-800">
+                                            {{ selectedProduct(produto.produto_id)?.estabelecimento_venda_nome || 'Sem registo' }}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Autorização</p>
+                                        <p class="mt-2 text-sm font-semibold text-slate-800">
+                                            {{ selectedProduct(produto.produto_id)?.estabelecimento_venda_autorizacao || 'Sem registo' }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div>
                                 <InputLabel value="Quantidade" />
                                 <TextInput v-model="produto.quantidade" type="number" step="0.01" min="0.01" class="mt-2 block w-full rounded-2xl" />
@@ -441,7 +530,7 @@ const setActiveTab = (tabId) => {
 
                             <div>
                                 <InputLabel value="Unidade" />
-                                <TextInput v-model="produto.unidade_medida" class="mt-2 block w-full rounded-2xl" />
+                                <TextInput v-model="produto.unidade_medida" readonly class="mt-2 block w-full rounded-2xl bg-slate-50 text-slate-600" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.unidade_medida`]" />
                             </div>
 
@@ -481,32 +570,14 @@ const setActiveTab = (tabId) => {
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.intervalo_seguranca_dias`]" />
                             </div>
 
-                            <div v-if="isTratamentoFitossanitario(form.tipo)">
-                                <InputLabel value="Estabelecimento de venda" />
-                                <TextInput v-model="produto.estabelecimento_venda_nome" class="mt-2 block w-full rounded-2xl" />
-                                <InputError class="mt-2" :message="form.errors[`produtos.${index}.estabelecimento_venda_nome`]" />
-                            </div>
-
-                            <div v-if="isTratamentoFitossanitario(form.tipo)">
-                                <InputLabel value="N.º autorização do estabelecimento" />
-                                <TextInput v-model="produto.estabelecimento_venda_autorizacao" class="mt-2 block w-full rounded-2xl" />
-                                <InputError class="mt-2" :message="form.errors[`produtos.${index}.estabelecimento_venda_autorizacao`]" />
-                            </div>
-
-                            <div>
-                                <InputLabel value="Custo unitário" />
-                                <TextInput
-                                    v-model="produto.custo_unitario"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    readonly
-                                    class="mt-2 block w-full rounded-2xl bg-slate-50 text-slate-600"
-                                />
-                                <p class="mt-2 text-xs leading-5 text-slate-500">
-                                    Preço automático do produto. Atualiza o valor no produto quando muda a fatura.
+                            <div class="rounded-2xl bg-emerald-50 p-4">
+                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Preço automático</p>
+                                <p class="mt-2 text-sm font-semibold text-emerald-900">
+                                    {{ produto.custo_unitario ? `€ ${formatCurrency(parseFloat(produto.custo_unitario) || 0)}` : 'Sem preço definido no produto' }}
                                 </p>
-                                <InputError class="mt-2" :message="form.errors[`produtos.${index}.custo_unitario`]" />
+                                <p class="mt-1 text-xs text-slate-500">
+                                    O custo vem do produto e o total é calculado automaticamente.
+                                </p>
                             </div>
 
                             <div class="flex items-end">

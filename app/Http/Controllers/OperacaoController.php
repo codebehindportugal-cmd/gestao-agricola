@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreOperacaoRequest;
 use App\Http\Requests\UpdateOperacaoRequest;
 use App\Models\Operacao;
+use App\Support\OperacaoDuration;
 use Illuminate\Http\JsonResponse;
 
 class OperacaoController extends Controller
@@ -25,19 +26,29 @@ class OperacaoController extends Controller
 
     public function store(StoreOperacaoRequest $request): JsonResponse
     {
-        $data = $request->validated();
+        $data = $this->normalizePayload($request->validated());
         $produtos = $data['produtos'] ?? [];
-        unset($data['produtos']);
+        $parcelaIds = $this->selectedParcelaIds($data);
+        unset($data['produtos'], $data['parcela_ids']);
 
-        $operacao = Operacao::create($data);
+        $operacoes = collect($parcelaIds)->map(function (int $parcelaId) use ($data, $produtos, $parcelaIds) {
+            $operacao = Operacao::create([
+                ...$data,
+                'parcela_id' => $parcelaId,
+                'cultura_id' => count($parcelaIds) > 1 ? null : ($data['cultura_id'] ?? null),
+                'campanha_id' => count($parcelaIds) > 1 ? null : ($data['campanha_id'] ?? null),
+            ]);
 
-        if (count($produtos)) {
-            $operacao->produtos()->sync($this->formatProdutos($produtos));
-        }
+            if (count($produtos)) {
+                $operacao->produtos()->sync($this->formatProdutos($produtos));
+            }
+
+            return $operacao->load('parcela', 'cultura', 'maquina', 'produtos');
+        });
 
         return response()->json([
             'message' => 'Operação criada com sucesso',
-            'data' => $operacao->load('parcela', 'cultura', 'maquina', 'produtos'),
+            'data' => $operacoes->count() === 1 ? $operacoes->first() : $operacoes,
         ], 201);
     }
 
@@ -59,9 +70,9 @@ class OperacaoController extends Controller
 
     public function update(UpdateOperacaoRequest $request, Operacao $operacao): JsonResponse
     {
-        $data = $request->validated();
+        $data = $this->normalizePayload($request->validated());
         $produtos = $data['produtos'] ?? [];
-        unset($data['produtos']);
+        unset($data['produtos'], $data['parcela_ids']);
 
         $operacao->update($data);
         $operacao->produtos()->sync($this->formatProdutos($produtos));
@@ -138,5 +149,28 @@ class OperacaoController extends Controller
         }
 
         return (float) $value;
+    }
+
+    private function normalizePayload(array $data): array
+    {
+        $data['duracao_horas'] = OperacaoDuration::calculateFromStrings(
+            $data['data_hora_inicio'] ?? null,
+            $data['data_hora_fim'] ?? null,
+        );
+
+        return $data;
+    }
+
+    private function selectedParcelaIds(array $data): array
+    {
+        $parcelaIds = collect($data['parcela_ids'] ?? [])
+            ->filter()
+            ->map(fn ($id) => (int) $id);
+
+        if ($parcelaIds->isEmpty() && ! empty($data['parcela_id'])) {
+            $parcelaIds->push((int) $data['parcela_id']);
+        }
+
+        return $parcelaIds->unique()->values()->all();
     }
 }

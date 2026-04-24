@@ -47,6 +47,7 @@ const filterState = reactive({
 
 const baseFormData = {
     parcela_id: props.filters.parcela_id ?? '',
+    parcela_ids: [],
     cultura_id: '',
     campanha_id: '',
     tipo: '',
@@ -79,6 +80,8 @@ const productForm = useForm({
     custo_unitario: '',
     codigo_interno: '',
     numero_autorizacao_dgav: '',
+    estabelecimento_venda_nome: '',
+    estabelecimento_venda_autorizacao: '',
     descricao: '',
 });
 
@@ -109,6 +112,7 @@ const openCreateModal = () => {
     createForm.clearErrors();
     createForm.estado = 'planejada';
     createForm.parcela_id = filterState.parcela_id || '';
+    createForm.parcela_ids = filterState.parcela_id ? [filterState.parcela_id] : [];
     createForm.produtos = [];
     createModalOpen.value = true;
 };
@@ -123,6 +127,7 @@ const openEditModal = (operacao) => {
     editForm.reset();
     editForm.clearErrors();
     editForm.parcela_id = operacao.parcela_id?.toString() ?? '';
+    editForm.parcela_ids = [];
     editForm.cultura_id = operacao.cultura_id?.toString() ?? '';
     editForm.campanha_id = operacao.campanha_id?.toString() ?? '';
     editForm.tipo = operacao.tipo ?? '';
@@ -173,6 +178,8 @@ const openProductModal = (type = 'fitofarmaco') => {
         custo_unitario: '',
         codigo_interno: '',
         numero_autorizacao_dgav: '',
+        estabelecimento_venda_nome: '',
+        estabelecimento_venda_autorizacao: '',
         descricao: '',
     });
     productForm.reset();
@@ -187,6 +194,8 @@ const closeProductModal = () => {
 
 const normalizePayload = (form) => form.transform((data) => ({
     ...data,
+    parcela_id: data.parcela_id || data.parcela_ids?.[0] || null,
+    parcela_ids: (data.parcela_ids ?? []).filter(Boolean),
     cultura_id: data.cultura_id || null,
     campanha_id: data.campanha_id || null,
     maquina_id: data.maquina_id || null,
@@ -194,7 +203,7 @@ const normalizePayload = (form) => form.transform((data) => ({
     operador_id: data.operador_id || null,
     funcionario_id: data.funcionario_id || null,
     equipa_id: data.equipa_id || null,
-    duracao_horas: data.duracao_horas || null,
+    duracao_horas: null,
     custo_estimado: data.custo_estimado || null,
     custo_real: data.custo_real || null,
     data_hora_inicio: data.data_hora_inicio ? data.data_hora_inicio.replace('T', ' ') : '',
@@ -245,6 +254,8 @@ const submitProduct = () => {
             ...data,
             custo_unitario: data.custo_unitario || null,
             codigo_interno: data.codigo_interno || null,
+            estabelecimento_venda_nome: data.estabelecimento_venda_nome || null,
+            estabelecimento_venda_autorizacao: data.estabelecimento_venda_autorizacao || null,
             descricao: data.descricao || null,
         }))
         .post(route('app.operacoes.produtos.store', currentQuery.value), {
@@ -529,20 +540,12 @@ const stockStats = computed(() => ({
                                 <p class="mt-2 text-sm text-slate-700">{{ operacao.data_hora_fim?.replace('T', ' ') || 'Por definir' }}</p>
                             </div>
                             <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Cultura</p>
-                                <p class="mt-2 text-sm text-slate-700">{{ operacao.cultura_nome || 'Sem cultura' }}</p>
-                            </div>
-                            <div class="rounded-3xl bg-slate-50 p-4">
                                 <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Responsável</p>
                                 <p class="mt-2 text-sm text-slate-700">{{ operacao.operador_nome || 'Sem operador' }}</p>
                             </div>
                             <div class="rounded-3xl bg-slate-50 p-4">
                                 <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Equipa</p>
                                 <p class="mt-2 text-sm text-slate-700">{{ operacao.equipa_nome || 'Sem equipa' }}</p>
-                            </div>
-                            <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Campanha</p>
-                                <p class="mt-2 text-sm text-slate-700">{{ operacao.campanha_nome || 'Sem campanha' }}</p>
                             </div>
                             <div class="rounded-3xl bg-slate-50 p-4">
                                 <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Máquina</p>
@@ -633,6 +636,7 @@ const stockStats = computed(() => ({
                         :produtos="produtos"
                         :tipo-options="tipoOptions"
                         :estado-options="estadoOptions"
+                        allow-multiple-parcelas
                         @submit="submitCreate"
                         @cancel="closeCreateModal"
                         @open-product-modal="openProductModal"
@@ -732,6 +736,18 @@ const stockStats = computed(() => ({
                         <InputLabel value="N.º AV/APV/ACP/AE" />
                         <TextInput v-model="productForm.numero_autorizacao_dgav" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="productForm.errors.numero_autorizacao_dgav" />
+                    </div>
+
+                    <div v-if="productForm.tipo === 'fitofarmaco'" class="sm:col-span-2">
+                        <InputLabel value="Estabelecimento de venda" />
+                        <TextInput v-model="productForm.estabelecimento_venda_nome" class="mt-2 block w-full rounded-2xl" />
+                        <InputError class="mt-2" :message="productForm.errors.estabelecimento_venda_nome" />
+                    </div>
+
+                    <div v-if="productForm.tipo === 'fitofarmaco'" class="sm:col-span-2">
+                        <InputLabel value="N.º autorização do estabelecimento" />
+                        <TextInput v-model="productForm.estabelecimento_venda_autorizacao" class="mt-2 block w-full rounded-2xl" />
+                        <InputError class="mt-2" :message="productForm.errors.estabelecimento_venda_autorizacao" />
                     </div>
 
                     <div class="sm:col-span-2">

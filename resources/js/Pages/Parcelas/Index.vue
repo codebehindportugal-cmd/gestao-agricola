@@ -40,8 +40,10 @@ const props = defineProps({
 
 const page = usePage();
 const flashSuccess = computed(() => page.props.flash?.success);
+const flashError = computed(() => page.props.flash?.error);
 const createModalOpen = ref(false);
 const editingParcela = ref(null);
+const importInput = ref(null);
 
 const filterState = reactive({
     search: props.filters.search ?? '',
@@ -68,6 +70,9 @@ const baseFormData = {
 
 const createForm = useForm({ ...baseFormData });
 const editForm = useForm({ ...baseFormData });
+const importForm = useForm({
+    ficheiro: null,
+});
 const createErrorMessages = computed(() => Object.values(createForm.errors));
 const editErrorMessages = computed(() => Object.values(editForm.errors));
 
@@ -162,6 +167,31 @@ const deleteParcela = (parcela) => {
     });
 };
 
+const openImportPicker = () => {
+    importInput.value?.click();
+};
+
+const submitImport = (event) => {
+    const file = event.target.files?.[0] ?? null;
+
+    if (!file) {
+        return;
+    }
+
+    importForm.ficheiro = file;
+    importForm.post(route('app.terrenos.import'), {
+        forceFormData: true,
+        preserveScroll: true,
+        onSuccess: () => {
+            importForm.reset();
+            event.target.value = '';
+        },
+        onError: () => {
+            event.target.value = '';
+        },
+    });
+};
+
 const formatArea = (value) => {
     const number = Number(value ?? 0);
 
@@ -241,13 +271,37 @@ const updateEditPolygonArea = (area) => {
                     </p>
                 </div>
 
-                <Link
-                    v-if="can.create"
-                    :href="route('app.parcelas.create', currentQuery)"
-                    class="justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600"
-                >
-                    Nova parcela
-                </Link>
+                <div class="flex flex-wrap gap-3">
+                    <a
+                        :href="route('app.terrenos.export')"
+                        class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                    >
+                        Exportar
+                    </a>
+                    <SecondaryButton
+                        v-if="can.create"
+                        type="button"
+                        class="justify-center rounded-full px-5 py-3 text-sm normal-case tracking-normal"
+                        :disabled="importForm.processing"
+                        @click="openImportPicker"
+                    >
+                        Importar
+                    </SecondaryButton>
+                    <input
+                        ref="importInput"
+                        type="file"
+                        accept="application/json,.json"
+                        class="hidden"
+                        @change="submitImport"
+                    >
+                    <Link
+                        v-if="can.create"
+                        :href="route('app.parcelas.create', currentQuery)"
+                        class="justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600"
+                    >
+                        Nova parcela
+                    </Link>
+                </div>
             </div>
         </template>
 
@@ -258,6 +312,12 @@ const updateEditPolygonArea = (area) => {
                     class="rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-800"
                 >
                     {{ flashSuccess }}
+                </div>
+                <div
+                    v-if="flashError || importForm.errors.ficheiro"
+                    class="rounded-3xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-medium text-red-700"
+                >
+                    {{ flashError || importForm.errors.ficheiro }}
                 </div>
 
                 <section class="grid gap-4 md:grid-cols-4">

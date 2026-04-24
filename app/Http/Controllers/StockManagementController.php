@@ -41,6 +41,9 @@ class StockManagementController extends Controller
                     'nome' => $produto->nome,
                     'tipo' => $produto->tipo,
                     'codigo_interno' => $produto->codigo_interno,
+                    'numero_autorizacao_dgav' => $produto->numero_autorizacao_dgav,
+                    'estabelecimento_venda_nome' => $produto->estabelecimento_venda_nome,
+                    'estabelecimento_venda_autorizacao' => $produto->estabelecimento_venda_autorizacao,
                     'unidade_medida' => $produto->unidade_medida,
                     'custo_unitario' => $produto->custo_unitario,
                     'stock_minimo' => $stockMinimo,
@@ -89,6 +92,8 @@ class StockManagementController extends Controller
             'quantidade_inicial' => ['nullable', 'numeric', 'min:0'],
             'codigo_interno' => ['nullable', 'string', 'max:255', 'unique:produtos,codigo_interno'],
             'numero_autorizacao_dgav' => ['nullable', 'string', 'max:255'],
+            'estabelecimento_venda_nome' => ['nullable', 'string', 'max:255'],
+            'estabelecimento_venda_autorizacao' => ['nullable', 'string', 'max:255'],
             'descricao' => ['nullable', 'string'],
         ]);
 
@@ -101,6 +106,8 @@ class StockManagementController extends Controller
                 'stock_minimo' => $data['stock_minimo'] === '' ? 0 : (int) round((float) ($data['stock_minimo'] ?? 0)),
                 'codigo_interno' => $data['codigo_interno'] ?? null,
                 'numero_autorizacao_dgav' => $data['numero_autorizacao_dgav'] ?? null,
+                'estabelecimento_venda_nome' => $data['estabelecimento_venda_nome'] ?? null,
+                'estabelecimento_venda_autorizacao' => $data['estabelecimento_venda_autorizacao'] ?? null,
                 'descricao' => $data['descricao'] ?? null,
             ]);
 

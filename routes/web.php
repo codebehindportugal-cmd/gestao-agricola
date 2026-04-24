@@ -32,6 +32,8 @@ Route::get('/dashboard', DashboardController::class)
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/terrenos', [TerrenoManagementController::class, 'index'])->name('app.terrenos.index');
+    Route::get('/terrenos/exportar', [TerrenoManagementController::class, 'export'])->name('app.terrenos.export');
+    Route::post('/terrenos/importar', [TerrenoManagementController::class, 'import'])->name('app.terrenos.import');
     Route::get('/terrenos/criar', [TerrenoManagementController::class, 'create'])->name('app.terrenos.create');
     Route::post('/terrenos', [TerrenoManagementController::class, 'store'])->name('app.terrenos.store');
     Route::get('/terrenos/{terreno}/editar', [TerrenoManagementController::class, 'edit'])->name('app.terrenos.edit');
