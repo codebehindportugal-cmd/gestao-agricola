@@ -22,6 +22,7 @@ use App\Support\StockConsumption;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -223,7 +224,7 @@ class OperacaoManagementController extends Controller
                         ? null
                         : round((float) ($produto->stock_atual ?? 0) * (float) $produto->custo_unitario, 2),
                 ]),
-            'cadernoCampo' => $this->cadernoCampoResumo(),
+            'cadernoCampo' => $this->cadernoCampoResumoNormalizado(),
             'exploracaoDados' => $this->exploracaoDados(),
         ]);
     }
@@ -249,6 +250,9 @@ class OperacaoManagementController extends Controller
                         'parcela_id' => $parcelaId,
                         'cultura_id' => $isBulkOperation ? null : ($data['cultura_id'] ?? null),
                     ];
+                    $operationData = $isBulkOperation
+                        ? $this->distributedOperationPayload($operationData, $parcelaId, $distributionWeights)
+                        : $operationData;
                     $operationData['campanha_id'] = $isBulkOperation ? null : $this->resolveCampanhaId($operationData);
 
                     $operacao = Operacao::query()->create([
@@ -645,6 +649,19 @@ class OperacaoManagementController extends Controller
             ->all();
     }
 
+    private function distributedOperationPayload(array $data, int $parcelaId, array $weights): array
+    {
+        $weight = (float) ($weights[$parcelaId] ?? 0);
+
+        foreach (['combustivel_gasto_l', 'distancia_km'] as $field) {
+            if (($data[$field] ?? null) !== null) {
+                $data[$field] = round((float) $data[$field] * $weight, 2);
+            }
+        }
+
+        return $data;
+    }
+
     private function tipoOptions(): array
     {
         return [
@@ -714,6 +731,62 @@ class OperacaoManagementController extends Controller
             'plantas', 'planta' => 'planta',
             default => $normalized ?: 'outro',
         };
+    }
+
+    private function cadernoCampoResumoNormalizado()
+    {
+        return Campanha::query()
+            ->with(['cultura:id,nome'])
+            ->orderByDesc('ano')
+            ->limit(8)
+            ->get(['id', 'cultura_id', 'ano', 'status', 'producao_real', 'custo_real'])
+            ->map(function (Campanha $campanha) {
+                $operacoes = Operacao::query()
+                    ->with(['produtos:id,nome,tipo'])
+                    ->where('campanha_id', $campanha->id)
+                    ->get();
+                $tratamentos = $operacoes
+                    ->filter(fn (Operacao $operacao) => $this->normaliseText($operacao->tipo) === 'tratamento fitossanitario');
+
+                $custoProdutosTratamentos = (float) $tratamentos
+                    ->flatMap(fn (Operacao $operacao) => $operacao->produtos)
+                    ->sum(fn (Produto $produto) => (float) ($produto->pivot->custo_total ?? 0));
+                $custoProdutos = (float) $operacoes
+                    ->flatMap(fn (Operacao $operacao) => $operacao->produtos)
+                    ->sum(fn (Produto $produto) => (float) ($produto->pivot->custo_total ?? 0));
+                $custoOperacoes = (float) $operacoes->sum('custo_real');
+                $custoOutros = (float) Custo::query()
+                    ->where('campanha_id', $campanha->id)
+                    ->sum('valor');
+                $custoTotal = ($campanha->custo_real ?? null) !== null
+                    ? (float) $campanha->custo_real
+                    : $custoOperacoes + $custoProdutos + $custoOutros;
+                $producaoReal = (float) Colheita::query()
+                    ->where('campanha_id', $campanha->id)
+                    ->sum('quantidade_total') ?: (float) ($campanha->producao_real ?? 0);
+
+                return [
+                    'id' => $campanha->id,
+                    'nome' => "{$campanha->cultura?->nome} - {$campanha->ano}",
+                    'tratamentos' => $tratamentos->count(),
+                    'producao_real' => $producaoReal,
+                    'custo_operacoes' => $custoOperacoes,
+                    'custo_produtos' => $custoProdutosTratamentos,
+                    'custo_outros' => $custoOutros,
+                    'custo_total' => $custoTotal,
+                    'custo_por_unidade' => $producaoReal > 0 ? round($custoTotal / $producaoReal, 4) : null,
+                ];
+            });
+    }
+
+    private function normaliseText(?string $value): string
+    {
+        return Str::of($value ?? '')
+            ->ascii()
+            ->lower()
+            ->replaceMatches('/[^a-z0-9]+/', ' ')
+            ->squish()
+            ->toString();
     }
 
     private function cadernoCampoResumo()

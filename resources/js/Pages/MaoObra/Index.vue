@@ -82,7 +82,18 @@ watch(
     },
 );
 
-const labelize = (value) => String(value ?? '').replaceAll('_', ' ');
+const labels = {
+    ativo: 'Ativo',
+    inativo: 'Inativo',
+    em_licenca: 'Em licença',
+    permanente: 'Permanente',
+    temporario: 'Temporário',
+    estagiario: 'Estagiário',
+    ativa: 'Ativa',
+    inativa: 'Inativa',
+};
+
+const labelize = (value) => labels[value] ?? String(value ?? '').replaceAll('_', ' ');
 
 const funcionarioStatusClass = (status) => ({
     ativo: 'bg-emerald-50 text-emerald-700',
@@ -258,7 +269,7 @@ const formatCurrency = (value) => {
 
                 <section class="grid gap-4 md:grid-cols-5">
                     <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.22)]">
-                        <p class="text-sm font-medium text-slate-500">Operarios</p>
+                        <p class="text-sm font-medium text-slate-500">Operários</p>
                         <p class="mt-3 text-4xl font-black text-slate-900">{{ summary.funcionarios }}</p>
                     </article>
                     <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.22)]">
@@ -300,7 +311,7 @@ const formatCurrency = (value) => {
                             </select>
                         </div>
                         <div>
-                            <InputLabel value="Estado equipa" />
+                            <InputLabel value="Estado da equipa" />
                             <select v-model="filterState.equipa_status" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
                                 <option value="">Todas</option>
                                 <option v-for="status in equipaStatusOptions" :key="status" :value="status">{{ labelize(status) }}</option>
@@ -317,7 +328,7 @@ const formatCurrency = (value) => {
                 <section class="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
                     <div class="flex flex-col gap-4">
                         <div class="flex items-center justify-between gap-4">
-                            <h2 class="text-xl font-black text-slate-900">Operarios</h2>
+                            <h2 class="text-xl font-black text-slate-900">Operários</h2>
                             <p class="text-sm text-slate-500">{{ funcionarios.total }} registos</p>
                         </div>
 
@@ -350,11 +361,11 @@ const formatCurrency = (value) => {
                                     <p class="mt-2 text-xl font-black text-slate-900">{{ funcionario.jornadas_count }}</p>
                                 </div>
                                 <div class="rounded-3xl bg-slate-50 p-4">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Saida</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Saída</p>
                                     <p class="mt-2 text-sm text-slate-700">{{ funcionario.data_saida || 'Sem data' }}</p>
                                 </div>
                                 <div class="rounded-3xl bg-emerald-50 p-4">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Valor hora</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Valor/hora</p>
                                     <p class="mt-2 text-sm font-bold text-emerald-900">{{ formatCurrency(funcionario.valor_hora) }}</p>
                                 </div>
                             </div>
@@ -363,7 +374,7 @@ const formatCurrency = (value) => {
                                 <span v-for="equipa in funcionario.equipas" :key="equipa.id" class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
                                     {{ equipa.nome }}
                                 </span>
-                                <span v-if="!funcionario.equipas.length" class="text-sm text-slate-500">Sem equipa atribuida</span>
+                                <span v-if="!funcionario.equipas.length" class="text-sm text-slate-500">Sem equipa atribuída</span>
                             </div>
 
                             <p class="mt-4 rounded-3xl bg-lime-50/60 p-4 text-sm leading-7 text-slate-600">
@@ -412,7 +423,7 @@ const formatCurrency = (value) => {
                                             {{ labelize(equipa.status) }}
                                         </span>
                                     </div>
-                                    <p class="mt-2 text-sm text-slate-500">Lider: {{ equipa.lider_nome || 'Sem lider' }}</p>
+                                    <p class="mt-2 text-sm text-slate-500">Líder: {{ equipa.lider_nome || 'Sem líder' }}</p>
                                 </div>
                                 <div class="rounded-3xl bg-emerald-50 px-4 py-3 text-center">
                                     <p class="text-2xl font-black text-emerald-700">{{ equipa.funcionarios_count }}</p>
@@ -428,7 +439,7 @@ const formatCurrency = (value) => {
                                 <span v-for="funcionario in equipa.funcionarios" :key="funcionario.id" class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                                     {{ funcionario.nome }} · {{ funcionario.cargo }}
                                 </span>
-                                <span v-if="!equipa.funcionarios.length" class="text-sm text-slate-500">Sem membros atribuidos</span>
+                                <span v-if="!equipa.funcionarios.length" class="text-sm text-slate-500">Sem membros atribuídos</span>
                             </div>
 
                             <div class="mt-5 flex flex-wrap gap-3">
@@ -485,7 +496,7 @@ const formatCurrency = (value) => {
                         <InputError class="mt-2" :message="funcionarioForm.errors.cargo" />
                     </div>
                     <div>
-                        <InputLabel value="N.� autoriza��o do aplicador" />
+                        <InputLabel value="N.o autorização do aplicador" />
                         <TextInput v-model="funcionarioForm.aplicador_numero_autorizacao" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="funcionarioForm.errors.aplicador_numero_autorizacao" />
                     </div>
@@ -569,9 +580,9 @@ const formatCurrency = (value) => {
                         <InputError class="mt-2" :message="equipaForm.errors.status" />
                     </div>
                     <div class="sm:col-span-2">
-                        <InputLabel value="Lider" />
+                        <InputLabel value="Líder" />
                         <select v-model="equipaForm.lider_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
-                            <option value="">Sem lider</option>
+                            <option value="">Sem líder</option>
                             <option v-for="funcionario in funcionarioOptions" :key="funcionario.id" :value="String(funcionario.id)">
                                 {{ funcionario.nome }} - {{ funcionario.cargo }}
                             </option>

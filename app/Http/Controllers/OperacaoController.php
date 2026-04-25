@@ -6,6 +6,7 @@ use App\Http\Requests\StoreOperacaoRequest;
 use App\Http\Requests\UpdateOperacaoRequest;
 use App\Models\Maquina;
 use App\Models\Operacao;
+use App\Models\Parcela;
 use App\Support\OperacaoDuration;
 use App\Support\StockConsumption;
 use Illuminate\Http\JsonResponse;
@@ -32,12 +33,18 @@ class OperacaoController extends Controller
         $data = $this->normalizePayload($request->validated());
         $produtos = $data['produtos'] ?? [];
         $parcelaIds = $this->selectedParcelaIds($data);
+        $isBulkOperation = count($parcelaIds) > 1;
+        $distributionWeights = $isBulkOperation ? $this->parcelDistributionWeights($parcelaIds) : [];
         unset($data['produtos'], $data['parcela_ids']);
 
-        $operacoes = DB::transaction(function () use ($data, $produtos, $parcelaIds) {
-            return collect($parcelaIds)->map(function (int $parcelaId) use ($data, $produtos, $parcelaIds) {
+        $operacoes = DB::transaction(function () use ($data, $produtos, $parcelaIds, $isBulkOperation, $distributionWeights) {
+            return collect($parcelaIds)->map(function (int $parcelaId) use ($data, $produtos, $parcelaIds, $isBulkOperation, $distributionWeights) {
+                $operationData = $isBulkOperation
+                    ? $this->distributedOperationPayload($data, $parcelaId, $distributionWeights)
+                    : $data;
+
                 $operacao = Operacao::create([
-                    ...$data,
+                    ...$operationData,
                     'parcela_id' => $parcelaId,
                     'cultura_id' => count($parcelaIds) > 1 ? null : ($data['cultura_id'] ?? null),
                     'campanha_id' => count($parcelaIds) > 1 ? null : ($data['campanha_id'] ?? null),
@@ -218,5 +225,45 @@ class OperacaoController extends Controller
         }
 
         return $parcelaIds->unique()->values()->all();
+    }
+
+    private function parcelDistributionWeights(array $parcelaIds): array
+    {
+        $parcelas = Parcela::query()
+            ->whereIn('id', $parcelaIds)
+            ->get(['id', 'area_util', 'area_total']);
+
+        $areas = collect($parcelaIds)->mapWithKeys(function (int $parcelaId) use ($parcelas) {
+            $parcela = $parcelas->firstWhere('id', $parcelaId);
+
+            return [$parcelaId => (float) ($parcela?->area_util ?: $parcela?->area_total ?: 0)];
+        });
+
+        $totalArea = (float) $areas->sum();
+
+        if ($totalArea <= 0) {
+            $equalWeight = count($parcelaIds) > 0 ? 1 / count($parcelaIds) : 0;
+
+            return collect($parcelaIds)
+                ->mapWithKeys(fn (int $parcelaId) => [$parcelaId => $equalWeight])
+                ->all();
+        }
+
+        return $areas
+            ->map(fn (float $area) => $area > 0 ? $area / $totalArea : 0)
+            ->all();
+    }
+
+    private function distributedOperationPayload(array $data, int $parcelaId, array $weights): array
+    {
+        $weight = (float) ($weights[$parcelaId] ?? 0);
+
+        foreach (['combustivel_gasto_l', 'distancia_km'] as $field) {
+            if (($data[$field] ?? null) !== null) {
+                $data[$field] = round((float) $data[$field] * $weight, 2);
+            }
+        }
+
+        return $data;
     }
 }
