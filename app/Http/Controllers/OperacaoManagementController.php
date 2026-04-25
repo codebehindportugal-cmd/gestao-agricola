@@ -222,23 +222,6 @@ class OperacaoManagementController extends Controller
                     'ano' => $campanha->ano,
                     'status' => $campanha->status,
                 ]),
-            'stockResumo' => Produto::query()
-                ->withSum('stocks as stock_atual', 'quantidade')
-                ->orderBy('nome')
-                ->get(['id', 'nome', 'tipo', 'unidade_medida', 'custo_unitario', 'stock_minimo'])
-                ->map(fn (Produto $produto) => [
-                    'id' => $produto->id,
-                    'nome' => $produto->nome,
-                    'tipo' => $produto->tipo,
-                    'unidade_medida' => $produto->unidade_medida,
-                    'custo_unitario' => $produto->custo_unitario,
-                    'stock_minimo' => (float) ($produto->stock_minimo ?? 0),
-                    'stock_atual' => (float) ($produto->stock_atual ?? 0),
-                    'abaixo_minimo' => (float) ($produto->stock_atual ?? 0) <= (float) ($produto->stock_minimo ?? 0),
-                    'valor_stock' => $produto->custo_unitario === null
-                        ? null
-                        : round((float) ($produto->stock_atual ?? 0) * (float) $produto->custo_unitario, 2),
-                ]),
             'cadernoCampo' => $this->cadernoCampoResumoNormalizado(),
             'exploracaoDados' => $this->exploracaoDados(),
         ]);
@@ -537,10 +520,11 @@ class OperacaoManagementController extends Controller
         unset($data['colheita_quantidade_perdas']);
         unset($data['colheita_qualidade']);
 
-        $data['duracao_horas'] = OperacaoDuration::calculateFromStrings(
-            $data['data_hora_inicio'] ?? null,
-            $data['data_hora_fim'] ?? null,
-        );
+        $data['duracao_horas'] = $this->nullableFloat($data['duracao_horas'] ?? null)
+            ?? OperacaoDuration::calculateFromStrings(
+                $data['data_hora_inicio'] ?? null,
+                $data['data_hora_fim'] ?? null,
+            );
         $data['combustivel_gasto_l'] = $this->calculateFuelUsage($data);
         $data = $this->fillDgavDefaults($data);
 
@@ -715,7 +699,7 @@ class OperacaoManagementController extends Controller
     {
         $weight = (float) ($weights[$parcelaId] ?? 0);
 
-        foreach (['combustivel_gasto_l', 'distancia_km'] as $field) {
+        foreach (['duracao_horas', 'combustivel_gasto_l', 'distancia_km'] as $field) {
             if (($data[$field] ?? null) !== null) {
                 $data[$field] = round((float) $data[$field] * $weight, 2);
             }

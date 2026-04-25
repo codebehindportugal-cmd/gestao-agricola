@@ -29,7 +29,6 @@ const props = defineProps({
     campanhas: { type: Array, default: () => [] },
     cadernoCampo: { type: Array, default: () => [] },
     produtos: { type: Array, default: () => [] },
-    stockResumo: { type: Array, default: () => [] },
     exploracaoDados: { type: Object, default: () => ({}) },
 });
 
@@ -305,7 +304,7 @@ const normalizePayload = (form) => form.transform((data) => {
         operador_id: data.operador_id || null,
         funcionario_id: data.funcionario_id || null,
         equipa_id: data.equipa_id || null,
-        duracao_horas: null,
+        duracao_horas: data.duracao_horas || null,
         distancia_km: data.distancia_km || null,
         combustivel_gasto_l: null,
         custo_estimado: data.custo_estimado || null,
@@ -417,11 +416,6 @@ const formatNumber = (value) => {
     }).format(Number(value ?? 0));
 };
 
-const stockStats = computed(() => ({
-    totalProdutos: props.stockResumo.length,
-    abaixoMinimo: props.stockResumo.filter((produto) => produto.abaixo_minimo).length,
-    valorTotal: props.stockResumo.reduce((total, produto) => total + Number(produto.valor_stock ?? 0), 0),
-}));
 </script>
 
 <template>
@@ -548,86 +542,20 @@ const stockStats = computed(() => ({
                             <p v-if="campanha.custo_por_unidade" class="mt-1 text-xs font-semibold text-emerald-700">
                                 {{ formatNumber(campanha.custo_por_unidade) }} €/unidade produzida
                             </p>
-                            <Link
-                                :href="route('app.campanhas.exportar', campanha.id)"
-                                class="mt-4 inline-flex items-center rounded-full border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
-                            >
-                                Gerar caderno
-                            </Link>
-                        </article>
-                    </div>
-                </section>
-
-                <section v-if="stockResumo.length" class="rounded-[32px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                        <div>
-                            <h2 class="text-xl font-black text-slate-900">Stock de produtos</h2>
-                            <p class="mt-1 text-sm text-slate-500">Visão rápida do que tens disponível, do mínimo definido e do valor em stock.</p>
-                        </div>
-
-                        <div class="grid gap-3 sm:grid-cols-3">
-                            <div class="rounded-2xl bg-slate-50 px-4 py-3">
-                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Produtos</p>
-                                <p class="mt-2 text-2xl font-black text-slate-900">{{ stockStats.totalProdutos }}</p>
-                            </div>
-                            <div class="rounded-2xl bg-amber-50 px-4 py-3">
-                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">A rever</p>
-                                <p class="mt-2 text-2xl font-black text-amber-700">{{ stockStats.abaixoMinimo }}</p>
-                            </div>
-                            <div class="rounded-2xl bg-emerald-50 px-4 py-3">
-                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Valor stock</p>
-                                <p class="mt-2 text-2xl font-black text-emerald-700">{{ formatNumber(stockStats.valorTotal) }} €</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        <article
-                            v-for="produto in stockResumo"
-                            :key="produto.id"
-                            class="rounded-3xl border p-4"
-                            :class="produto.abaixo_minimo ? 'border-amber-200 bg-amber-50/70' : 'border-emerald-100 bg-emerald-50/50'"
-                        >
-                            <div class="flex items-start justify-between gap-3">
-                                <div>
-                                    <p class="text-sm font-semibold text-slate-900">{{ produto.nome }}</p>
-                                    <p class="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">{{ produto.tipo }}</p>
-                                </div>
-                                <span
-                                    class="rounded-full px-3 py-1 text-xs font-semibold"
-                                    :class="produto.abaixo_minimo ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'"
+                            <div class="mt-4 flex flex-wrap gap-2">
+                                <Link
+                                    :href="route('app.campanhas.caderno-campo', campanha.id)"
+                                    class="inline-flex items-center rounded-full border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
                                 >
-                                    {{ produto.abaixo_minimo ? 'baixo' : 'ok' }}
-                                </span>
+                                    Caderno
+                                </Link>
+                                <Link
+                                    :href="route('app.campanhas.custos-pdf', campanha.id)"
+                                    class="inline-flex items-center rounded-full border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+                                >
+                                    Custos PDF
+                                </Link>
                             </div>
-
-                            <div class="mt-4 grid gap-3 sm:grid-cols-3">
-                                <div class="rounded-2xl bg-white/80 p-3">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Atual</p>
-                                    <p class="mt-2 text-sm font-bold text-slate-900">
-                                        {{ formatNumber(produto.stock_atual) }} {{ produto.unidade_medida }}
-                                    </p>
-                                </div>
-                                <div class="rounded-2xl bg-white/80 p-3">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Mínimo</p>
-                                    <p class="mt-2 text-sm font-bold text-slate-900">
-                                        {{ formatNumber(produto.stock_minimo) }} {{ produto.unidade_medida }}
-                                    </p>
-                                </div>
-                                <div class="rounded-2xl bg-white/80 p-3">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Preço</p>
-                                    <p class="mt-2 text-sm font-bold text-slate-900">
-                                        {{ produto.custo_unitario !== null ? `${formatNumber(produto.custo_unitario)} €` : '-' }}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <p class="mt-4 text-sm text-slate-600">
-                                Valor em stock:
-                                <span class="font-semibold text-slate-900">
-                                    {{ produto.valor_stock !== null ? `${formatNumber(produto.valor_stock)} €` : '-' }}
-                                </span>
-                            </p>
                         </article>
                     </div>
                 </section>

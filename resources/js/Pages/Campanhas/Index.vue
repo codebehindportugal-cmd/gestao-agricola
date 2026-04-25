@@ -148,12 +148,20 @@ const statusBadgeClass = (status) => ({
                                 </p>
                             </div>
 
-                            <Link
-                                :href="route('app.campanhas.exportar', campanha.id)"
-                                class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100"
-                            >
-                                Exportar relatório
-                            </Link>
+                            <div class="flex flex-wrap gap-2">
+                                <Link
+                                    :href="route('app.campanhas.caderno-campo', campanha.id)"
+                                    class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100"
+                                >
+                                    Caderno de campo
+                                </Link>
+                                <Link
+                                    :href="route('app.campanhas.custos-pdf', campanha.id)"
+                                    class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-100"
+                                >
+                                    Custos PDF
+                                </Link>
+                            </div>
                         </div>
 
                         <div class="mt-6 grid gap-4 md:grid-cols-4">

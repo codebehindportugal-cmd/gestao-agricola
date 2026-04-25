@@ -317,6 +317,12 @@ const tabs = computed(() => [
 ]);
 
 const visibleTabs = computed(() => tabs.value.filter((tab) => tab.visible));
+const lastAutomaticDuration = ref('');
+
+const applyCalculatedDuration = () => {
+    props.form.duracao_horas = calculatedDuration.value;
+    lastAutomaticDuration.value = calculatedDuration.value;
+};
 
 watch(() => props.form.tipo, () => {
     ensureProductRows(props.form);
@@ -340,8 +346,15 @@ watch(() => props.form.parcela_ids, () => {
     syncContextFromParcela(props.form);
 }, { deep: true });
 
-watch(calculatedDuration, (duration) => {
-    props.form.duracao_horas = duration;
+watch(calculatedDuration, (duration, previousDuration) => {
+    if (
+        !props.form.duracao_horas
+        || props.form.duracao_horas === previousDuration
+        || props.form.duracao_horas === lastAutomaticDuration.value
+    ) {
+        props.form.duracao_horas = duration;
+        lastAutomaticDuration.value = duration;
+    }
 }, { immediate: true });
 
 watch(calculatedFuelUsage, (fuelUsage) => {
@@ -556,7 +569,20 @@ const setActiveTab = (tabId) => {
 
                 <div>
                     <InputLabel value="Duração (h)" />
-                    <TextInput v-model="form.duracao_horas" readonly class="mt-2 block w-full rounded-2xl bg-slate-50 text-slate-600" placeholder="Calculada pela hora de inicio/fim" />
+                    <div class="mt-2 flex gap-2">
+                        <TextInput v-model="form.duracao_horas" type="number" step="0.01" min="0" class="block w-full rounded-2xl" placeholder="Horas reais da parcela" />
+                        <SecondaryButton
+                            v-if="calculatedDuration"
+                            type="button"
+                            class="shrink-0 rounded-full px-4 py-2 text-xs normal-case tracking-normal"
+                            @click="applyCalculatedDuration"
+                        >
+                            Usar cálculo
+                        </SecondaryButton>
+                    </div>
+                    <p v-if="calculatedDuration" class="mt-2 text-xs text-slate-500">
+                        Calculado pelas datas: {{ calculatedDuration }} h. Podes ajustar para o tempo real desta parcela.
+                    </p>
                     <InputError class="mt-2" :message="form.errors.duracao_horas" />
                 </div>
 

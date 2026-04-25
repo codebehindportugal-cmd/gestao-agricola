@@ -190,15 +190,16 @@ class OperacaoController extends Controller
             return null;
         }
 
-        return (float) $value;
+        return (float) str_replace(',', '.', (string) $value);
     }
 
     private function normalizePayload(array $data): array
     {
-        $data['duracao_horas'] = OperacaoDuration::calculateFromStrings(
-            $data['data_hora_inicio'] ?? null,
-            $data['data_hora_fim'] ?? null,
-        );
+        $data['duracao_horas'] = $this->nullableFloat($data['duracao_horas'] ?? null)
+            ?? OperacaoDuration::calculateFromStrings(
+                $data['data_hora_inicio'] ?? null,
+                $data['data_hora_fim'] ?? null,
+            );
         $data['combustivel_gasto_l'] = $this->calculateFuelUsage($data);
 
         return $data;
@@ -274,7 +275,7 @@ class OperacaoController extends Controller
     {
         $weight = (float) ($weights[$parcelaId] ?? 0);
 
-        foreach (['combustivel_gasto_l', 'distancia_km'] as $field) {
+        foreach (['duracao_horas', 'combustivel_gasto_l', 'distancia_km'] as $field) {
             if (($data[$field] ?? null) !== null) {
                 $data[$field] = round((float) $data[$field] * $weight, 2);
             }

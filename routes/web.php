@@ -50,7 +50,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/culturas/{cultura}', [CulturaManagementController::class, 'update'])->name('app.culturas.update');
     Route::delete('/culturas/{cultura}', [CulturaManagementController::class, 'destroy'])->name('app.culturas.destroy');
     Route::get('/campanhas', [CampanhaController::class, 'index'])->name('app.campanhas.index');
-    Route::get('/campanhas/{campanha}/exportar', [CampanhaController::class, 'exportar'])->name('app.campanhas.exportar');
+    Route::get('/campanhas/{campanha}/caderno-campo', [CampanhaController::class, 'exportarCadernoCampo'])->name('app.campanhas.caderno-campo');
+    Route::get('/campanhas/{campanha}/custos-pdf', [CampanhaController::class, 'exportarCustosPdf'])->name('app.campanhas.custos-pdf');
+    Route::get('/campanhas/{campanha}/exportar', [CampanhaController::class, 'exportarCadernoCampo'])->name('app.campanhas.exportar');
     Route::get('/operacoes', [OperacaoManagementController::class, 'index'])->name('app.operacoes.index');
     Route::post('/operacoes', [OperacaoManagementController::class, 'store'])->name('app.operacoes.store');
     Route::post('/operacoes/exploracao-dados', [OperacaoManagementController::class, 'updateExploracaoDados'])->name('app.operacoes.exploracao-dados.update');

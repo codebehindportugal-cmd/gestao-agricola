@@ -79,7 +79,7 @@ class CampanhaController extends Controller
         ]);
     }
 
-    public function exportar(Campanha $campanha)
+    public function exportarCadernoCampo(Campanha $campanha)
     {
         $this->authorize('view', $campanha);
 
@@ -202,6 +202,77 @@ class CampanhaController extends Controller
             'registosFitofarmaceuticos',
             'identificacao',
             'linhasVazias',
+            'dataGeracao'
+        ));
+    }
+
+    public function exportarCustosPdf(Campanha $campanha)
+    {
+        $this->authorize('view', $campanha);
+
+        $campanha->load([
+            'cultura.parcela.terreno',
+            'operacoes' => function ($query) {
+                $query->with(['parcela.terreno', 'maquina', 'alfaia', 'operador', 'funcionario', 'equipa', 'produtos']);
+            },
+            'custos',
+            'colheitas',
+        ]);
+
+        $operacoes = $campanha->operacoes->map(function ($operacao) {
+            $custoProdutos = (float) $operacao->produtos
+                ->sum(fn (Produto $produto) => (float) ($produto->pivot->custo_total ?? 0));
+
+            return [
+                'data' => optional($operacao->data_hora_inicio)?->format('d/m/Y') ?? 'N/A',
+                'tipo' => $operacao->tipo ?? 'N/A',
+                'parcela' => trim(($operacao->parcela?->terreno?->nome ? "{$operacao->parcela->terreno->nome} - " : '').($operacao->parcela?->nome ?? '')),
+                'maquina' => $operacao->maquina?->nome,
+                'alfaia' => $operacao->alfaia?->nome,
+                'responsavel' => $operacao->funcionario?->nome ?? $operacao->operador?->name,
+                'equipa' => $operacao->equipa?->nome,
+                'duracao_horas' => (float) ($operacao->duracao_horas ?? 0),
+                'combustivel_gasto_l' => (float) ($operacao->combustivel_gasto_l ?? 0),
+                'custo_real' => (float) ($operacao->custo_real ?? 0),
+                'custo_produtos' => $custoProdutos,
+                'custo_total' => (float) ($operacao->custo_real ?? 0) + $custoProdutos,
+            ];
+        });
+
+        $custosAvulsos = $campanha->custos->map(fn ($custo) => [
+            'data' => optional($custo->data_custo ?? null)?->format('d/m/Y') ?? 'N/A',
+            'tipo' => $custo->tipo ?? 'Outro',
+            'descricao' => $custo->descricao ?? $custo->observacoes ?? '',
+            'valor' => (float) ($custo->valor ?? 0),
+        ]);
+
+        $totalOperacoes = (float) $operacoes->sum('custo_real');
+        $totalProdutos = (float) $operacoes->sum('custo_produtos');
+        $totalCustosAvulsos = (float) $custosAvulsos->sum('valor');
+        $custoTotal = $totalOperacoes + $totalProdutos + $totalCustosAvulsos;
+        $producaoReal = (float) $campanha->colheitas->sum('quantidade_total') ?: (float) ($campanha->producao_real ?? 0);
+        $custoPorKg = $producaoReal > 0 ? round($custoTotal / $producaoReal, 2) : 0;
+        $areaTotal = (float) ($campanha->cultura?->parcela?->area_util ?? $campanha->cultura?->parcela?->area_total ?? 0);
+        $custoPorHa = $areaTotal > 0 ? round($custoTotal / $areaTotal, 2) : 0;
+
+        $resumo = [
+            'total_operacoes' => $totalOperacoes,
+            'total_produtos' => $totalProdutos,
+            'total_custos_avulsos' => $totalCustosAvulsos,
+            'custo_total' => $custoTotal,
+            'producao_real' => $producaoReal,
+            'custo_por_kg' => $custoPorKg,
+            'area_total' => $areaTotal,
+            'custo_por_ha' => $custoPorHa,
+        ];
+
+        $dataGeracao = now()->format('d/m/Y H:i');
+
+        return view('campanhas.custos_pdf', compact(
+            'campanha',
+            'operacoes',
+            'custosAvulsos',
+            'resumo',
             'dataGeracao'
         ));
     }
