@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Campanha;
 use App\Models\Cultura;
+use App\Models\Operacao;
 use App\Models\Produto;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -85,12 +87,10 @@ class CampanhaController extends Controller
 
         $campanha->load([
             'cultura.parcela.terreno',
-            'operacoes' => function ($query) {
-                $query->with(['parcela.terreno', 'cultura', 'produtos', 'custos']);
-            },
             'colheitas',
             'custos',
         ]);
+        $campanha->setRelation('operacoes', $this->reportOperationsForCampaign($campanha, ['parcela.terreno', 'cultura', 'produtos', 'custos']));
 
         $exploracao = $campanha->cultura?->parcela?->terreno?->nome ?? 'N/A';
         $cultura = $campanha->cultura?->nome ?? 'N/A';
@@ -212,12 +212,10 @@ class CampanhaController extends Controller
 
         $campanha->load([
             'cultura.parcela.terreno',
-            'operacoes' => function ($query) {
-                $query->with(['parcela.terreno', 'maquina', 'alfaia', 'operador', 'funcionario', 'equipa', 'produtos']);
-            },
             'custos',
             'colheitas',
         ]);
+        $campanha->setRelation('operacoes', $this->reportOperationsForCampaign($campanha, ['parcela.terreno', 'maquina', 'alfaia', 'operador', 'funcionario', 'equipa', 'produtos']));
 
         $operacoes = $campanha->operacoes->map(function ($operacao) {
             $custoProdutos = (float) $operacao->produtos
@@ -308,6 +306,42 @@ class CampanhaController extends Controller
         }
 
         return round((float) ($produto->pivot->quantidade ?? 0) * (float) $produto->pivot->custo_unitario, 2);
+    }
+
+    private function reportOperationsForCampaign(Campanha $campanha, array $with = []): Collection
+    {
+        $cultura = $campanha->cultura;
+        $parcelaId = $cultura?->parcela_id;
+        $culturaNome = $cultura?->nome;
+
+        return Operacao::query()
+            ->with($with)
+            ->where(function ($query) use ($campanha, $parcelaId, $culturaNome) {
+                $query->where('campanha_id', $campanha->id);
+
+                if (! $parcelaId) {
+                    return;
+                }
+
+                $query->orWhere(function ($fallbackQuery) use ($campanha, $parcelaId, $culturaNome) {
+                    $fallbackQuery
+                        ->where('parcela_id', $parcelaId)
+                        ->whereYear('data_hora_inicio', (int) $campanha->ano)
+                        ->where(function ($scopeQuery) use ($campanha, $culturaNome) {
+                            $scopeQuery
+                                ->where('cultura_id', $campanha->cultura_id)
+                                ->orWhereNull('cultura_id');
+
+                            if ($culturaNome) {
+                                $scopeQuery->orWhereHas('cultura', fn ($culturaQuery) => $culturaQuery->where('nome', $culturaNome));
+                            }
+                        });
+                });
+            })
+            ->orderBy('data_hora_inicio')
+            ->get()
+            ->unique('id')
+            ->values();
     }
 
     private function normaliseText(?string $value): string
