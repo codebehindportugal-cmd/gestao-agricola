@@ -578,7 +578,13 @@ class OperacaoManagementController extends Controller
                     ->where('tipo', 'tratamento fitossanitário')
                     ->get();
 
-                $custoProdutos = (float) $operacoes
+                $custoProdutosTratamentos = (float) $operacoes
+                    ->flatMap(fn (Operacao $operacao) => $operacao->produtos)
+                    ->sum(fn (Produto $produto) => (float) ($produto->pivot->custo_total ?? 0));
+                $custoProdutos = (float) Operacao::query()
+                    ->with(['produtos:id,nome,tipo'])
+                    ->where('campanha_id', $campanha->id)
+                    ->get()
                     ->flatMap(fn (Operacao $operacao) => $operacao->produtos)
                     ->sum(fn (Produto $produto) => (float) ($produto->pivot->custo_total ?? 0));
                 $custoOperacoes = (float) Operacao::query()
@@ -598,7 +604,7 @@ class OperacaoManagementController extends Controller
                     'tratamentos' => $operacoes->count(),
                     'producao_real' => $campanha->producao_real,
                     'custo_operacoes' => $custoOperacoes,
-                    'custo_produtos' => $custoProdutos,
+                    'custo_produtos' => $custoProdutosTratamentos,
                     'custo_outros' => $custoOutros,
                     'custo_total' => $custoTotal,
                     'custo_por_unidade' => $producaoReal > 0 ? round($custoTotal / $producaoReal, 4) : null,

@@ -162,8 +162,8 @@ const statusBadgeClass = (status) => ({
                                 <p class="mt-2 text-lg font-bold text-slate-900">{{ formatNumber(campanha.producao_real) }} kg</p>
                             </div>
                             <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Custo real</p>
-                                <p class="mt-2 text-lg font-bold text-slate-900">{{ formatCurrency(campanha.custo_real) }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Custo total</p>
+                                <p class="mt-2 text-lg font-bold text-slate-900">{{ formatCurrency(campanha.custo_total) }}</p>
                             </div>
                             <div class="rounded-3xl bg-slate-50 p-4">
                                 <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Custo por kg</p>

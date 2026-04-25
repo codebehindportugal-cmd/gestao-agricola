@@ -63,8 +63,25 @@ class Campanha extends Model
             return 0;
         }
 
-        $totalCusto = (float) $this->operacoes->sum('custo_real') + (float) $this->custos->sum('valor');
+        $totalCusto = $this->custo_total_calculado;
 
         return round($totalCusto / $totalKg, 2);
+    }
+
+    public function getCustoProdutosAttribute(): float
+    {
+        return (float) $this->operacoes
+            ->flatMap(fn (Operacao $operacao) => $operacao->produtos)
+            ->sum(fn (Produto $produto) => (float) ($produto->pivot->custo_total ?? 0));
+    }
+
+    public function getCustoTotalCalculadoAttribute(): float
+    {
+        return round(
+            (float) $this->operacoes->sum('custo_real')
+            + $this->custo_produtos
+            + (float) $this->custos->sum('valor'),
+            2
+        );
     }
 }

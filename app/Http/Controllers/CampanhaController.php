@@ -17,7 +17,14 @@ class CampanhaController extends Controller
         $filters = $request->only(['search', 'status', 'ano', 'cultura_id']);
 
         $campanhas = Campanha::query()
-            ->with('cultura:id,nome')
+            ->with([
+                'cultura:id,nome',
+                'colheitas:id,campanha_id,quantidade_total',
+                'custos:id,campanha_id,valor',
+                'operacoes' => fn ($query) => $query
+                    ->select('id', 'campanha_id', 'custo_real')
+                    ->with('produtos:id,nome'),
+            ])
             ->withCount(['operacoes', 'colheitas'])
             ->when($filters['search'] ?? null, function ($query, $search) {
                 $query->where(function ($subQuery) use ($search) {
@@ -43,6 +50,7 @@ class CampanhaController extends Controller
                 'producao_real' => $campanha->producao_real,
                 'custo_estimado' => $campanha->custo_estimado,
                 'custo_real' => $campanha->custo_real,
+                'custo_total' => $campanha->custo_total_calculado,
                 'custo_por_kg' => $campanha->custo_por_kg,
                 'operacoes_count' => $campanha->operacoes_count,
                 'colheitas_count' => $campanha->colheitas_count,
@@ -55,7 +63,10 @@ class CampanhaController extends Controller
             'summary' => [
                 'total' => Campanha::query()->count(),
                 'concluidas' => Campanha::query()->where('status', 'concluida')->count(),
-                'custo_total' => (float) Campanha::query()->sum('custo_real'),
+                'custo_total' => Campanha::query()
+                    ->with(['custos:id,campanha_id,valor', 'operacoes.produtos:id,nome'])
+                    ->get()
+                    ->sum(fn (Campanha $campanha) => $campanha->custo_total_calculado),
             ],
             'can' => [
                 'create' => $request->user()->can('create', Campanha::class),
@@ -93,7 +104,10 @@ class CampanhaController extends Controller
             ->groupBy('tipo')
             ->map(fn ($custos) => $custos->sum('valor'));
 
-        $custoTotal = (float) $campanha->custos->sum('valor') + (float) $campanha->operacoes->sum('custo_real');
+        $custoProdutos = $campanha->operacoes
+            ->flatMap(fn ($operacao) => $operacao->produtos)
+            ->sum(fn ($produto) => (float) ($produto->pivot->custo_total ?? 0));
+        $custoTotal = (float) $campanha->custos->sum('valor') + (float) $campanha->operacoes->sum('custo_real') + $custoProdutos;
         $custoPorKg = $campanha->custo_por_kg;
         $areaTotal = $campanha->cultura?->parcela?->area_util ?? 0;
         $custoPorHa = $areaTotal > 0 ? round($custoTotal / $areaTotal, 2) : 0;

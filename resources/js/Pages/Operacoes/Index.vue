@@ -227,40 +227,44 @@ const submitExploracao = () => {
     });
 };
 
-const normalizePayload = (form) => form.transform((data) => ({
-    ...data,
-    parcela_id: data.parcela_id || data.parcela_ids?.[0] || null,
-    parcela_ids: (data.parcela_ids ?? []).filter(Boolean),
-    cultura_id: data.cultura_id || null,
-    campanha_id: data.campanha_id || null,
-    maquina_id: data.maquina_id || null,
-    alfaia_id: data.alfaia_id || null,
-    operador_id: data.operador_id || null,
-    funcionario_id: data.funcionario_id || null,
-    equipa_id: data.equipa_id || null,
-    duracao_horas: null,
-    distancia_km: data.distancia_km || null,
-    combustivel_gasto_l: null,
-    custo_estimado: data.custo_estimado || null,
-    custo_real: data.custo_real || null,
-    data_hora_inicio: data.data_hora_inicio ? data.data_hora_inicio.replace('T', ' ') : '',
-    data_hora_fim: data.data_hora_fim ? data.data_hora_fim.replace('T', ' ') : null,
-    produtos: (data.produtos ?? []).filter((produto) => produto.produto_id).map((produto) => ({
-        ...produto,
-        quantidade: produto.quantidade || null,
-        unidade_medida: produto.unidade_medida || null,
-        dose: produto.dose || null,
-        dose_unidade: produto.dose_unidade || null,
-        area_tratada: produto.area_tratada || null,
-        volume_calda: produto.volume_calda || null,
-        finalidade: produto.finalidade || null,
-        intervalo_seguranca_dias: produto.intervalo_seguranca_dias || null,
-        estabelecimento_venda_nome: produto.estabelecimento_venda_nome || null,
-        estabelecimento_venda_autorizacao: produto.estabelecimento_venda_autorizacao || null,
-        custo_unitario: produto.custo_unitario || null,
-        observacoes: produto.observacoes || null,
-    })),
-}));
+const normalizePayload = (form) => form.transform((data) => {
+    const parcelaIds = (data.parcela_ids ?? []).filter(Boolean);
+
+    return {
+        ...data,
+        parcela_id: data.parcela_id || parcelaIds[0] || null,
+        parcela_ids: parcelaIds.length ? parcelaIds : null,
+        cultura_id: data.cultura_id || null,
+        campanha_id: data.campanha_id || null,
+        maquina_id: data.maquina_id || null,
+        alfaia_id: data.alfaia_id || null,
+        operador_id: data.operador_id || null,
+        funcionario_id: data.funcionario_id || null,
+        equipa_id: data.equipa_id || null,
+        duracao_horas: null,
+        distancia_km: data.distancia_km || null,
+        combustivel_gasto_l: null,
+        custo_estimado: data.custo_estimado || null,
+        custo_real: data.custo_real || null,
+        data_hora_inicio: data.data_hora_inicio ? data.data_hora_inicio.replace('T', ' ') : '',
+        data_hora_fim: data.data_hora_fim ? data.data_hora_fim.replace('T', ' ') : null,
+        produtos: (data.produtos ?? []).filter((produto) => produto.produto_id).map((produto) => ({
+            ...produto,
+            quantidade: produto.quantidade || null,
+            unidade_medida: produto.unidade_medida || null,
+            dose: produto.dose || null,
+            dose_unidade: produto.dose_unidade || null,
+            area_tratada: produto.area_tratada || null,
+            volume_calda: produto.volume_calda || null,
+            finalidade: produto.finalidade || null,
+            intervalo_seguranca_dias: produto.intervalo_seguranca_dias || null,
+            estabelecimento_venda_nome: produto.estabelecimento_venda_nome || null,
+            estabelecimento_venda_autorizacao: produto.estabelecimento_venda_autorizacao || null,
+            custo_unitario: produto.custo_unitario || null,
+            observacoes: produto.observacoes || null,
+        })),
+    };
+});
 
 const submitCreate = () => {
     normalizePayload(createForm).post(route('app.operacoes.store', currentQuery.value), {
@@ -470,6 +474,12 @@ const stockStats = computed(() => ({
                             <p v-if="campanha.custo_por_unidade" class="mt-1 text-xs font-semibold text-emerald-700">
                                 {{ formatNumber(campanha.custo_por_unidade) }} €/unidade produzida
                             </p>
+                            <Link
+                                :href="route('app.campanhas.exportar', campanha.id)"
+                                class="mt-4 inline-flex items-center rounded-full border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                            >
+                                Gerar caderno
+                            </Link>
                         </article>
                     </div>
                 </section>

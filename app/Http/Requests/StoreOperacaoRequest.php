@@ -30,6 +30,15 @@ class StoreOperacaoRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if (is_array($this->input('parcela_ids')) && collect($this->input('parcela_ids'))->filter()->isEmpty()) {
+            $this->merge([
+                'parcela_ids' => null,
+            ]);
+        }
+    }
+
     public function rules(): array
     {
         return [
