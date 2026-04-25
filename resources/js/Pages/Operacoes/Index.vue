@@ -103,21 +103,28 @@ const editErrorMessages = computed(() => Object.values(editForm.errors));
 const productErrorMessages = computed(() => Object.values(productForm.errors));
 const exploracaoErrorMessages = computed(() => Object.values(exploracaoForm.errors));
 
-const currentQuery = computed(() => ({
-    search: filterState.search || undefined,
-    estado: filterState.estado || undefined,
-    parcela_id: filterState.parcela_id || undefined,
-    cultura_id: filterState.cultura_id || undefined,
-    tipo: filterState.tipo || undefined,
-}));
+const culturaFilterOptions = computed(() => {
+    const seen = new Set();
+
+    return props.culturas.filter((cultura) => {
+        if (seen.has(cultura.nome)) {
+            return false;
+        }
+
+        seen.add(cultura.nome);
+        return true;
+    });
+});
 
 const selectedCultureParcelaIds = computed(() => {
     if (!filterState.cultura_id) {
         return null;
     }
 
+    const selectedCulture = props.culturas.find((cultura) => String(cultura.id) === String(filterState.cultura_id));
+
     return props.culturas
-        .filter((cultura) => String(cultura.id) === String(filterState.cultura_id))
+        .filter((cultura) => String(cultura.id) === String(filterState.cultura_id) || cultura.nome === selectedCulture?.nome)
         .map((cultura) => String(cultura.parcela_id));
 });
 
@@ -128,6 +135,26 @@ const filteredParcelas = computed(() => {
 
     return props.parcelas.filter((parcela) => selectedCultureParcelaIds.value.includes(String(parcela.id)));
 });
+
+const filterParcelaId = computed(() => {
+    if (
+        filterState.parcela_id &&
+        selectedCultureParcelaIds.value &&
+        !selectedCultureParcelaIds.value.includes(String(filterState.parcela_id))
+    ) {
+        return '';
+    }
+
+    return filterState.parcela_id;
+});
+
+const currentQuery = computed(() => ({
+    search: filterState.search || undefined,
+    estado: filterState.estado || undefined,
+    parcela_id: filterParcelaId.value || undefined,
+    cultura_id: filterState.cultura_id || undefined,
+    tipo: filterState.tipo || undefined,
+}));
 
 watch(
     () => [filterState.search, filterState.estado, filterState.parcela_id, filterState.cultura_id, filterState.tipo],
@@ -154,8 +181,9 @@ const openCreateModal = () => {
     createForm.reset();
     createForm.clearErrors();
     createForm.estado = 'planejada';
-    createForm.parcela_id = filterState.parcela_id || '';
-    createForm.parcela_ids = filterState.parcela_id ? [filterState.parcela_id] : [];
+    createForm.parcela_id = filterParcelaId.value || '';
+    createForm.parcela_ids = filterParcelaId.value ? [filterParcelaId.value] : [];
+    createForm.cultura_id = filterState.cultura_id || '';
     createForm.produtos = [];
     createModalOpen.value = true;
 };
@@ -478,7 +506,7 @@ const stockStats = computed(() => ({
                             <InputLabel value="Cultura" />
                             <select v-model="filterState.cultura_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
                                 <option value="">Todas</option>
-                                <option v-for="cultura in culturas" :key="cultura.id" :value="String(cultura.id)">{{ cultura.nome }}</option>
+                                <option v-for="cultura in culturaFilterOptions" :key="cultura.id" :value="String(cultura.id)">{{ cultura.nome }}</option>
                             </select>
                         </div>
                         <div>

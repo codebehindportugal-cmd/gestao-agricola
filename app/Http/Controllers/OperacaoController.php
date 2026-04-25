@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreOperacaoRequest;
 use App\Http\Requests\UpdateOperacaoRequest;
+use App\Models\Cultura;
 use App\Models\Maquina;
 use App\Models\Operacao;
 use App\Models\Parcela;
@@ -18,6 +19,21 @@ class OperacaoController extends Controller
     {
         $operacoes = Operacao::with('parcela', 'cultura', 'maquina', 'alfaia', 'operador', 'produtos')
             ->when(request('parcela_id'), fn ($query) => $query->where('parcela_id', request('parcela_id')))
+            ->when(request('cultura_id'), function ($query, $culturaId) {
+                $cultura = Cultura::query()->find($culturaId, ['id', 'nome']);
+
+                $query->where(function ($subQuery) use ($culturaId, $cultura) {
+                    $subQuery
+                        ->where('cultura_id', $culturaId)
+                        ->orWhereHas('parcela.culturas', fn ($culturaQuery) => $culturaQuery->where('id', $culturaId));
+
+                    if ($cultura?->nome) {
+                        $subQuery
+                            ->orWhereHas('cultura', fn ($culturaQuery) => $culturaQuery->where('nome', $cultura->nome))
+                            ->orWhereHas('parcela.culturas', fn ($culturaQuery) => $culturaQuery->where('nome', $cultura->nome));
+                    }
+                });
+            })
             ->when(request('tipo'), fn ($query) => $query->where('tipo', request('tipo')))
             ->when(request('estado'), fn ($query) => $query->where('estado', request('estado')))
             ->when(request('data_inicio'), fn ($query) => $query->whereDate('data_hora_inicio', '>=', request('data_inicio')))
@@ -46,7 +62,7 @@ class OperacaoController extends Controller
                 $operacao = Operacao::create([
                     ...$operationData,
                     'parcela_id' => $parcelaId,
-                    'cultura_id' => count($parcelaIds) > 1 ? null : ($data['cultura_id'] ?? null),
+                    'cultura_id' => $this->culturaIdForOperationParcela($parcelaId, $data['cultura_id'] ?? null),
                     'campanha_id' => count($parcelaIds) > 1 ? null : ($data['campanha_id'] ?? null),
                 ]);
 
@@ -265,5 +281,49 @@ class OperacaoController extends Controller
         }
 
         return $data;
+    }
+
+    private function culturaIdForOperationParcela(int $parcelaId, mixed $requestedCulturaId = null): ?int
+    {
+        $requestedCultura = empty($requestedCulturaId)
+            ? null
+            : Cultura::query()->find($requestedCulturaId, ['id', 'nome', 'parcela_id']);
+
+        if ($requestedCultura && (int) $requestedCultura->parcela_id === $parcelaId) {
+            return (int) $requestedCultura->id;
+        }
+
+        if ($requestedCultura?->nome) {
+            $matchingCultureId = Cultura::query()
+                ->where('parcela_id', $parcelaId)
+                ->where('nome', $requestedCultura->nome)
+                ->orderBy('id')
+                ->value('id');
+
+            return $matchingCultureId ? (int) $matchingCultureId : null;
+        }
+
+        $cultureId = Cultura::query()
+            ->where('parcela_id', $parcelaId)
+            ->orderBy('id')
+            ->value('id');
+
+        if ($cultureId) {
+            return (int) $cultureId;
+        }
+
+        $parcela = Parcela::query()->find($parcelaId, ['id', 'nome', 'tipo_ocupacao']);
+
+        if (! $parcela) {
+            return null;
+        }
+
+        return (int) Cultura::query()->create([
+            'parcela_id' => $parcela->id,
+            'nome' => $parcela->nome,
+            'tipo' => $parcela->tipo_ocupacao ?: 'outro',
+            'data_plantacao' => now()->toDateString(),
+            'estado' => 'em_crescimento',
+        ])->id;
     }
 }

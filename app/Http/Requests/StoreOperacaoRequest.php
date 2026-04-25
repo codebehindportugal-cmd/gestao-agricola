@@ -128,8 +128,8 @@ class StoreOperacaoRequest extends FormRequest
                 $selectedParcelIds->push((string) $this->input('parcela_id'));
             }
 
-            if ($selectedParcelIds->count() > 1 && ($this->filled('cultura_id') || $this->filled('campanha_id'))) {
-                $validator->errors()->add('parcela_ids', 'Ao registar em varias parcelas, escolha a cultura e campanha depois em cada operacao, se necessario.');
+            if ($selectedParcelIds->count() > 1 && $this->filled('campanha_id')) {
+                $validator->errors()->add('parcela_ids', 'Ao registar em varias parcelas, a campanha e atribuida automaticamente a cada parcela.');
             }
 
             if ($tipo === 'colheita' && $selectedParcelIds->count() !== 1) {
@@ -145,10 +145,14 @@ class StoreOperacaoRequest extends FormRequest
             }
 
             if ($this->filled('cultura_id') && $selectedParcelIds->count() === 1) {
-                $cultureMatchesParcel = Cultura::query()
-                    ->where('id', $this->input('cultura_id'))
-                    ->where('parcela_id', $selectedParcelIds->first())
-                    ->exists();
+                $culture = Cultura::query()->find($this->input('cultura_id'), ['id', 'nome', 'parcela_id']);
+                $cultureMatchesParcel = $culture && (
+                    (string) $culture->parcela_id === $selectedParcelIds->first()
+                    || Cultura::query()
+                        ->where('parcela_id', $selectedParcelIds->first())
+                        ->where('nome', $culture->nome)
+                        ->exists()
+                );
 
                 if (! $cultureMatchesParcel) {
                     $validator->errors()->add('cultura_id', 'A cultura selecionada não pertence à parcela indicada.');

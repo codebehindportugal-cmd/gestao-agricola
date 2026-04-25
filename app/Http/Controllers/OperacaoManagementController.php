@@ -263,12 +263,15 @@ class OperacaoManagementController extends Controller
                     $operationData = [
                         ...$data,
                         'parcela_id' => $parcelaId,
-                        'cultura_id' => $isBulkOperation ? null : ($data['cultura_id'] ?? null),
                     ];
+                    $operationData['cultura_id'] = $this->culturaIdForOperationParcela(
+                        $parcelaId,
+                        $data['cultura_id'] ?? null,
+                    );
                     $operationData = $isBulkOperation
                         ? $this->distributedOperationPayload($operationData, $parcelaId, $distributionWeights)
                         : $operationData;
-                    $operationData['campanha_id'] = $isBulkOperation ? null : $this->resolveCampanhaId($operationData);
+                    $operationData['campanha_id'] = $this->resolveCampanhaId($operationData);
 
                     $operacao = Operacao::query()->create([
                         ...$operationData,
@@ -445,6 +448,50 @@ class OperacaoManagementController extends Controller
         );
 
         return $campanha->id;
+    }
+
+    private function culturaIdForOperationParcela(int $parcelaId, mixed $requestedCulturaId = null): ?int
+    {
+        $requestedCultura = empty($requestedCulturaId)
+            ? null
+            : Cultura::query()->find($requestedCulturaId, ['id', 'nome', 'parcela_id']);
+
+        if ($requestedCultura && (int) $requestedCultura->parcela_id === $parcelaId) {
+            return (int) $requestedCultura->id;
+        }
+
+        if ($requestedCultura?->nome) {
+            $matchingCultureId = Cultura::query()
+                ->where('parcela_id', $parcelaId)
+                ->where('nome', $requestedCultura->nome)
+                ->orderBy('id')
+                ->value('id');
+
+            return $matchingCultureId ? (int) $matchingCultureId : null;
+        }
+
+        $cultureId = Cultura::query()
+            ->where('parcela_id', $parcelaId)
+            ->orderBy('id')
+            ->value('id');
+
+        if ($cultureId) {
+            return (int) $cultureId;
+        }
+
+        $parcela = Parcela::query()->find($parcelaId, ['id', 'nome', 'tipo_ocupacao']);
+
+        if (! $parcela) {
+            return null;
+        }
+
+        return (int) Cultura::query()->create([
+            'parcela_id' => $parcela->id,
+            'nome' => $parcela->nome,
+            'tipo' => $parcela->tipo_ocupacao ?: 'outro',
+            'data_plantacao' => now()->toDateString(),
+            'estado' => 'em_crescimento',
+        ])->id;
     }
 
     private function redirectFilters(Request $request): array

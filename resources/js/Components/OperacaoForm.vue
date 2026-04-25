@@ -230,7 +230,9 @@ const syncContextFromParcela = (form) => {
 
     if (selectedParcelas.length !== 1) {
         form.parcela_id = selectedParcelas[0] ?? '';
-        form.cultura_id = '';
+        if (!props.allowMultipleParcelas) {
+            form.cultura_id = '';
+        }
         form.campanha_id = '';
         return;
     }
