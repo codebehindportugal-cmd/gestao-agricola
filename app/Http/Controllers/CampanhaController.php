@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Campanha;
 use App\Models\Cultura;
+use App\Models\Produto;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -47,7 +49,7 @@ class CampanhaController extends Controller
                 'data_fim' => optional($campanha->data_fim)?->format('Y-m-d'),
                 'status' => $campanha->status,
                 'producao_esperada' => $campanha->producao_esperada,
-                'producao_real' => $campanha->producao_real,
+                'producao_real' => (float) $campanha->colheitas->sum('quantidade_total') ?: $campanha->producao_real,
                 'custo_estimado' => $campanha->custo_estimado,
                 'custo_real' => $campanha->custo_real,
                 'custo_total' => $campanha->custo_total_calculado,
@@ -84,7 +86,7 @@ class CampanhaController extends Controller
         $campanha->load([
             'cultura.parcela.terreno',
             'operacoes' => function ($query) {
-                $query->with(['produtos', 'custos']);
+                $query->with(['parcela.terreno', 'cultura', 'produtos', 'custos']);
             },
             'colheitas',
             'custos',
@@ -127,20 +129,63 @@ class CampanhaController extends Controller
             ];
         });
 
-        $produtosFitofarmaceuticos = $campanha->operacoes->flatMap(function ($operacao) {
-            return $operacao->produtos
-                ->filter(function ($produto) {
-                    return in_array($produto->tipo, ['fitofarmaco', 'fitofarmaceutico', 'produto fitofarmaceutico'], true);
-                })
-                ->map(function ($produto) use ($operacao) {
-                    return [
-                        'nome' => $produto->nome,
-                        'numero_autorizacao' => $produto->numero_autorizacao_dgav ?? 'N/A',
-                        'dose' => trim(($produto->pivot->dose ?? '') . ' ' . ($produto->pivot->dose_unidade ?? '')),
-                        'area_tratada' => $produto->pivot->area_tratada,
-                        'data_aplicacao' => optional($operacao->data_hora_inicio)?->format('d/m/Y') ?? 'N/A',
-                    ];
-                });
+        $registosFitofarmaceuticos = $campanha->operacoes
+            ->filter(fn ($operacao) => $this->normaliseText($operacao->tipo) === 'tratamento fitossanitario')
+            ->flatMap(function ($operacao) {
+                return $operacao->produtos
+                    ->filter(fn (Produto $produto) => in_array($this->normaliseText($produto->tipo), [
+                        'fitofarmaco',
+                        'fitofarmaceutico',
+                        'produto fitofarmaceutico',
+                    ], true))
+                    ->map(function (Produto $produto) use ($operacao) {
+                        $areaTratada = (float) ($produto->pivot->area_tratada ?? 0);
+                        $volumeCalda = (float) ($produto->pivot->volume_calda ?? 0);
+
+                        return [
+                            'parcela' => trim(($operacao->parcela?->terreno?->nome ? "{$operacao->parcela->terreno->nome} - " : '').($operacao->parcela?->nome ?? '')),
+                            'cultura' => $operacao->cultura?->nome ?? $operacao->campanha?->cultura?->nome ?? '',
+                            'area_tratada' => $areaTratada > 0 ? number_format($areaTratada, 2, ',', ' ') : '',
+                            'inimigo_efeito' => $produto->pivot->finalidade ?? '',
+                            'produto' => $produto->nome,
+                            'numero_autorizacao' => $produto->numero_autorizacao_dgav ?? '',
+                            'estabelecimento_nome' => $produto->pivot->estabelecimento_venda_nome
+                                ?? $produto->estabelecimento_venda_nome
+                                ?? '',
+                            'estabelecimento_autorizacao' => $produto->pivot->estabelecimento_venda_autorizacao
+                                ?? $produto->estabelecimento_venda_autorizacao
+                                ?? '',
+                            'dose' => trim(($produto->pivot->dose ?? '').' '.($produto->pivot->dose_unidade ?? '')),
+                            'volume_calda' => $volumeCalda > 0 ? number_format($volumeCalda, 2, ',', ' ') : '',
+                            'data_aplicacao' => optional($operacao->data_hora_inicio)?->format('d/m/Y') ?? '',
+                            'produtor_nome' => $operacao->produtor_nome,
+                            'aplicador_nome' => $operacao->aplicador_nome,
+                            'aplicador_numero_autorizacao' => $operacao->aplicador_numero_autorizacao,
+                            'concelho' => $operacao->exploracao_concelho,
+                            'freguesia' => $operacao->exploracao_freguesia,
+                        ];
+                    });
+            })
+            ->values();
+
+        $identificacao = [
+            'produtor' => $registosFitofarmaceuticos->pluck('produtor_nome')->filter()->first() ?? '',
+            'aplicador' => $registosFitofarmaceuticos->pluck('aplicador_nome')->filter()->first() ?? '',
+            'aplicador_numero' => $registosFitofarmaceuticos->pluck('aplicador_numero_autorizacao')->filter()->first() ?? '',
+            'concelho' => $registosFitofarmaceuticos->pluck('concelho')->filter()->first() ?? '',
+            'freguesia' => $registosFitofarmaceuticos->pluck('freguesia')->filter()->first() ?? '',
+        ];
+
+        $linhasVazias = max(0, 8 - $registosFitofarmaceuticos->count());
+
+        $produtosFitofarmaceuticos = $registosFitofarmaceuticos->map(function ($registo) {
+            return [
+                'nome' => $registo['produto'],
+                'numero_autorizacao' => $registo['numero_autorizacao'] ?: 'N/A',
+                'dose' => $registo['dose'],
+                'area_tratada' => $registo['area_tratada'],
+                'data_aplicacao' => $registo['data_aplicacao'] ?: 'N/A',
+            ];
         });
 
         $dataGeracao = now()->format('d/m/Y H:i');
@@ -154,7 +199,20 @@ class CampanhaController extends Controller
             'financeiro',
             'operacoes',
             'produtosFitofarmaceuticos',
+            'registosFitofarmaceuticos',
+            'identificacao',
+            'linhasVazias',
             'dataGeracao'
         ));
+    }
+
+    private function normaliseText(?string $value): string
+    {
+        return Str::of($value ?? '')
+            ->ascii()
+            ->lower()
+            ->replaceMatches('/[^a-z0-9]+/', ' ')
+            ->squish()
+            ->toString();
     }
 }

@@ -6,6 +6,7 @@ use App\Http\Requests\StoreOperacaoRequest;
 use App\Http\Requests\UpdateOperacaoRequest;
 use App\Models\Alfaia;
 use App\Models\Campanha;
+use App\Models\Colheita;
 use App\Models\Cultura;
 use App\Models\Funcionario;
 use App\Models\Equipa;
@@ -38,6 +39,7 @@ class OperacaoManagementController extends Controller
                 'parcela.terreno:id,nome',
                 'cultura:id,nome',
                 'campanha:id,cultura_id,ano,data_inicio,data_fim,status',
+                'colheita:id,operacao_id,quantidade_total,quantidade_perdas,qualidade',
                 'maquina:id,nome,tipo,consumo_combustivel',
                 'alfaia:id,nome',
                 'operador:id,name',
@@ -94,6 +96,9 @@ class OperacaoManagementController extends Controller
                 'maquina_consumo_combustivel' => $operacao->maquina?->consumo_combustivel,
                 'custo_estimado' => $operacao->custo_estimado,
                 'custo_real' => $operacao->custo_real,
+                'colheita_quantidade_total' => $operacao->colheita?->quantidade_total,
+                'colheita_quantidade_perdas' => $operacao->colheita?->quantidade_perdas,
+                'colheita_qualidade' => $operacao->colheita?->qualidade,
                 'produtos' => $operacao->produtos->map(fn (Produto $produto) => [
                     'produto_id' => $produto->id,
                     'nome' => $produto->nome,
@@ -233,17 +238,26 @@ class OperacaoManagementController extends Controller
                 $produtos = $this->extractProdutosPayload($request);
                 $parcelaIds = $this->selectedParcelaIds($request);
                 $isBulkOperation = count($parcelaIds) > 1;
+                $distributionWeights = $isBulkOperation ? $this->parcelDistributionWeights($parcelaIds) : [];
 
                 foreach ($parcelaIds as $parcelaId) {
-                    $operacao = Operacao::query()->create([
+                    $produtosParcela = $isBulkOperation
+                        ? $this->distributedProdutosPayload($produtos, $parcelaId, $distributionWeights)
+                        : $produtos;
+                    $operationData = [
                         ...$data,
                         'parcela_id' => $parcelaId,
                         'cultura_id' => $isBulkOperation ? null : ($data['cultura_id'] ?? null),
-                        'campanha_id' => $isBulkOperation ? null : ($data['campanha_id'] ?? null),
+                    ];
+                    $operationData['campanha_id'] = $isBulkOperation ? null : $this->resolveCampanhaId($operationData);
+
+                    $operacao = Operacao::query()->create([
+                        ...$operationData,
                     ]);
 
-                    $operacao->produtos()->sync($produtos);
-                    StockConsumption::syncOperation($operacao->fresh(), [], $produtos);
+                    $operacao->produtos()->sync($produtosParcela);
+                    $this->syncColheita($operacao->fresh(), $request);
+                    StockConsumption::syncOperation($operacao->fresh(), [], $produtosParcela);
                 }
             });
         } catch (\Throwable $exception) {
@@ -266,8 +280,11 @@ class OperacaoManagementController extends Controller
                 $previousProducts = StockConsumption::productsFromOperation($operacao);
                 $previousFuel = $operacao->combustivel_gasto_l === null ? null : (float) $operacao->combustivel_gasto_l;
 
+                $data['campanha_id'] = $this->resolveCampanhaId($data);
+
                 $operacao->update($data);
                 $operacao->produtos()->sync($produtos);
+                $this->syncColheita($operacao->fresh(), $request);
                 StockConsumption::syncOperation($operacao->fresh(), $previousProducts, $produtos, $previousFuel);
             });
         } catch (\Throwable $exception) {
@@ -286,6 +303,7 @@ class OperacaoManagementController extends Controller
         try {
             DB::transaction(function () use ($operacao) {
                 StockConsumption::restoreOperation($operacao);
+                $operacao->colheita()->delete();
                 $operacao->delete();
             });
         } catch (\Throwable $exception) {
@@ -354,6 +372,62 @@ class OperacaoManagementController extends Controller
             ->with('success', 'Dados da exploração atualizados.');
     }
 
+    private function syncColheita(Operacao $operacao, Request $request): void
+    {
+        if ($operacao->tipo !== 'colheita') {
+            $operacao->colheita()->delete();
+            return;
+        }
+
+        $colheita = Colheita::withTrashed()->updateOrCreate(
+            ['operacao_id' => $operacao->id],
+            [
+                'cultura_id' => $operacao->cultura_id,
+                'campanha_id' => $operacao->campanha_id,
+                'parcela_id' => $operacao->parcela_id,
+                'data_colheita' => $operacao->data_hora_inicio?->toDateString(),
+                'quantidade_total' => $request->input('colheita_quantidade_total'),
+                'unidade_medida' => 'kg',
+                'qualidade' => $request->input('colheita_qualidade') ?: 'comercial',
+                'quantidade_perdas' => $request->input('colheita_quantidade_perdas') ?: null,
+                'operador_id' => $operacao->operador_id,
+                'observacoes' => $operacao->observacoes,
+            ]
+        );
+
+        if ($colheita->trashed()) {
+            $colheita->restore();
+        }
+    }
+
+    private function resolveCampanhaId(array $data): ?int
+    {
+        if (! empty($data['campanha_id'])) {
+            return (int) $data['campanha_id'];
+        }
+
+        if (empty($data['cultura_id'])) {
+            return null;
+        }
+
+        $date = \Illuminate\Support\Carbon::parse($data['data_hora_inicio'] ?? now());
+        $cultura = Cultura::query()->find($data['cultura_id'], ['id', 'quantidade_esperada']);
+
+        $campanha = Campanha::query()->firstOrCreate(
+            [
+                'cultura_id' => (int) $data['cultura_id'],
+                'ano' => (int) $date->year,
+            ],
+            [
+                'data_inicio' => $date->copy()->startOfYear()->toDateString(),
+                'status' => 'em_curso',
+                'producao_esperada' => $cultura?->quantidade_esperada,
+            ]
+        );
+
+        return $campanha->id;
+    }
+
     private function redirectFilters(Request $request): array
     {
         return array_filter($request->only(['search', 'estado', 'parcela_id', 'tipo']));
@@ -376,6 +450,9 @@ class OperacaoManagementController extends Controller
             'combustivel_gasto_l',
             'custo_estimado',
             'custo_real',
+            'colheita_quantidade_total',
+            'colheita_quantidade_perdas',
+            'colheita_qualidade',
             'data_hora_fim',
             'produtor_nome',
             'aplicador_nome',
@@ -390,6 +467,9 @@ class OperacaoManagementController extends Controller
 
         unset($data['produtos']);
         unset($data['parcela_ids']);
+        unset($data['colheita_quantidade_total']);
+        unset($data['colheita_quantidade_perdas']);
+        unset($data['colheita_qualidade']);
 
         $data['duracao_horas'] = OperacaoDuration::calculateFromStrings(
             $data['data_hora_inicio'] ?? null,
@@ -481,7 +561,14 @@ class OperacaoManagementController extends Controller
 
         return $produtosSelecionados
             ->mapWithKeys(function (array $produto) use ($produtosCatalogo) {
-                $quantidade = (float) ($produto['quantidade'] ?? 0);
+                $dose = $this->nullableFloat($produto['dose'] ?? null);
+                $areaTratada = $this->nullableFloat($produto['area_tratada'] ?? null);
+                $quantidade = $this->calculatedProductQuantity(
+                    $this->nullableFloat($produto['quantidade'] ?? null),
+                    $dose,
+                    $areaTratada,
+                    $produto['dose_unidade'] ?? null,
+                );
                 $produtoCatalogo = $produtosCatalogo->get($produto['produto_id']);
                 $custoUnitario = ($produtoCatalogo?->custo_unitario) === null
                     ? null
@@ -491,9 +578,9 @@ class OperacaoManagementController extends Controller
                     $produto['produto_id'] => [
                         'quantidade' => $quantidade,
                         'unidade_medida' => $produto['unidade_medida'],
-                        'dose' => $this->nullableFloat($produto['dose'] ?? null),
+                        'dose' => $dose,
                         'dose_unidade' => $produto['dose_unidade'] ?? null,
-                        'area_tratada' => $this->nullableFloat($produto['area_tratada'] ?? null),
+                        'area_tratada' => $areaTratada,
                         'volume_calda' => $this->nullableFloat($produto['volume_calda'] ?? null),
                         'finalidade' => $produto['finalidade'] ?? null,
                         'intervalo_seguranca_dias' => ($produto['intervalo_seguranca_dias'] ?? null) === '' || ($produto['intervalo_seguranca_dias'] ?? null) === null
@@ -506,6 +593,54 @@ class OperacaoManagementController extends Controller
                         'observacoes' => $produto['observacoes'] ?? null,
                     ],
                 ];
+            })
+            ->all();
+    }
+
+    private function parcelDistributionWeights(array $parcelaIds): array
+    {
+        $parcelas = Parcela::query()
+            ->whereIn('id', $parcelaIds)
+            ->get(['id', 'area_util', 'area_total']);
+
+        $areas = collect($parcelaIds)->mapWithKeys(function (int $parcelaId) use ($parcelas) {
+            $parcela = $parcelas->firstWhere('id', $parcelaId);
+
+            return [$parcelaId => (float) ($parcela?->area_util ?: $parcela?->area_total ?: 0)];
+        });
+
+        $totalArea = (float) $areas->sum();
+
+        if ($totalArea <= 0) {
+            $equalWeight = count($parcelaIds) > 0 ? 1 / count($parcelaIds) : 0;
+
+            return collect($parcelaIds)
+                ->mapWithKeys(fn (int $parcelaId) => [$parcelaId => $equalWeight])
+                ->all();
+        }
+
+        return $areas
+            ->map(fn (float $area) => $area > 0 ? $area / $totalArea : 0)
+            ->all();
+    }
+
+    private function distributedProdutosPayload(array $produtos, int $parcelaId, array $weights): array
+    {
+        $weight = (float) ($weights[$parcelaId] ?? 0);
+
+        return collect($produtos)
+            ->map(function (array $payload) use ($weight) {
+                foreach (['quantidade', 'area_tratada'] as $field) {
+                    if (($payload[$field] ?? null) !== null) {
+                        $payload[$field] = round((float) $payload[$field] * $weight, 3);
+                    }
+                }
+
+                if (($payload['custo_unitario'] ?? null) !== null) {
+                    $payload['custo_total'] = round((float) $payload['quantidade'] * (float) $payload['custo_unitario'], 2);
+                }
+
+                return $payload;
             })
             ->all();
     }
@@ -533,7 +668,24 @@ class OperacaoManagementController extends Controller
             return null;
         }
 
-        return (float) $value;
+        return (float) str_replace(',', '.', (string) $value);
+    }
+
+    private function calculatedProductQuantity(?float $submittedQuantity, ?float $dose, ?float $areaTratada, ?string $doseUnit): float
+    {
+        if ($dose !== null && $areaTratada !== null && $this->doseUnitIsPerHectare($doseUnit)) {
+            return round($dose * $areaTratada, 3);
+        }
+
+        return (float) ($submittedQuantity ?? 0);
+    }
+
+    private function doseUnitIsPerHectare(?string $doseUnit): bool
+    {
+        $unit = strtolower((string) $doseUnit);
+        $unit = str_replace([' ', 'hactare', 'hectare'], ['', 'ha', 'ha'], $unit);
+
+        return str_contains($unit, '/ha');
     }
 
     private function normalizeProdutoTipo(?string $tipo): string
@@ -596,13 +748,15 @@ class OperacaoManagementController extends Controller
                 $custoTotal = ($campanha->custo_real ?? null) !== null
                     ? (float) $campanha->custo_real
                     : $custoOperacoes + $custoProdutos + $custoOutros;
-                $producaoReal = (float) ($campanha->producao_real ?? 0);
+                $producaoReal = (float) Colheita::query()
+                    ->where('campanha_id', $campanha->id)
+                    ->sum('quantidade_total') ?: (float) ($campanha->producao_real ?? 0);
 
                 return [
                     'id' => $campanha->id,
                     'nome' => "{$campanha->cultura?->nome} - {$campanha->ano}",
                     'tratamentos' => $operacoes->count(),
-                    'producao_real' => $campanha->producao_real,
+                    'producao_real' => $producaoReal,
                     'custo_operacoes' => $custoOperacoes,
                     'custo_produtos' => $custoProdutosTratamentos,
                     'custo_outros' => $custoOutros,

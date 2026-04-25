@@ -67,6 +67,9 @@ class StoreOperacaoRequest extends FormRequest
             'custo_real' => 'nullable|numeric|min:0',
             'estado' => 'required|in:planejada,em_curso,concluida,cancelada',
             'observacoes' => 'nullable|string',
+            'colheita_quantidade_total' => 'nullable|numeric|min:0.01',
+            'colheita_quantidade_perdas' => 'nullable|numeric|min:0',
+            'colheita_qualidade' => 'nullable|string|in:premium,superior,comercial,segunda',
             'produtos' => 'nullable|array',
             'produtos.*.produto_id' => 'required_with:produtos|exists:produtos,id|distinct',
             'produtos.*.quantidade' => 'required_with:produtos|numeric|min:0.01',
@@ -127,6 +130,18 @@ class StoreOperacaoRequest extends FormRequest
 
             if ($selectedParcelIds->count() > 1 && ($this->filled('cultura_id') || $this->filled('campanha_id'))) {
                 $validator->errors()->add('parcela_ids', 'Ao registar em varias parcelas, escolha a cultura e campanha depois em cada operacao, se necessario.');
+            }
+
+            if ($tipo === 'colheita' && $selectedParcelIds->count() !== 1) {
+                $validator->errors()->add('parcela_ids', 'Registe a colheita numa parcela de cada vez para guardar os kg apanhados.');
+            }
+
+            if ($tipo === 'colheita' && ! $this->filled('cultura_id')) {
+                $validator->errors()->add('cultura_id', 'A colheita precisa de uma cultura associada.');
+            }
+
+            if ($tipo === 'colheita' && blank($this->input('colheita_quantidade_total'))) {
+                $validator->errors()->add('colheita_quantidade_total', 'Indique os kg apanhados nesta colheita.');
             }
 
             if ($this->filled('cultura_id') && $selectedParcelIds->count() === 1) {

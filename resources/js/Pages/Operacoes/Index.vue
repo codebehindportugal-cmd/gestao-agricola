@@ -70,6 +70,9 @@ const baseFormData = {
     combustivel_gasto_l: '',
     custo_estimado: '',
     custo_real: '',
+    colheita_quantidade_total: '',
+    colheita_quantidade_perdas: '',
+    colheita_qualidade: 'comercial',
     estado: 'planejada',
     observacoes: '',
     produtos: [],
@@ -158,6 +161,9 @@ const openEditModal = (operacao) => {
     editForm.combustivel_gasto_l = operacao.combustivel_gasto_l?.toString() ?? '';
     editForm.custo_estimado = operacao.custo_estimado?.toString() ?? '';
     editForm.custo_real = operacao.custo_real?.toString() ?? '';
+    editForm.colheita_quantidade_total = operacao.colheita_quantidade_total?.toString() ?? '';
+    editForm.colheita_quantidade_perdas = operacao.colheita_quantidade_perdas?.toString() ?? '';
+    editForm.colheita_qualidade = operacao.colheita_qualidade ?? 'comercial';
     editForm.estado = operacao.estado ?? 'planejada';
     editForm.observacoes = operacao.observacoes ?? '';
     editForm.produtos = (operacao.produtos ?? []).map((produto) => ({
@@ -246,6 +252,9 @@ const normalizePayload = (form) => form.transform((data) => {
         combustivel_gasto_l: null,
         custo_estimado: data.custo_estimado || null,
         custo_real: data.custo_real || null,
+        colheita_quantidade_total: data.colheita_quantidade_total || null,
+        colheita_quantidade_perdas: data.colheita_quantidade_perdas || null,
+        colheita_qualidade: data.colheita_qualidade || 'comercial',
         data_hora_inicio: data.data_hora_inicio ? data.data_hora_inicio.replace('T', ' ') : '',
         data_hora_fim: data.data_hora_fim ? data.data_hora_fim.replace('T', ' ') : null,
         produtos: (data.produtos ?? []).filter((produto) => produto.produto_id).map((produto) => ({
@@ -608,6 +617,11 @@ const stockStats = computed(() => ({
                             <div class="rounded-3xl bg-slate-50 p-4">
                                 <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Duração</p>
                                 <p class="mt-2 text-sm text-slate-700">{{ operacao.duracao_horas ? `${formatNumber(operacao.duracao_horas)} h` : 'Sem duração' }}</p>
+                            </div>
+                            <div v-if="operacao.tipo === 'colheita'" class="rounded-3xl bg-emerald-50 p-4">
+                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-emerald-700">Kg apanhados</p>
+                                <p class="mt-2 text-sm font-semibold text-slate-800">{{ formatNumber(operacao.colheita_quantidade_total) }} kg</p>
+                                <p v-if="operacao.colheita_quantidade_perdas" class="mt-1 text-xs text-slate-500">Perdas: {{ formatNumber(operacao.colheita_quantidade_perdas) }} kg</p>
                             </div>
                             <div class="rounded-3xl bg-amber-50 p-4">
                                 <p class="text-xs font-semibold uppercase tracking-[0.25em] text-amber-600">Combustível</p>

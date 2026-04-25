@@ -15,6 +15,7 @@ class Colheita extends Model
 
     protected $fillable = [
         'cultura_id',
+        'operacao_id',
         'campanha_id',
         'parcela_id',
         'data_colheita',
@@ -37,6 +38,11 @@ class Colheita extends Model
     public function cultura(): BelongsTo
     {
         return $this->belongsTo(Cultura::class);
+    }
+
+    public function operacao(): BelongsTo
+    {
+        return $this->belongsTo(Operacao::class);
     }
 
     public function campanha(): BelongsTo

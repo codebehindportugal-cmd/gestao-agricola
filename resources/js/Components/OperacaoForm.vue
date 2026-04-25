@@ -71,9 +71,47 @@ const normalizeText = (value) => String(value ?? '')
 const productConfigFor = (tipo) => productTypeConfig[normalizeText(tipo)] ?? null;
 const usesProducts = (form) => !!productConfigFor(form.tipo);
 const isTratamentoFitossanitario = (tipo) => normalizeText(tipo) === 'tratamento fitossanitario';
+const isFertilizacao = (tipo) => normalizeText(tipo) === 'fertilizacao';
+const usesDoseAreaCalculation = (tipo) => isTratamentoFitossanitario(tipo) || isFertilizacao(tipo);
+const isColheita = (tipo) => normalizeText(tipo) === 'colheita';
 const productTitle = (form) => productConfigFor(form.tipo)?.title ?? 'Produtos';
 const productEmptyText = (form) => productConfigFor(form.tipo)?.empty ?? 'Adiciona os produtos usados nesta operação.';
 const productRequired = (form) => productConfigFor(form.tipo)?.required ?? false;
+
+const parseDecimal = (value) => {
+    if (value === null || value === undefined || value === '') {
+        return 0;
+    }
+
+    return Number(String(value).replace(',', '.')) || 0;
+};
+
+const doseIsPerHectare = (unit) => normalizeText(unit).includes('/ha');
+
+const calculatedProductQuantity = (produto) => {
+    const dose = parseDecimal(produto.dose);
+    const area = parseDecimal(produto.area_tratada);
+
+    if (!dose || !area || !doseIsPerHectare(produto.dose_unidade)) {
+        return null;
+    }
+
+    return Number((dose * area).toFixed(3)).toString();
+};
+
+const syncCalculatedProductQuantities = (form) => {
+    if (!usesDoseAreaCalculation(form.tipo)) {
+        return;
+    }
+
+    (form.produtos ?? []).forEach((produto) => {
+        const quantidade = calculatedProductQuantity(produto);
+
+        if (quantidade !== null && produto.quantidade !== quantidade) {
+            produto.quantidade = quantidade;
+        }
+    });
+};
 
 const estadoLabel = (estado) => ({
     planejada: 'planeada',
@@ -141,9 +179,11 @@ const updateProductDefaults = (form, index) => {
     row.estabelecimento_venda_nome = produto.estabelecimento_venda_nome || '';
     row.estabelecimento_venda_autorizacao = produto.estabelecimento_venda_autorizacao || '';
 
-    if (isTratamentoFitossanitario(form.tipo) && !row.area_tratada && selectedParcelaArea.value) {
+    if (usesDoseAreaCalculation(form.tipo) && !row.area_tratada && selectedParcelaArea.value) {
         row.area_tratada = selectedParcelaArea.value.toString();
     }
+
+    syncCalculatedProductQuantities(form);
 };
 
 const selectedProduct = (produtoId) => props.produtos.find((item) => String(item.id) === String(produtoId)) ?? null;
@@ -157,7 +197,18 @@ const selectedParcela = computed(() => {
 
     return props.parcelas.find((item) => String(item.id) === String(parcelaId)) ?? null;
 });
-const selectedParcelaArea = computed(() => selectedParcela.value?.area_util ?? selectedParcela.value?.area_total ?? '');
+const selectedParcelaArea = computed(() => {
+    if (props.allowMultipleParcelas) {
+        const selectedIds = (props.form.parcela_ids ?? []).filter(Boolean).map(String);
+        const totalArea = props.parcelas
+            .filter((parcela) => selectedIds.includes(String(parcela.id)))
+            .reduce((total, parcela) => total + (parseDecimal(parcela.area_util) || parseDecimal(parcela.area_total) || 0), 0);
+
+        return totalArea || '';
+    }
+
+    return selectedParcela.value?.area_util ?? selectedParcela.value?.area_total ?? '';
+});
 
 const syncCampanhaFromCultura = (form) => {
     const culturaId = String(form.cultura_id || '');
@@ -268,9 +319,15 @@ const visibleTabs = computed(() => tabs.value.filter((tab) => tab.visible));
 watch(() => props.form.tipo, () => {
     ensureProductRows(props.form);
 
+    if (isColheita(props.form.tipo) && !props.form.colheita_qualidade) {
+        props.form.colheita_qualidade = 'comercial';
+    }
+
     if (!usesProducts(props.form) && activeTab.value === 'produtos') {
         activeTab.value = 'geral';
     }
+
+    syncCalculatedProductQuantities(props.form);
 });
 
 watch(() => props.form.parcela_id, () => {
@@ -303,7 +360,7 @@ watch(selectedFuncionario, (funcionario) => {
 }, { immediate: true });
 
 watch([selectedParcelaArea, () => props.form.tipo], ([area]) => {
-    if (!area || !isTratamentoFitossanitario(props.form.tipo)) {
+    if (!area || !usesDoseAreaCalculation(props.form.tipo)) {
         return;
     }
 
@@ -311,7 +368,13 @@ watch([selectedParcelaArea, () => props.form.tipo], ([area]) => {
         ...produto,
         area_tratada: produto.area_tratada || area.toString(),
     }));
+
+    syncCalculatedProductQuantities(props.form);
 }, { immediate: true });
+
+watch(() => props.form.produtos, () => {
+    syncCalculatedProductQuantities(props.form);
+}, { deep: true });
 
 onMounted(() => {
     activeTab.value = 'geral';
@@ -414,6 +477,33 @@ const setActiveTab = (tabId) => {
                     <InputLabel value="Data e hora de fim" />
                     <TextInput v-model="form.data_hora_fim" type="datetime-local" class="mt-2 block w-full rounded-2xl" />
                     <InputError class="mt-2" :message="form.errors.data_hora_fim" />
+                </div>
+
+                <div v-if="isColheita(form.tipo)" class="sm:col-span-2 rounded-3xl border border-emerald-100 bg-emerald-50/70 p-4">
+                    <div class="grid gap-4 sm:grid-cols-3">
+                        <div>
+                            <InputLabel value="Kg apanhados" />
+                            <TextInput v-model="form.colheita_quantidade_total" type="number" step="0.01" min="0.01" class="mt-2 block w-full rounded-2xl bg-white" />
+                            <InputError class="mt-2" :message="form.errors.colheita_quantidade_total" />
+                        </div>
+
+                        <div>
+                            <InputLabel value="Perdas (kg)" />
+                            <TextInput v-model="form.colheita_quantidade_perdas" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl bg-white" />
+                            <InputError class="mt-2" :message="form.errors.colheita_quantidade_perdas" />
+                        </div>
+
+                        <div>
+                            <InputLabel value="Qualidade" />
+                            <select v-model="form.colheita_qualidade" class="mt-2 block w-full rounded-2xl border-slate-200 bg-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                <option value="premium">Premium</option>
+                                <option value="superior">Superior</option>
+                                <option value="comercial">Comercial</option>
+                                <option value="segunda">Segunda</option>
+                            </select>
+                            <InputError class="mt-2" :message="form.errors.colheita_qualidade" />
+                        </div>
+                    </div>
                 </div>
 
                 <div class="sm:col-span-2">
@@ -548,6 +638,10 @@ const setActiveTab = (tabId) => {
 
                     <InputError class="mt-2" :message="form.errors.produtos" />
 
+                    <div v-if="allowMultipleParcelas" class="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+                        Ao selecionar várias parcelas, indica a quantidade total usada na tarefa. O sistema reparte essa quantidade pelas parcelas pela área de cada uma, evitando duplicar litros ou kg no stock e nos custos.
+                    </div>
+
                     <div v-if="!productOptionsFor(form).length" class="mt-3 rounded-2xl border border-dashed border-emerald-200 bg-white/70 p-4 text-sm text-slate-600">
                         Não existem produtos deste tipo na lista.
                         <button
@@ -601,7 +695,18 @@ const setActiveTab = (tabId) => {
 
                             <div>
                                 <InputLabel value="Quantidade" />
-                                <TextInput v-model="produto.quantidade" type="number" step="0.01" min="0.01" class="mt-2 block w-full rounded-2xl" />
+                                <TextInput
+                                    v-model="produto.quantidade"
+                                    type="number"
+                                    step="0.001"
+                                    min="0.001"
+                                    :readonly="usesDoseAreaCalculation(form.tipo) && calculatedProductQuantity(produto) !== null"
+                                    class="mt-2 block w-full rounded-2xl"
+                                    :class="{ 'bg-slate-50 text-slate-600': usesDoseAreaCalculation(form.tipo) && calculatedProductQuantity(produto) !== null }"
+                                />
+                                <p v-if="usesDoseAreaCalculation(form.tipo) && calculatedProductQuantity(produto) !== null" class="mt-1 text-xs text-slate-500">
+                                    Calculado: dose × área tratada.
+                                </p>
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.quantidade`]" />
                             </div>
 
@@ -611,26 +716,26 @@ const setActiveTab = (tabId) => {
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.unidade_medida`]" />
                             </div>
 
-                            <div v-if="isTratamentoFitossanitario(form.tipo)">
+                            <div v-if="usesDoseAreaCalculation(form.tipo)">
                                 <InputLabel value="Dose" />
                                 <TextInput v-model="produto.dose" type="number" step="0.001" min="0" class="mt-2 block w-full rounded-2xl" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.dose`]" />
                             </div>
 
-                            <div v-if="isTratamentoFitossanitario(form.tipo)">
+                            <div v-if="usesDoseAreaCalculation(form.tipo)">
                                 <InputLabel value="Unidade da dose" />
                                 <TextInput v-model="produto.dose_unidade" class="mt-2 block w-full rounded-2xl" placeholder="L/ha, kg/ha" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.dose_unidade`]" />
                             </div>
 
-                            <div v-if="isTratamentoFitossanitario(form.tipo)">
+                            <div v-if="usesDoseAreaCalculation(form.tipo)">
                                 <InputLabel value="Área tratada (ha)" />
                                 <TextInput v-model="produto.area_tratada" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.area_tratada`]" />
                             </div>
 
                             <div v-if="isTratamentoFitossanitario(form.tipo)">
-                                <InputLabel value="Volume de calda (L)" />
+                                <InputLabel value="Volume de calda (L/ha)" />
                                 <TextInput v-model="produto.volume_calda" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.volume_calda`]" />
                             </div>

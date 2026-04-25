@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Operacao extends Model
@@ -121,5 +122,10 @@ class Operacao extends Model
     public function custos(): HasMany
     {
         return $this->hasMany(Custo::class);
+    }
+
+    public function colheita(): HasOne
+    {
+        return $this->hasOne(Colheita::class);
     }
 }
