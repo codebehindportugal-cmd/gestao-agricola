@@ -32,7 +32,7 @@ class OperacaoManagementController extends Controller
     {
         $this->authorize('viewAny', Operacao::class);
 
-        $filters = $request->only(['search', 'estado', 'parcela_id', 'tipo']);
+        $filters = $request->only(['search', 'estado', 'parcela_id', 'cultura_id', 'tipo']);
         $user = $request->user();
 
         $operacoes = Operacao::query()
@@ -59,6 +59,21 @@ class OperacaoManagementController extends Controller
             })
             ->when($filters['estado'] ?? null, fn ($query, $estado) => $query->where('estado', $estado))
             ->when($filters['parcela_id'] ?? null, fn ($query, $parcelaId) => $query->where('parcela_id', $parcelaId))
+            ->when($filters['cultura_id'] ?? null, function ($query, $culturaId) {
+                $cultura = Cultura::query()->find($culturaId, ['id', 'nome']);
+
+                $query->where(function ($subQuery) use ($culturaId, $cultura) {
+                    $subQuery
+                        ->where('cultura_id', $culturaId)
+                        ->orWhereHas('parcela.culturas', fn ($culturaQuery) => $culturaQuery->where('id', $culturaId));
+
+                    if ($cultura?->nome) {
+                        $subQuery
+                            ->orWhereHas('cultura', fn ($culturaQuery) => $culturaQuery->where('nome', $cultura->nome))
+                            ->orWhereHas('parcela.culturas', fn ($culturaQuery) => $culturaQuery->where('nome', $cultura->nome));
+                    }
+                });
+            })
             ->when($filters['tipo'] ?? null, fn ($query, $tipo) => $query->where('tipo', $tipo))
             ->orderByDesc('data_hora_inicio')
             ->paginate(9)
@@ -434,7 +449,7 @@ class OperacaoManagementController extends Controller
 
     private function redirectFilters(Request $request): array
     {
-        return array_filter($request->only(['search', 'estado', 'parcela_id', 'tipo']));
+        return array_filter($request->only(['search', 'estado', 'parcela_id', 'cultura_id', 'tipo']));
     }
 
     private function normalizePayload(Request $request): array

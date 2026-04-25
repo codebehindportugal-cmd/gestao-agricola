@@ -44,6 +44,7 @@ const filterState = reactive({
     search: props.filters.search ?? '',
     estado: props.filters.estado ?? '',
     parcela_id: props.filters.parcela_id ?? '',
+    cultura_id: props.filters.cultura_id ?? '',
     tipo: props.filters.tipo ?? '',
 });
 
@@ -106,11 +107,30 @@ const currentQuery = computed(() => ({
     search: filterState.search || undefined,
     estado: filterState.estado || undefined,
     parcela_id: filterState.parcela_id || undefined,
+    cultura_id: filterState.cultura_id || undefined,
     tipo: filterState.tipo || undefined,
 }));
 
+const selectedCultureParcelaIds = computed(() => {
+    if (!filterState.cultura_id) {
+        return null;
+    }
+
+    return props.culturas
+        .filter((cultura) => String(cultura.id) === String(filterState.cultura_id))
+        .map((cultura) => String(cultura.parcela_id));
+});
+
+const filteredParcelas = computed(() => {
+    if (!selectedCultureParcelaIds.value) {
+        return props.parcelas;
+    }
+
+    return props.parcelas.filter((parcela) => selectedCultureParcelaIds.value.includes(String(parcela.id)));
+});
+
 watch(
-    () => [filterState.search, filterState.estado, filterState.parcela_id, filterState.tipo],
+    () => [filterState.search, filterState.estado, filterState.parcela_id, filterState.cultura_id, filterState.tipo],
     () => {
         router.get(route('app.operacoes.index'), currentQuery.value, {
             preserveState: true,
@@ -119,6 +139,16 @@ watch(
         });
     },
 );
+
+watch(() => filterState.cultura_id, () => {
+    if (
+        filterState.parcela_id &&
+        selectedCultureParcelaIds.value &&
+        !selectedCultureParcelaIds.value.includes(String(filterState.parcela_id))
+    ) {
+        filterState.parcela_id = '';
+    }
+});
 
 const openCreateModal = () => {
     createForm.reset();
@@ -432,7 +462,7 @@ const stockStats = computed(() => ({
                 </section>
 
                 <section class="rounded-[32px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                    <div class="grid gap-4 md:grid-cols-[1fr_0.85fr_0.85fr_0.85fr_auto]">
+                    <div class="grid gap-4 md:grid-cols-[1fr_0.8fr_0.8fr_0.8fr_0.8fr_auto]">
                         <div>
                             <InputLabel value="Pesquisar" />
                             <TextInput v-model="filterState.search" class="mt-2 block w-full rounded-2xl border-slate-200" placeholder="Tipo, estado ou observações" />
@@ -445,10 +475,17 @@ const stockStats = computed(() => ({
                             </select>
                         </div>
                         <div>
+                            <InputLabel value="Cultura" />
+                            <select v-model="filterState.cultura_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                <option value="">Todas</option>
+                                <option v-for="cultura in culturas" :key="cultura.id" :value="String(cultura.id)">{{ cultura.nome }}</option>
+                            </select>
+                        </div>
+                        <div>
                             <InputLabel value="Parcela" />
                             <select v-model="filterState.parcela_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
                                 <option value="">Todas</option>
-                                <option v-for="parcela in parcelas" :key="parcela.id" :value="String(parcela.id)">{{ parcela.nome }}</option>
+                                <option v-for="parcela in filteredParcelas" :key="parcela.id" :value="String(parcela.id)">{{ parcela.nome }}</option>
                             </select>
                         </div>
                         <div>
@@ -459,7 +496,7 @@ const stockStats = computed(() => ({
                             </select>
                         </div>
                         <div class="flex items-end">
-                            <SecondaryButton class="w-full justify-center rounded-full px-5 py-3 text-sm normal-case tracking-normal" @click="filterState.search = ''; filterState.estado = ''; filterState.parcela_id = ''; filterState.tipo = ''">
+                            <SecondaryButton class="w-full justify-center rounded-full px-5 py-3 text-sm normal-case tracking-normal" @click="filterState.search = ''; filterState.estado = ''; filterState.parcela_id = ''; filterState.cultura_id = ''; filterState.tipo = ''">
                                 Limpar
                             </SecondaryButton>
                         </div>
@@ -698,7 +735,7 @@ const stockStats = computed(() => ({
                     <OperacaoForm
                         :key="createModalOpen ? 'create-open' : 'create-closed'"
                         :form="createForm"
-                        :parcelas="parcelas"
+                        :parcelas="filteredParcelas"
                         :culturas="culturas"
                         :campanhas="campanhas"
                         :maquinas="maquinas"
