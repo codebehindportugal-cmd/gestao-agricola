@@ -236,6 +236,44 @@
             </tbody>
         </table>
 
+        <h2>Produtos Aplicados</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 11%">Data</th>
+                    <th style="width: 17%">Operação</th>
+                    <th style="width: 18%">Parcela</th>
+                    <th>Produto</th>
+                    <th style="width: 12%">Tipo</th>
+                    <th class="right" style="width: 12%">Quantidade</th>
+                    <th class="right" style="width: 11%">Preço</th>
+                    <th class="right" style="width: 11%">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($produtosAplicados as $produto)
+                    <tr>
+                        <td>{{ $produto['data'] }}</td>
+                        <td>{{ $produto['operacao'] }}</td>
+                        <td>{{ $produto['parcela'] ?: 'N/A' }}</td>
+                        <td>{{ $produto['nome'] }}</td>
+                        <td>{{ $produto['tipo'] ?: 'N/A' }}</td>
+                        <td class="right">{{ $number($produto['quantidade']) }} {{ $produto['unidade_medida'] }}</td>
+                        <td class="right">{{ $produto['custo_unitario'] === null ? '-' : $money($produto['custo_unitario']) }}</td>
+                        <td class="right">{{ $money($produto['custo_total']) }}</td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="8">Sem produtos associados às operações desta campanha.</td>
+                    </tr>
+                @endforelse
+                <tr class="totals">
+                    <td colspan="7">Total de produtos aplicados</td>
+                    <td class="right">{{ $money($resumo['total_produtos']) }}</td>
+                </tr>
+            </tbody>
+        </table>
+
         <h2>Outros Custos da Campanha</h2>
         <table>
             <thead>

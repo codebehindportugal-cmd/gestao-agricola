@@ -108,7 +108,7 @@ class CampanhaController extends Controller
 
         $custoProdutos = $campanha->operacoes
             ->flatMap(fn ($operacao) => $operacao->produtos)
-            ->sum(fn ($produto) => (float) ($produto->pivot->custo_total ?? 0));
+            ->sum(fn (Produto $produto) => $this->produtoPivotCost($produto));
         $custoTotal = (float) $campanha->custos->sum('valor') + (float) $campanha->operacoes->sum('custo_real') + $custoProdutos;
         $custoPorKg = $campanha->custo_por_kg;
         $areaTotal = $campanha->cultura?->parcela?->area_util ?? 0;
@@ -221,7 +221,7 @@ class CampanhaController extends Controller
 
         $operacoes = $campanha->operacoes->map(function ($operacao) {
             $custoProdutos = (float) $operacao->produtos
-                ->sum(fn (Produto $produto) => (float) ($produto->pivot->custo_total ?? 0));
+                ->sum(fn (Produto $produto) => $this->produtoPivotCost($produto));
 
             return [
                 'data' => optional($operacao->data_hora_inicio)?->format('d/m/Y') ?? 'N/A',
@@ -236,8 +236,27 @@ class CampanhaController extends Controller
                 'custo_real' => (float) ($operacao->custo_real ?? 0),
                 'custo_produtos' => $custoProdutos,
                 'custo_total' => (float) ($operacao->custo_real ?? 0) + $custoProdutos,
+                'produtos' => $operacao->produtos->map(fn (Produto $produto) => [
+                    'nome' => $produto->nome,
+                    'tipo' => $produto->tipo,
+                    'quantidade' => (float) ($produto->pivot->quantidade ?? 0),
+                    'unidade_medida' => $produto->pivot->unidade_medida ?? $produto->unidade_medida,
+                    'custo_unitario' => $produto->pivot->custo_unitario === null
+                        ? null
+                        : (float) $produto->pivot->custo_unitario,
+                    'custo_total' => $this->produtoPivotCost($produto),
+                ])->values(),
             ];
         });
+
+        $produtosAplicados = $operacoes
+            ->flatMap(fn (array $operacao) => $operacao['produtos']->map(fn (array $produto) => [
+                ...$produto,
+                'data' => $operacao['data'],
+                'operacao' => $operacao['tipo'],
+                'parcela' => $operacao['parcela'],
+            ]))
+            ->values();
 
         $custosAvulsos = $campanha->custos->map(fn ($custo) => [
             'data' => optional($custo->data_custo ?? null)?->format('d/m/Y') ?? 'N/A',
@@ -271,10 +290,24 @@ class CampanhaController extends Controller
         return view('campanhas.custos_pdf', compact(
             'campanha',
             'operacoes',
+            'produtosAplicados',
             'custosAvulsos',
             'resumo',
             'dataGeracao'
         ));
+    }
+
+    private function produtoPivotCost(Produto $produto): float
+    {
+        if ($produto->pivot?->custo_total !== null) {
+            return (float) $produto->pivot->custo_total;
+        }
+
+        if ($produto->pivot?->custo_unitario === null) {
+            return 0.0;
+        }
+
+        return round((float) ($produto->pivot->quantidade ?? 0) * (float) $produto->pivot->custo_unitario, 2);
     }
 
     private function normaliseText(?string $value): string

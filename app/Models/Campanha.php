@@ -72,7 +72,17 @@ class Campanha extends Model
     {
         return (float) $this->operacoes
             ->flatMap(fn (Operacao $operacao) => $operacao->produtos)
-            ->sum(fn (Produto $produto) => (float) ($produto->pivot->custo_total ?? 0));
+            ->sum(function (Produto $produto) {
+                if ($produto->pivot?->custo_total !== null) {
+                    return (float) $produto->pivot->custo_total;
+                }
+
+                if ($produto->pivot?->custo_unitario === null) {
+                    return 0;
+                }
+
+                return round((float) ($produto->pivot->quantidade ?? 0) * (float) $produto->pivot->custo_unitario, 2);
+            });
     }
 
     public function getCustoTotalCalculadoAttribute(): float
