@@ -46,7 +46,8 @@ const primaryLinks = [
 const resourceLinks = [
     { label: 'Stock', routeName: 'app.stock.index', active: 'app.stock.*' },
     { label: 'Maquinaria', routeName: 'app.maquinaria.index', active: 'app.maquinaria.*' },
-    { label: 'Mão de obra', routeName: 'app.mao-obra.index', active: 'app.mao-obra.*' },
+    { label: 'Mão de obra', routeName: 'app.mao-obra.index', active: 'app.mao-obra.index' },
+    { label: 'Localização', routeName: 'app.mao-obra.localizacoes', active: 'app.mao-obra.localizacoes' },
 ];
 
 const canManageUsers = computed(() => {

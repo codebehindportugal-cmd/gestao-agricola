@@ -7,6 +7,7 @@ use App\Http\Controllers\TerrenoManagementController;
 use App\Http\Controllers\CulturaManagementController;
 use App\Http\Controllers\MaquinariaManagementController;
 use App\Http\Controllers\MaoObraManagementController;
+use App\Http\Controllers\FuncionarioLocationController;
 use App\Http\Controllers\OperacaoManagementController;
 use App\Http\Controllers\CampanhaController;
 use App\Http\Controllers\UserController;
@@ -29,6 +30,11 @@ Route::get('/', function () {
 Route::get('/dashboard', DashboardController::class)
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
+
+Route::get('/partilhar-localizacao/{token}', [FuncionarioLocationController::class, 'show'])
+    ->name('funcionarios.localizacao.share');
+Route::post('/partilhar-localizacao/{token}', [FuncionarioLocationController::class, 'store'])
+    ->name('funcionarios.localizacao.store');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/terrenos', [TerrenoManagementController::class, 'index'])->name('app.terrenos.index');
@@ -74,6 +80,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/stock/estabelecimentos', [StockManagementController::class, 'storeEstabelecimento'])->name('app.stock.estabelecimentos.store');
     Route::patch('/stock/produtos/{produto}', [StockManagementController::class, 'update'])->name('app.stock.update');
     Route::get('/mao-obra', [MaoObraManagementController::class, 'index'])->name('app.mao-obra.index');
+    Route::get('/mao-obra/localizacoes', [FuncionarioLocationController::class, 'index'])->name('app.mao-obra.localizacoes');
+    Route::post('/mao-obra/operarios/{funcionario}/renovar-link-localizacao', [FuncionarioLocationController::class, 'refreshToken'])->name('app.funcionarios.localizacao.refresh');
     Route::post('/mao-obra/operarios', [MaoObraManagementController::class, 'storeFuncionario'])->name('app.funcionarios.store');
     Route::patch('/mao-obra/operarios/{funcionario}', [MaoObraManagementController::class, 'updateFuncionario'])->name('app.funcionarios.update');
     Route::delete('/mao-obra/operarios/{funcionario}', [MaoObraManagementController::class, 'destroyFuncionario'])->name('app.funcionarios.destroy');
