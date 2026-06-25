@@ -3,12 +3,16 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import Pagination from '@/Components/Pagination.vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
+import { useQRScanner } from '@/composables/useQRScanner.js';
+
+const { scanAndParseAT } = useQRScanner();
 
 const props = defineProps({
     despesas: { type: Object, required: true },
     filters: { type: Object, default: () => ({}) },
     categorias: { type: Array, default: () => [] },
     taxasIva: { type: Array, default: () => [0, 6, 13, 23] },
+    marcas: { type: Object, default: () => ({}) },
     resumoMes: { type: Object, default: () => ({}) },
     resumoMesAnterior: { type: Object, default: () => ({}) },
     analytics: { type: Object, default: () => ({ tem_items: false }) },
@@ -21,6 +25,7 @@ const mesAtual = ref(props.filters.mes ?? new Date().getMonth() + 1);
 const anoAtual = ref(props.filters.ano ?? new Date().getFullYear());
 const searchQuery = ref(props.filters.search ?? '');
 const categoriaFiltro = ref(props.filters.categoria ?? '');
+const marcaFiltro = ref(props.filters.marca ?? '');
 let searchTimer = null;
 
 function aplicarFiltros() {
@@ -29,10 +34,11 @@ function aplicarFiltros() {
         ano: anoAtual.value,
         search: searchQuery.value || undefined,
         categoria: categoriaFiltro.value || undefined,
+        marca: marcaFiltro.value || undefined,
     }, { preserveState: true, preserveScroll: true, replace: true });
 }
 
-watch([mesAtual, anoAtual, categoriaFiltro], () => aplicarFiltros());
+watch([mesAtual, anoAtual, categoriaFiltro, marcaFiltro], () => aplicarFiltros());
 watch(searchQuery, () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(aplicarFiltros, 350);
@@ -65,6 +71,7 @@ const form = useForm({
     valor: '',
     data: new Date().toISOString().split('T')[0],
     categoria: 'outro',
+    marca: 'horta_da_maria',
     notas: '',
     ficheiro: null,
     items: [],
@@ -118,6 +125,7 @@ function abrirCriar() {
     form.reset();
     form.data = new Date().toISOString().split('T')[0];
     form.categoria = 'outro';
+    form.marca = 'horta_da_maria';
     form.items = [];
     ficheiroPreview.value = null;
     ficheiroNome.value = '';
@@ -132,6 +140,7 @@ function abrirEditar(despesa) {
     form.valor = despesa.total_fatura;
     form.data = despesa.data;
     form.categoria = despesa.categoria;
+    form.marca = despesa.marca ?? 'horta_da_maria';
     form.notas = despesa.notas ?? '';
     form.ficheiro = null;
     form.items = despesa.items.map(i => ({
@@ -163,9 +172,12 @@ function onFicheiroChange(e) {
         const reader = new FileReader();
         reader.onload = (ev) => { ficheiroPreview.value = ev.target.result; };
         reader.readAsDataURL(file);
+        // Tentar detectar QR AT automaticamente
+        tentarLerQR(file);
     } else {
         ficheiroPreview.value = null;
     }
+    qrDetectado.value = null;
 }
 
 function submeter() {
@@ -203,6 +215,35 @@ function eliminar() {
     });
 }
 
+// ─── QR AT scan ──────────────────────────────────────────────────────────────
+const qrDetectado = ref(null);   // { nif_fornecedor, data, numero_fatura, total, total_iva }
+const qrScanning = ref(false);
+
+async function tentarLerQR(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    qrScanning.value = true;
+    try {
+        const resultado = await scanAndParseAT(file);
+        if (resultado.is_at_qr) {
+            qrDetectado.value = resultado;
+        }
+    } catch {
+        // QR não encontrado — ignorar silenciosamente
+    } finally {
+        qrScanning.value = false;
+    }
+}
+
+function preencherFromQR() {
+    const qr = qrDetectado.value;
+    if (!qr) return;
+    if (qr.data && !form.data) form.data = qr.data;
+    if (qr.numero_fatura && !form.numero_fatura) form.numero_fatura = qr.numero_fatura;
+    if (qr.nif_fornecedor && !form.fornecedor) form.fornecedor = `NIF: ${qr.nif_fornecedor}`;
+    if (qr.total && !form.valor) form.valor = qr.total.toFixed(2);
+    qrDetectado.value = null;
+}
+
 // ─── lightbox ────────────────────────────────────────────────────────────────
 const lightboxUrl = ref(null);
 
@@ -226,6 +267,18 @@ const categoriaIcone = (cat) => ({
     combustivel: '⛽', sementes: '🌱', fertilizantes: '🧪', fitofarmaceuticos: '💊',
     equipamento: '🔧', mao_obra: '👷', outro: '📦',
 }[cat] ?? '📦');
+
+const marcaLabel = (m) => props.marcas[m] ?? m;
+const marcaBadge = (m) => ({
+    horta_da_maria: 'bg-emerald-100 text-emerald-800',
+    extravaganty:   'bg-purple-100 text-purple-800',
+    ateneya_geral:  'bg-blue-100 text-blue-800',
+}[m] ?? 'bg-slate-100 text-slate-600');
+const marcaIcone = (m) => ({
+    horta_da_maria: '🌿',
+    extravaganty:   '✨',
+    ateneya_geral:  '🏢',
+}[m] ?? '🏷️');
 
 const variacaoLabel = computed(() => {
     const v = props.resumoMes.variacao;
@@ -286,6 +339,29 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                 </button>
             </div>
 
+            <!-- Grupo Ateneya — consolidado por marca -->
+            <div v-if="Object.keys(resumoMes.por_marca ?? {}).length > 0"
+                 class="mb-4 overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <div class="flex flex-wrap items-stretch divide-x divide-blue-100">
+                    <!-- total grupo -->
+                    <div class="min-w-[140px] flex-shrink-0 px-5 py-4">
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-blue-500">Grupo Ateneya</p>
+                        <p class="mt-0.5 text-xl font-black text-blue-900">{{ fmt(resumoMes.total_grupo ?? resumoMes.total) }}</p>
+                        <p class="mt-0.5 text-[10px] text-blue-400">consolidado</p>
+                    </div>
+                    <!-- breakdown por marca -->
+                    <template v-for="(val, key) in resumoMes.por_marca" :key="key">
+                        <div v-if="val > 0" class="min-w-[120px] flex-1 px-4 py-4">
+                            <p class="text-[10px] font-semibold text-blue-400">{{ marcaIcone(key) }} {{ marcaLabel(key) }}</p>
+                            <p class="mt-0.5 text-base font-bold text-blue-800">{{ fmt(val) }}</p>
+                            <p class="text-[10px] text-blue-300">
+                                {{ (resumoMes.total ?? 0) > 0 ? Math.round(val / resumoMes.total * 100) : 0 }}%
+                            </p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
             <!-- resumo do mês -->
             <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div class="col-span-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
@@ -315,6 +391,11 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                         class="h-10 rounded-full border border-slate-200 bg-white px-4 text-sm outline-none focus:border-emerald-400">
                     <option value="">Todas as categorias</option>
                     <option v-for="cat in categorias" :key="cat" :value="cat">{{ categoriaLabel(cat) }}</option>
+                </select>
+                <select v-model="marcaFiltro"
+                        class="h-10 rounded-full border border-slate-200 bg-white px-4 text-sm outline-none focus:border-emerald-400">
+                    <option value="">Todas as marcas</option>
+                    <option v-for="(label, key) in marcas" :key="key" :value="key">{{ marcaIcone(key) }} {{ label }}</option>
                 </select>
             </div>
 
@@ -353,6 +434,9 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                     <p class="font-semibold text-slate-900">{{ d.titulo }}</p>
                                     <span class="rounded-full px-2 py-0.5 text-xs font-medium" :class="categoriaBadge(d.categoria)">
                                         {{ categoriaLabel(d.categoria) }}
+                                    </span>
+                                    <span class="rounded-full px-2 py-0.5 text-xs font-medium" :class="marcaBadge(d.marca)">
+                                        {{ marcaIcone(d.marca) }} {{ marcaLabel(d.marca) }}
                                     </span>
                                     <span v-if="d.tem_items"
                                           class="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
@@ -517,6 +601,29 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                 </div>
                             </div>
 
+                            <!-- QR AT detectado -->
+                            <div v-if="qrScanning" class="flex items-center gap-2 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                                <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                                A procurar QR AT na imagem…
+                            </div>
+                            <div v-if="qrDetectado && !qrScanning"
+                                 class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
+                                <p class="font-semibold text-blue-800">QR AT detectado na fatura</p>
+                                <p class="mt-0.5 text-xs text-blue-600">
+                                    {{ [qrDetectado.numero_fatura, qrDetectado.data, qrDetectado.total ? fmt(qrDetectado.total) : null].filter(Boolean).join(' · ') }}
+                                </p>
+                                <div class="mt-2 flex gap-2">
+                                    <button type="button" @click="preencherFromQR"
+                                            class="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-500">
+                                        Preencher campos
+                                    </button>
+                                    <button type="button" @click="qrDetectado = null"
+                                            class="rounded-full border border-blue-200 px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100">
+                                        Ignorar
+                                    </button>
+                                </div>
+                            </div>
+
                             <!-- título -->
                             <div>
                                 <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Título *</label>
@@ -556,6 +663,23 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                         <option v-for="cat in categorias" :key="cat" :value="cat">{{ categoriaLabel(cat) }}</option>
                                     </select>
                                 </div>
+                            </div>
+
+                            <!-- marca -->
+                            <div>
+                                <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Marca / empresa *</label>
+                                <div class="grid grid-cols-3 gap-2">
+                                    <label v-for="(label, key) in marcas" :key="key"
+                                           class="relative cursor-pointer rounded-xl border-2 px-3 py-2.5 text-center text-xs font-semibold transition"
+                                           :class="form.marca === key
+                                               ? marcaBadge(key) + ' border-current shadow-sm'
+                                               : 'border-slate-200 text-slate-500 hover:border-slate-300'">
+                                        <input type="radio" v-model="form.marca" :value="key" class="sr-only" />
+                                        <span class="block text-base">{{ marcaIcone(key) }}</span>
+                                        <span class="mt-0.5 block leading-tight">{{ label }}</span>
+                                    </label>
+                                </div>
+                                <p v-if="form.errors.marca" class="mt-1 text-xs text-red-600">{{ form.errors.marca }}</p>
                             </div>
 
                             <!-- notas -->
@@ -635,9 +759,15 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
 
                                     <!-- total da linha -->
                                     <div class="mt-2 flex items-center justify-between text-xs">
-                                        <span class="text-slate-400">
-                                            base {{ fmt(itemBase(item)) }} + IVA {{ fmt(itemBase(item) * (parseFloat(item.iva_percentagem) || 0) / 100) }}
-                                        </span>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-slate-400">
+                                                base {{ fmt(itemBase(item)) }} + IVA {{ fmt(itemBase(item) * (parseFloat(item.iva_percentagem) || 0) / 100) }}
+                                            </span>
+                                            <span v-if="item.produto_id"
+                                                  class="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">
+                                                📦 +{{ (parseFloat(item.quantidade) || 0).toFixed(2) }} ao stock
+                                            </span>
+                                        </div>
                                         <span class="font-bold text-slate-800">{{ fmt(itemTotal(item)) }}</span>
                                     </div>
                                 </div>

@@ -21,6 +21,7 @@
         "vue": "^3.4.0"
     },
     "dependencies": {
+        "jsqr": "^1.4.0",
         "leaflet": "^1.9.4",
         "leaflet-draw": "^1.0.4",
         "pinia": "^3.0.4"

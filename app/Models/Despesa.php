@@ -19,6 +19,7 @@ class Despesa extends Model
         'valor',
         'data',
         'categoria',
+        'marca',
         'ficheiro_path',
         'notas',
     ];
@@ -31,6 +32,11 @@ class Despesa extends Model
     public function items(): HasMany
     {
         return $this->hasMany(FaturaItem::class);
+    }
+
+    public function movimentos(): HasMany
+    {
+        return $this->hasMany(MovimentoStock::class);
     }
 
     public function getSubtotalCalculadoAttribute(): float
