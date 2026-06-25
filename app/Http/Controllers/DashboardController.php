@@ -5,9 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Alfaia;
 use App\Models\Campanha;
 use App\Models\Cultura;
+use App\Models\Despesa;
 use App\Models\Maquina;
+use App\Models\Manutencao;
 use App\Models\Operacao;
 use App\Models\Parcela;
+use App\Models\Produto;
 use App\Models\Terreno;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -23,6 +26,8 @@ class DashboardController extends Controller
             'recentOperations' => $this->buildRecentOperations(),
             'focusAreas' => $this->buildFocusAreas(),
             'mapPolygons' => $this->buildMapPolygons(),
+            'alertas' => $this->buildAlertas(),
+            'despesasMes' => $this->buildDespesasMes(),
         ]);
     }
 
@@ -165,6 +170,124 @@ class DashboardController extends Controller
         }
 
         return $polygons;
+    }
+
+    private function buildAlertas(): array
+    {
+        $hoje = now()->startOfDay();
+        $alertasIS = [];
+
+        if (Schema::hasTable('operacoes') && Schema::hasTable('operacao_produtos')) {
+            $operacoes = Operacao::query()
+                ->with([
+                    'parcela:id,nome',
+                    'cultura:id,nome',
+                    'produtos:id,nome',
+                ])
+                ->where('tipo', 'tratamento fitossanitario')
+                ->whereNotNull('data_hora_inicio')
+                ->where('data_hora_inicio', '>=', $hoje->copy()->subDays(90))
+                ->whereHas('produtos', fn ($q) => $q->whereNotNull('intervalo_seguranca_dias')->where('intervalo_seguranca_dias', '>', 0))
+                ->get();
+
+            foreach ($operacoes as $operacao) {
+                foreach ($operacao->produtos as $produto) {
+                    $is = (int) $produto->pivot->intervalo_seguranca_dias;
+
+                    if ($is <= 0) {
+                        continue;
+                    }
+
+                    $fimIntervalo = $operacao->data_hora_inicio->copy()->addDays($is)->startOfDay();
+                    $diasRestantes = (int) $hoje->diffInDays($fimIntervalo, false);
+
+                    if ($diasRestantes < 0) {
+                        continue;
+                    }
+
+                    $alertasIS[] = [
+                        'operacao_id' => $operacao->id,
+                        'parcela_nome' => $operacao->parcela?->nome ?? 'Parcela desconhecida',
+                        'cultura_nome' => $operacao->cultura?->nome,
+                        'produto_nome' => $produto->nome,
+                        'data_aplicacao' => $operacao->data_hora_inicio->format('d/m/Y'),
+                        'fim_intervalo' => $fimIntervalo->format('d/m/Y'),
+                        'dias_restantes' => $diasRestantes,
+                    ];
+                }
+            }
+
+            usort($alertasIS, fn ($a, $b) => $a['dias_restantes'] <=> $b['dias_restantes']);
+            $alertasIS = array_slice($alertasIS, 0, 10);
+        }
+
+        $alertasManutencao = [];
+
+        if (Schema::hasTable('manutencoes')) {
+            $alertasManutencao = Manutencao::query()
+                ->with('maquina:id,nome')
+                ->whereNotNull('proxima_manutencao')
+                ->where('proxima_manutencao', '<=', $hoje->copy()->addDays(30)->toDateString())
+                ->orderBy('proxima_manutencao')
+                ->limit(10)
+                ->get()
+                ->map(fn (Manutencao $m) => [
+                    'maquina_nome' => $m->maquina?->nome ?? 'Máquina desconhecida',
+                    'tipo' => $m->tipo,
+                    'proxima_manutencao' => optional($m->proxima_manutencao)->format('d/m/Y'),
+                    'dias_ate_manutencao' => (int) $hoje->diffInDays($m->proxima_manutencao, false),
+                ])
+                ->values()
+                ->all();
+        }
+
+        return [
+            'intervalo_seguranca' => $alertasIS,
+            'manutencoes' => $alertasManutencao,
+        ];
+    }
+
+    private function buildDespesasMes(): array
+    {
+        if (! Schema::hasTable('despesas')) {
+            return ['total' => 0, 'count' => 0, 'variacao' => null, 'por_categoria' => []];
+        }
+
+        $mes = now()->month;
+        $ano = now()->year;
+
+        $despesasMes = Despesa::query()
+            ->whereYear('data', $ano)
+            ->whereMonth('data', $mes)
+            ->get(['valor', 'categoria']);
+
+        $total = (float) $despesasMes->sum('valor');
+
+        $mesPrev = $mes === 1 ? 12 : $mes - 1;
+        $anoPrev = $mes === 1 ? $ano - 1 : $ano;
+        $totalAnterior = (float) Despesa::query()
+            ->whereYear('data', $anoPrev)
+            ->whereMonth('data', $mesPrev)
+            ->sum('valor');
+
+        $variacao = $totalAnterior > 0
+            ? round((($total - $totalAnterior) / $totalAnterior) * 100, 1)
+            : null;
+
+        $porCategoria = $despesasMes->groupBy('categoria')
+            ->map(fn ($group) => (float) $group->sum('valor'))
+            ->sortDesc()
+            ->take(3)
+            ->all();
+
+        return [
+            'total' => $total,
+            'count' => $despesasMes->count(),
+            'variacao' => $variacao,
+            'por_categoria' => $porCategoria,
+            'mes' => $mes,
+            'ano' => $ano,
+        ];
     }
 
     private function safeCount(string $table, string $model): int

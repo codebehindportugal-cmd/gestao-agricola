@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\Cultura;
+use App\Models\Despesa;
 use App\Models\Equipa;
 use App\Models\Funcionario;
 use App\Models\Alfaia;
@@ -13,6 +14,7 @@ use App\Models\Parcela;
 use App\Models\Terreno;
 use App\Policies\CulturaPolicy;
 use App\Policies\CampanhaPolicy;
+use App\Policies\DespesaPolicy;
 use App\Policies\EquipaPolicy;
 use App\Policies\FuncionarioPolicy;
 use App\Policies\AlfaiaPolicy;
@@ -48,6 +50,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Equipa::class, EquipaPolicy::class);
         Gate::policy(Maquina::class, MaquinaPolicy::class);
         Gate::policy(Alfaia::class, AlfaiaPolicy::class);
+        Gate::policy(Despesa::class, DespesaPolicy::class);
 
         Vite::prefetch(concurrency: 3);
     }

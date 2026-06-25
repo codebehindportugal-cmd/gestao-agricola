@@ -2,19 +2,50 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import DashboardPolygonsMap from '@/Components/DashboardPolygonsMap.vue';
 import { Head, Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
-defineProps({
+const props = defineProps({
     stats: { type: Array, default: () => [] },
     statusCards: { type: Array, default: () => [] },
     recentOperations: { type: Array, default: () => [] },
     focusAreas: { type: Array, default: () => [] },
     mapPolygons: { type: Array, default: () => [] },
+    alertas: { type: Object, default: () => ({ intervalo_seguranca: [], manutencoes: [] }) },
+    despesasMes: { type: Object, default: () => ({ total: 0, count: 0, variacao: null, por_categoria: {} }) },
+});
+
+const formatCurrency = (v) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v || 0);
+
+const despesasVariacao = computed(() => {
+    const v = props.despesasMes.variacao;
+    if (v === null || v === undefined) return null;
+    if (v > 0) return { cls: 'text-red-600', label: `+${v}%` };
+    if (v < 0) return { cls: 'text-emerald-600', label: `${v}%` };
+    return { cls: 'text-slate-500', label: '0%' };
 });
 
 const toneClasses = {
     emerald: 'border-emerald-200 bg-emerald-50 text-emerald-700',
     amber: 'border-amber-200 bg-amber-50 text-amber-700',
     sky: 'border-sky-200 bg-sky-50 text-sky-700',
+};
+
+const totalAlertas = computed(() =>
+    (props.alertas.intervalo_seguranca?.length ?? 0) + (props.alertas.manutencoes?.length ?? 0)
+);
+
+const urgenciaIS = (dias) => {
+    if (dias === 0) return { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800', badge: 'bg-red-100 text-red-700', label: 'hoje' };
+    if (dias <= 3) return { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800', badge: 'bg-red-100 text-red-700', label: `${dias}d` };
+    if (dias <= 7) return { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', badge: 'bg-amber-100 text-amber-700', label: `${dias}d` };
+    return { bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-800', badge: 'bg-yellow-100 text-yellow-700', label: `${dias}d` };
+};
+
+const urgenciaManutencao = (dias) => {
+    if (dias < 0) return { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800', badge: 'bg-red-100 text-red-700', label: `${Math.abs(dias)}d atraso` };
+    if (dias === 0) return { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800', badge: 'bg-red-100 text-red-700', label: 'hoje' };
+    if (dias <= 7) return { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', badge: 'bg-amber-100 text-amber-700', label: `${dias}d` };
+    return { bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-800', badge: 'bg-yellow-100 text-yellow-700', label: `${dias}d` };
 };
 </script>
 
@@ -60,6 +91,120 @@ const toneClasses = {
                         <p class="text-sm font-medium text-slate-500">{{ stat.label }}</p>
                         <p class="mt-4 text-4xl font-black tracking-tight text-slate-900">{{ stat.value }}</p>
                         <p class="mt-3 text-sm leading-6 text-slate-600">{{ stat.description }}</p>
+                    </article>
+                </section>
+
+                <!-- widget despesas do mês -->
+                <section v-if="despesasMes.count > 0 || despesasMes.total > 0"
+                         class="rounded-[28px] border border-orange-100 bg-white/90 p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.32em] text-orange-600">Despesas do mês</p>
+                            <p class="mt-1 text-3xl font-black text-slate-900">{{ formatCurrency(despesasMes.total) }}</p>
+                            <p class="mt-1 text-sm text-slate-500">{{ despesasMes.count }} despesa(s) registada(s)</p>
+                        </div>
+                        <div class="flex flex-col items-end gap-2">
+                            <span v-if="despesasVariacao" class="text-sm font-semibold" :class="despesasVariacao.cls">
+                                {{ despesasVariacao.label }} vs mês ant.
+                            </span>
+                            <Link :href="route('app.despesas.index')"
+                                  class="rounded-full bg-orange-50 px-4 py-2 text-xs font-semibold text-orange-700 transition hover:bg-orange-100">
+                                Ver despesas
+                            </Link>
+                        </div>
+                    </div>
+                    <div v-if="Object.keys(despesasMes.por_categoria).length" class="mt-4 flex flex-wrap gap-2">
+                        <span v-for="(val, cat) in despesasMes.por_categoria" :key="cat"
+                              class="rounded-full bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-700">
+                            {{ cat.replace('_', ' ') }}: {{ formatCurrency(val) }}
+                        </span>
+                    </div>
+                </section>
+
+                <section v-if="totalAlertas > 0" class="grid gap-5 lg:grid-cols-2">
+                    <article v-if="alertas.intervalo_seguranca?.length" class="rounded-[32px] border border-amber-200 bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.32em] text-amber-600">Intervalos de segurança</p>
+                                <h2 class="mt-2 text-xl font-black text-slate-900">Parcelas em período de IS</h2>
+                                <p class="mt-1 text-sm text-slate-500">Não colher antes do término do intervalo de segurança.</p>
+                            </div>
+                            <span class="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-sm font-bold text-amber-700">
+                                {{ alertas.intervalo_seguranca.length }}
+                            </span>
+                        </div>
+
+                        <div class="mt-4 space-y-3">
+                            <div
+                                v-for="alerta in alertas.intervalo_seguranca"
+                                :key="`is-${alerta.operacao_id}-${alerta.produto_nome}`"
+                                class="flex items-start gap-3 rounded-2xl border p-4"
+                                :class="[urgenciaIS(alerta.dias_restantes).bg, urgenciaIS(alerta.dias_restantes).border]"
+                            >
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <p class="text-sm font-bold" :class="urgenciaIS(alerta.dias_restantes).text">
+                                            {{ alerta.parcela_nome }}
+                                        </p>
+                                        <span v-if="alerta.cultura_nome" class="text-xs text-slate-500">— {{ alerta.cultura_nome }}</span>
+                                    </div>
+                                    <p class="mt-1 text-xs text-slate-600">
+                                        {{ alerta.produto_nome }} · aplicado {{ alerta.data_aplicacao }}
+                                    </p>
+                                    <p class="mt-1 text-xs font-medium text-slate-700">
+                                        Pode colher a partir de <span class="font-bold">{{ alerta.fim_intervalo }}</span>
+                                    </p>
+                                </div>
+                                <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-bold" :class="urgenciaIS(alerta.dias_restantes).badge">
+                                    {{ urgenciaIS(alerta.dias_restantes).label }}
+                                </span>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article v-if="alertas.manutencoes?.length" class="rounded-[32px] border border-red-200 bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.32em] text-red-600">Revisões de máquinas</p>
+                                <h2 class="mt-2 text-xl font-black text-slate-900">Manutenções a agendar</h2>
+                                <p class="mt-1 text-sm text-slate-500">Próximas 30 dias ou já em atraso.</p>
+                            </div>
+                            <span class="shrink-0 rounded-full bg-red-100 px-3 py-1 text-sm font-bold text-red-700">
+                                {{ alertas.manutencoes.length }}
+                            </span>
+                        </div>
+
+                        <div class="mt-4 space-y-3">
+                            <div
+                                v-for="(manutencao, index) in alertas.manutencoes"
+                                :key="`mant-${index}`"
+                                class="flex items-start gap-3 rounded-2xl border p-4"
+                                :class="[urgenciaManutencao(manutencao.dias_ate_manutencao).bg, urgenciaManutencao(manutencao.dias_ate_manutencao).border]"
+                            >
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-bold" :class="urgenciaManutencao(manutencao.dias_ate_manutencao).text">
+                                        {{ manutencao.maquina_nome }}
+                                    </p>
+                                    <p class="mt-1 text-xs text-slate-600 capitalize">{{ manutencao.tipo }}</p>
+                                    <p class="mt-1 text-xs font-medium text-slate-700">
+                                        {{ manutencao.dias_ate_manutencao < 0 ? 'Deveria ter sido feita a' : 'Prevista para' }}
+                                        <span class="font-bold">{{ manutencao.proxima_manutencao }}</span>
+                                    </p>
+                                </div>
+                                <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-bold" :class="urgenciaManutencao(manutencao.dias_ate_manutencao).badge">
+                                    {{ urgenciaManutencao(manutencao.dias_ate_manutencao).label }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <Link
+                                :href="route('app.maquinaria.index')"
+                                class="text-sm font-semibold text-red-700 hover:text-red-600"
+                            >
+                                Ver maquinaria →
+                            </Link>
+                        </div>
                     </article>
                 </section>
 

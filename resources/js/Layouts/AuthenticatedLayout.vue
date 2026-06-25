@@ -48,6 +48,7 @@ const resourceLinks = [
     { label: 'Maquinaria', routeName: 'app.maquinaria.index', active: 'app.maquinaria.*' },
     { label: 'Mão de obra', routeName: 'app.mao-obra.index', active: 'app.mao-obra.index' },
     { label: 'Localização', routeName: 'app.mao-obra.localizacoes', active: 'app.mao-obra.localizacoes' },
+    { label: 'Despesas', routeName: 'app.despesas.index', active: 'app.despesas.*' },
 ];
 
 const canManageUsers = computed(() => {
@@ -63,7 +64,8 @@ const resourcesActive = computed(() => {
         route().current('app.alfaias.*') ||
         route().current('app.mao-obra.*') ||
         route().current('app.funcionarios.*') ||
-        route().current('app.equipas.*');
+        route().current('app.equipas.*') ||
+        route().current('app.despesas.*');
 });
 
 const resourcesPanelOpen = computed(() => showingResourcesDropdown.value || resourcesActive.value);
