@@ -37,6 +37,7 @@ class Operacao extends Model
         'combustivel_gasto_l',
         'custo_estimado',
         'custo_real',
+        'referencia_externa',
         'estado',
         'observacoes',
         'image_path',
