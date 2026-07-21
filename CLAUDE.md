@@ -93,6 +93,14 @@ php artisan make:controller NomeController
 php artisan make:migration add_campo_to_tabela_table
 ```
 
+## API de Ingestao (v1)
+- Autenticacao por token pessoal Sanctum no header `Authorization: Bearer <token>`.
+- Emitir tokens com `php artisan agri:emitir-token {email} --nome=integracao --abilities=custos:write --abilities=aplicacoes:write`.
+- Rotas protegidas em `/api/v1`: `POST /custos` exige `custos:write`; `POST /aplicacoes` exige `aplicacoes:write`.
+- Todas as respostas novas usam envelope JSON: `{ "sucesso": bool, "dados": {...}|null, "avisos": [], "erros": [] }`.
+- Idempotencia: quando `referencia_externa` ja existe, o endpoint devolve o registo existente e nao cria duplicado.
+- Referencias podem ser enviadas por ID ou nome/codigo; se houver ambiguidade, a API devolve 422 com candidatos.
+
 ## Funcionalidades em Desenvolvimento
 
 ### 1. Custos por Campanha
