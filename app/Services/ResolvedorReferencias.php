@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\Campanha;
+use App\Models\Cultura;
 use App\Models\Funcionario;
 use App\Models\Maquina;
+use App\Models\Operacao;
 use App\Models\Parcela;
 use App\Models\Produto;
 use Illuminate\Database\Eloquent\Builder;
@@ -64,6 +66,42 @@ class ResolvedorReferencias
         );
 
         return $parcela;
+    }
+
+    public function resolverCultura(int|string|null $valor): Cultura
+    {
+        /** @var Cultura $cultura */
+        $cultura = $this->resolverModelo(
+            Cultura::query(),
+            $valor,
+            'cultura',
+            fn (Builder $query, string $texto) => $query->where('nome', $texto),
+            fn (Cultura $cultura) => [
+                'id' => $cultura->id,
+                'nome' => $cultura->nome,
+                'parcela_id' => $cultura->parcela_id,
+            ]
+        );
+
+        return $cultura;
+    }
+
+    public function resolverOperacao(int|string|null $valor): Operacao
+    {
+        /** @var Operacao $operacao */
+        $operacao = $this->resolverModelo(
+            Operacao::query(),
+            $valor,
+            'operacao',
+            fn (Builder $query, string $texto) => $query->where('tipo', $texto),
+            fn (Operacao $operacao) => [
+                'id' => $operacao->id,
+                'tipo' => $operacao->tipo,
+                'data' => $operacao->data_hora_inicio?->toDateString(),
+            ]
+        );
+
+        return $operacao;
     }
 
     public function resolverProduto(

@@ -8,6 +8,7 @@ use App\Http\Controllers\CulturaController;
 use App\Http\Controllers\OperacaoController;
 use App\Http\Controllers\MaquinaController;
 use App\Http\Controllers\AlfaiaController;
+use App\Http\Controllers\Api\V1\CustoController;
 use App\Http\Controllers\Api\V1\PingController;
 
 /*
@@ -54,4 +55,7 @@ Route::prefix('v1')->group(function () {
 // Routes protegidas (com autenticação - implementar depois)
 Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
     Route::get('ping', PingController::class);
+
+    Route::post('custos', [CustoController::class, 'store'])
+        ->middleware(['throttle:api', 'abilities:custos:write', 'api.write.role']);
 });

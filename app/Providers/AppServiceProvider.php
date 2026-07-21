@@ -23,6 +23,9 @@ use App\Policies\OperacaoPolicy;
 use App\Policies\ParcelaPolicy;
 use App\Policies\TerrenoPolicy;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Http\Request;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 
@@ -41,6 +44,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+
         Gate::policy(Terreno::class, TerrenoPolicy::class);
         Gate::policy(Parcela::class, ParcelaPolicy::class);
         Gate::policy(Cultura::class, CulturaPolicy::class);

@@ -23,6 +23,7 @@ class Custo extends Model
         'parcela_id',
         'maquina_id',
         'funcionario_id',
+        'referencia_externa',
         'observacoes',
     ];
 
