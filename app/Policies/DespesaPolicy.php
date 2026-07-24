@@ -22,12 +22,12 @@ class DespesaPolicy
         return $user->hasRole(['admin', 'gestor_agricola', 'operador', 'armazem']);
     }
 
-    public function update(User $user, Despesa $despesa): bool
+    public function update(User $user, ?Despesa $despesa = null): bool
     {
         return $user->hasRole(['admin', 'gestor_agricola']);
     }
 
-    public function delete(User $user, Despesa $despesa): bool
+    public function delete(User $user, ?Despesa $despesa = null): bool
     {
         return $user->hasRole(['admin', 'gestor_agricola']);
     }

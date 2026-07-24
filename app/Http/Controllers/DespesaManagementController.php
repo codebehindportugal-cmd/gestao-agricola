@@ -76,8 +76,8 @@ class DespesaManagementController extends Controller
             'produtos'          => Produto::query()->orderBy('nome')->get(['id', 'nome', 'tipo', 'unidade_medida', 'custo_unitario']),
             'can' => [
                 'create' => $request->user()->can('create', Despesa::class),
-                'update' => $request->user()->can('update', Despesa::class, new Despesa()),
-                'delete' => $request->user()->can('delete', Despesa::class, new Despesa()),
+                'update' => $request->user()->can('update', new Despesa()),
+                'delete' => $request->user()->can('delete', new Despesa()),
             ],
         ]);
     }
