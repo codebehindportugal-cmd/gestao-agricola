@@ -10,6 +10,7 @@ use App\Http\Controllers\MaoObraManagementController;
 use App\Http\Controllers\FuncionarioLocationController;
 use App\Http\Controllers\OperacaoManagementController;
 use App\Http\Controllers\CampanhaController;
+use App\Http\Controllers\CampaignContextController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\PermissionController;
@@ -38,6 +39,8 @@ Route::post('/partilhar-localizacao/{token}', [FuncionarioLocationController::cl
     ->name('funcionarios.localizacao.store');
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::post('/campanha-ativa', [CampaignContextController::class, 'update'])->name('app.campanha-ativa.update');
+
     Route::get('/terrenos', [TerrenoManagementController::class, 'index'])->name('app.terrenos.index');
     Route::get('/terrenos/exportar', [TerrenoManagementController::class, 'export'])->name('app.terrenos.exportar');
     Route::post('/terrenos/importar', [TerrenoManagementController::class, 'import'])->name('app.terrenos.importar');
@@ -86,6 +89,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/despesas', [DespesaManagementController::class, 'store'])->name('app.despesas.store');
     Route::patch('/despesas/{despesa}', [DespesaManagementController::class, 'update'])->name('app.despesas.update');
     Route::delete('/despesas/{despesa}', [DespesaManagementController::class, 'destroy'])->name('app.despesas.destroy');
+    Route::post('/despesas/vendas', [DespesaManagementController::class, 'storeReceita'])->name('app.despesas.vendas.store');
+    Route::delete('/despesas/vendas/{receita}', [DespesaManagementController::class, 'destroyReceita'])->name('app.despesas.vendas.destroy');
     Route::get('/despesas/resumo-pdf', [DespesaManagementController::class, 'exportarResumoMensal'])->name('app.despesas.resumo-pdf');
     Route::get('/despesas/exportar-csv', [DespesaManagementController::class, 'exportarCsv'])->name('app.despesas.exportar-csv');
 

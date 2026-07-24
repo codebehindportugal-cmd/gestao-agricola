@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Campanha;
 use App\Models\Despesa;
 use App\Models\FaturaItem;
 use App\Models\MovimentoStock;
 use App\Models\Produto;
+use App\Models\Receita;
 use App\Models\Stock;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -37,9 +39,11 @@ class DespesaManagementController extends Controller
         $filters = $request->only(['search', 'categoria', 'mes', 'ano']);
         $mes = (int) ($filters['mes'] ?? now()->month);
         $ano = (int) ($filters['ano'] ?? now()->year);
+        $campanhaId = $this->activeCampaignId($request);
 
         $despesas = Despesa::query()
             ->with(['items:id,despesa_id,descricao,quantidade,preco_unitario,iva_percentagem,produto_id,notas'])
+            ->when($campanhaId, fn ($q) => $q->where('campanha_id', $campanhaId))
             ->when($filters['search'] ?? null, fn ($q, $s) => $q->where(function ($sub) use ($s) {
                 $sub->where('titulo', 'like', "%{$s}%")
                     ->orWhere('fornecedor', 'like', "%{$s}%")
@@ -59,12 +63,15 @@ class DespesaManagementController extends Controller
 
         return Inertia::render('Despesas/Index', [
             'despesas'          => $despesas,
+            'vendas'            => $this->vendasMes($mes, $ano, $campanhaId),
             'filters'           => array_merge($filters, ['mes' => $mes, 'ano' => $ano]),
             'categorias'        => self::CATEGORIAS,
             'taxasIva'          => self::TAXAS_IVA,
-            'resumoMes'         => $this->buildResumoMes($mes, $ano),
-            'resumoMesAnterior' => $this->buildResumoMes($mesAnt, $anoAnt),
-            'analytics'         => $this->buildAnalytics($mes, $ano),
+            'tiposVenda'        => ['venda_colheita', 'subsidio', 'servico', 'outro'],
+            'resumoMes'         => $this->buildResumoMes($mes, $ano, $campanhaId),
+            'resumoMesAnterior' => $this->buildResumoMes($mesAnt, $anoAnt, $campanhaId),
+            'resumoVendas'      => $this->buildResumoVendas($mes, $ano, $campanhaId),
+            'analytics'         => $this->buildAnalytics($mes, $ano, $campanhaId),
             'produtos'          => Produto::query()->orderBy('nome')->get(['id', 'nome', 'tipo', 'unidade_medida', 'custo_unitario']),
             'can' => [
                 'create' => $request->user()->can('create', Despesa::class),
@@ -79,6 +86,7 @@ class DespesaManagementController extends Controller
         $this->authorize('create', Despesa::class);
 
         $validated = $this->validateDespesa($request, true);
+        $validated['campanha_id'] = $this->activeCampaignId($request);
         $items = $validated['items'] ?? [];
         unset($validated['ficheiro'], $validated['items']);
 
@@ -111,6 +119,40 @@ class DespesaManagementController extends Controller
         return redirect()
             ->route('app.despesas.index', $request->only(['mes', 'ano']))
             ->with('success', $msg);
+    }
+
+    public function storeReceita(Request $request): RedirectResponse
+    {
+        $this->authorize('create', Despesa::class);
+
+        $data = $request->validate([
+            'descricao' => ['required', 'string', 'max:255'],
+            'tipo' => ['required', 'string', 'in:venda_colheita,subsidio,servico,outro'],
+            'valor' => ['required', 'numeric', 'gt:0'],
+            'data' => ['required', 'date'],
+            'comprador_nome' => ['nullable', 'string', 'max:255'],
+            'documento' => ['nullable', 'string', 'max:255'],
+            'observacoes' => ['nullable', 'string'],
+        ]);
+
+        $data['campanha_id'] = $this->activeCampaignId($request);
+
+        Receita::query()->create($data);
+
+        return redirect()
+            ->route('app.despesas.index', $request->only(['mes', 'ano']))
+            ->with('success', 'Venda registada com sucesso.');
+    }
+
+    public function destroyReceita(Request $request, Receita $receita): RedirectResponse
+    {
+        $this->authorize('delete', new Despesa());
+
+        $receita->delete();
+
+        return redirect()
+            ->route('app.despesas.index', $request->only(['mes', 'ano']))
+            ->with('success', 'Venda eliminada com sucesso.');
     }
 
     public function update(Request $request, Despesa $despesa): RedirectResponse
@@ -178,11 +220,14 @@ class DespesaManagementController extends Controller
 
         $mes    = (int) ($request->query('mes', now()->month));
         $ano    = (int) ($request->query('ano', now()->year));
-        $resumo    = $this->buildResumoMes($mes, $ano);
-        $analytics = $this->buildAnalytics($mes, $ano);
+        $campanhaId = $this->activeCampaignId($request);
+        $resumo    = $this->buildResumoMes($mes, $ano, $campanhaId);
+        $analytics = $this->buildAnalytics($mes, $ano, $campanhaId);
+        $resumoVendas = $this->buildResumoVendas($mes, $ano, $campanhaId);
 
         $despesas = Despesa::query()
             ->with('items')
+            ->when($campanhaId, fn ($q) => $q->where('campanha_id', $campanhaId))
             ->whereYear('data', $ano)
             ->whereMonth('data', $mes)
             ->orderBy('data')
@@ -209,7 +254,7 @@ class DespesaManagementController extends Controller
 
         $nomeMes = \Carbon\Carbon::create($ano, $mes, 1)->translatedFormat('F Y');
 
-        return view('despesas.resumo_mensal', compact('resumo', 'analytics', 'despesas', 'nomeMes', 'mes', 'ano'));
+        return view('despesas.resumo_mensal', compact('resumo', 'analytics', 'resumoVendas', 'despesas', 'nomeMes', 'mes', 'ano'));
     }
 
     public function exportarCsv(Request $request)
@@ -218,13 +263,16 @@ class DespesaManagementController extends Controller
 
         $mes = (int) ($request->query('mes', now()->month));
         $ano = (int) ($request->query('ano', now()->year));
+        $campanhaId = $this->activeCampaignId($request);
 
         $despesas = Despesa::query()
             ->with('items')
+            ->when($campanhaId, fn ($q) => $q->where('campanha_id', $campanhaId))
             ->whereYear('data', $ano)
             ->whereMonth('data', $mes)
             ->orderBy('data')
             ->get();
+        $vendas = $this->vendasMes($mes, $ano, $campanhaId);
 
         $nomeMes  = \Carbon\Carbon::create($ano, $mes, 1)->format('Y-m');
         $filename = "despesas-{$nomeMes}.csv";
@@ -234,7 +282,7 @@ class DespesaManagementController extends Controller
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ];
 
-        $callback = function () use ($despesas) {
+        $callback = function () use ($despesas, $vendas) {
             $handle = fopen('php://output', 'w');
             fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
 
@@ -269,6 +317,23 @@ class DespesaManagementController extends Controller
                             '',
                         ], ';');
                     }
+                }
+            }
+
+            if (! empty($vendas)) {
+                fputcsv($handle, [], ';');
+                fputcsv($handle, ['Vendas'], ';');
+                fputcsv($handle, ['Data', 'Descricao', 'Tipo', 'Comprador', 'Documento', 'Valor'], ';');
+
+                foreach ($vendas as $venda) {
+                    fputcsv($handle, [
+                        $venda['data'] ? \Carbon\Carbon::parse($venda['data'])->format('d/m/Y') : '',
+                        $venda['descricao'],
+                        $venda['tipo'],
+                        $venda['comprador_nome'] ?? '',
+                        $venda['documento'] ?? '',
+                        number_format($venda['valor'], 2, ',', '.'),
+                    ], ';');
                 }
             }
 
@@ -449,9 +514,10 @@ class DespesaManagementController extends Controller
 
     // ── Analytics ────────────────────────────────────────────────────────────
 
-    private function buildResumoMes(int $mes, int $ano): array
+    private function buildResumoMes(int $mes, int $ano, ?int $campanhaId = null): array
     {
         $despesas = Despesa::query()
+            ->when($campanhaId, fn ($q) => $q->where('campanha_id', $campanhaId))
             ->whereYear('data', $ano)
             ->whereMonth('data', $mes)
             ->get(['valor', 'categoria']);
@@ -472,7 +538,7 @@ class DespesaManagementController extends Controller
         ];
     }
 
-    private function buildAnalytics(int $mes, int $ano): array
+    private function buildAnalytics(int $mes, int $ano, ?int $campanhaId = null): array
     {
         $empty = [
             'tem_items'      => false,
@@ -487,6 +553,7 @@ class DespesaManagementController extends Controller
         }
 
         $despesaIds = Despesa::query()
+            ->when($campanhaId, fn ($q) => $q->where('campanha_id', $campanhaId))
             ->whereYear('data', $ano)
             ->whereMonth('data', $mes)
             ->pluck('id');
@@ -538,5 +605,61 @@ class DespesaManagementController extends Controller
             'por_fornecedor' => $porFornecedor,
             'top_descricoes' => $topDescricoes,
         ];
+    }
+
+    private function buildResumoVendas(int $mes, int $ano, ?int $campanhaId = null): array
+    {
+        $vendas = Receita::query()
+            ->when($campanhaId, fn ($q) => $q->where('campanha_id', $campanhaId))
+            ->whereYear('data', $ano)
+            ->whereMonth('data', $mes)
+            ->get(['valor', 'tipo']);
+
+        return [
+            'total' => round((float) $vendas->sum('valor'), 2),
+            'count' => $vendas->count(),
+            'por_tipo' => collect(['venda_colheita', 'subsidio', 'servico', 'outro'])
+                ->mapWithKeys(fn ($tipo) => [$tipo => round((float) $vendas->where('tipo', $tipo)->sum('valor'), 2)])
+                ->all(),
+        ];
+    }
+
+    private function vendasMes(int $mes, int $ano, ?int $campanhaId = null): array
+    {
+        return Receita::query()
+            ->when($campanhaId, fn ($q) => $q->where('campanha_id', $campanhaId))
+            ->whereYear('data', $ano)
+            ->whereMonth('data', $mes)
+            ->orderByDesc('data')
+            ->orderByDesc('id')
+            ->get(['id', 'descricao', 'tipo', 'valor', 'data', 'comprador_nome', 'documento', 'observacoes'])
+            ->map(fn (Receita $receita) => [
+                'id' => $receita->id,
+                'descricao' => $receita->descricao,
+                'tipo' => $receita->tipo,
+                'valor' => (float) $receita->valor,
+                'data' => $receita->data?->format('Y-m-d'),
+                'comprador_nome' => $receita->comprador_nome,
+                'documento' => $receita->documento,
+                'observacoes' => $receita->observacoes,
+            ])
+            ->all();
+    }
+
+    private function activeCampaignId(Request $request): ?int
+    {
+        $id = $request->session()->get('campanha_ativa_id');
+
+        if ($id && Campanha::query()->whereKey($id)->exists()) {
+            return (int) $id;
+        }
+
+        $defaultId = Campanha::query()
+            ->orderByRaw("CASE WHEN status = 'em_curso' THEN 0 ELSE 1 END")
+            ->orderByDesc('ano')
+            ->orderByDesc('id')
+            ->value('id');
+
+        return $defaultId ? (int) $defaultId : null;
     }
 }

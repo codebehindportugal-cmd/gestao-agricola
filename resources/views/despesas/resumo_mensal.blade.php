@@ -46,15 +46,27 @@
 <body>
 <div class="sheet">
     <header>
-        <h1>Resumo de Despesas</h1>
+        <h1>Resumo de Despesas e Vendas</h1>
         <div class="muted">{{ $nomeMes }} &mdash; Horta da Maria / Gestão Agrícola</div>
     </header>
     <!-- KPIs -->
     <div class="kpi-grid">
         <div class="kpi">
-            <div class="kpi-label">Total do mês</div>
+            <div class="kpi-label">Vendas do mês</div>
+            <div class="kpi-value" style="color:#059669">{{ number_format($resumoVendas['total'] ?? 0, 2, ',', '.') }} €</div>
+            <div class="kpi-sub">{{ $resumoVendas['count'] ?? 0 }} venda(s)</div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-label">Despesas do mês</div>
             <div class="kpi-value">{{ number_format($resumo['total'], 2, ',', '.') }} €</div>
             <div class="kpi-sub">{{ $resumo['count'] }} fatura(s)</div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-label">Saldo</div>
+            <div class="kpi-value" style="color:{{ (($resumoVendas['total'] ?? 0) - $resumo['total']) >= 0 ? '#0369a1' : '#d97706' }}">
+                {{ number_format(($resumoVendas['total'] ?? 0) - $resumo['total'], 2, ',', '.') }} €
+            </div>
+            <div class="kpi-sub">vendas - despesas</div>
         </div>
         @if($analytics['tem_items'])
         <div class="kpi">

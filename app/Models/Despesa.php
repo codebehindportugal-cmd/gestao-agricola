@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -18,6 +19,7 @@ class Despesa extends Model
         'fornecedor',
         'valor',
         'data',
+        'campanha_id',
         'categoria',
         'marca',
         'ficheiro_path',
@@ -32,6 +34,11 @@ class Despesa extends Model
     public function items(): HasMany
     {
         return $this->hasMany(FaturaItem::class);
+    }
+
+    public function campanha(): BelongsTo
+    {
+        return $this->belongsTo(Campanha::class);
     }
 
     public function movimentos(): HasMany

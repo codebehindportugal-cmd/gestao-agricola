@@ -1,23 +1,29 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import Pagination from '@/Components/Pagination.vue';
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import { useQRScanner } from '@/composables/useQRScanner.js';
 
 const { scanAndParseAT } = useQRScanner();
+const page = usePage();
 
 const props = defineProps({
     despesas: { type: Object, required: true },
     filters: { type: Object, default: () => ({}) },
     categorias: { type: Array, default: () => [] },
     taxasIva: { type: Array, default: () => [0, 6, 13, 23] },
+    vendas: { type: Array, default: () => [] },
+    tiposVenda: { type: Array, default: () => [] },
     resumoMes: { type: Object, default: () => ({}) },
+    resumoVendas: { type: Object, default: () => ({}) },
     resumoMesAnterior: { type: Object, default: () => ({}) },
     analytics: { type: Object, default: () => ({ tem_items: false }) },
     produtos: { type: Array, default: () => [] },
     can: { type: Object, default: () => ({}) },
 });
+
+const activeCampaign = computed(() => page.props.workingCampaign?.active ?? null);
 
 // ─── filtros / navegação mês ─────────────────────────────────────────────────
 const mesAtual = ref(props.filters.mes ?? new Date().getMonth() + 1);
@@ -223,6 +229,57 @@ function eliminar() {
     });
 }
 
+const vendaForm = useForm({
+    descricao: '',
+    tipo: 'venda_colheita',
+    valor: '',
+    data_venda: new Date().toISOString().split('T')[0],
+    comprador_nome: '',
+    documento: '',
+    observacoes: '',
+});
+
+const vendaTipoLabel = (tipo) => ({
+    venda_colheita: 'Venda de colheita',
+    subsidio: 'Subsidio',
+    servico: 'Servico',
+    outro: 'Outro',
+}[tipo] ?? tipo);
+
+const totalDespesas = computed(() => Number(props.resumoMes.total ?? 0));
+const totalVendas = computed(() => Number(props.resumoVendas.total ?? 0));
+const saldoMes = computed(() => totalVendas.value - totalDespesas.value);
+
+function submeterVenda() {
+    const url = `${route('app.despesas.vendas.store')}?mes=${mesAtual.value}&ano=${anoAtual.value}`;
+
+    vendaForm.transform((data) => {
+        const payload = { ...data, data: data.data_venda };
+        delete payload.data_venda;
+
+        return payload;
+    });
+
+    vendaForm.post(url, {
+        preserveScroll: true,
+        onSuccess: () => {
+            vendaForm.transform((data) => data);
+            vendaForm.reset();
+            vendaForm.tipo = 'venda_colheita';
+            vendaForm.data_venda = new Date().toISOString().split('T')[0];
+        },
+        onFinish: () => vendaForm.transform((data) => data),
+    });
+}
+
+function eliminarVenda(venda) {
+    if (!window.confirm(`Eliminar a venda "${venda.descricao}"?`)) return;
+
+    router.delete(`${route('app.despesas.vendas.destroy', venda.id)}?mes=${mesAtual.value}&ano=${anoAtual.value}`, {
+        preserveScroll: true,
+    });
+}
+
 // ─── QR AT scan ──────────────────────────────────────────────────────────────
 const qrDetectado = ref(null);   // { nif_fornecedor, data, numero_fatura, total, total_iva }
 const qrScanning = ref(false);
@@ -299,7 +356,8 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                     <p class="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700">Despesas e faturas</p>
                     <h1 class="mt-2 text-3xl font-black text-slate-900">Controlo de despesas e documentos</h1>
                     <p class="mt-2 max-w-2xl text-sm text-slate-600">
-                        Registe faturas com linhas de produto, IVA e foto. Resumo automático por categoria e fornecedor.
+                        {{ activeCampaign ? `Campanha: ${activeCampaign.nome}.` : 'Sem campanha ativa.' }}
+                        Registe faturas, vendas e acompanhe o saldo do mês.
                     </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
@@ -335,15 +393,28 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                 </button>
             </div>
             <!-- resumo do mês -->
-            <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div class="col-span-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-emerald-700">Total do mês</p>
-                    <p class="mt-1 text-2xl font-black text-emerald-900">{{ fmt(resumoMes.total) }}</p>
-                    <p class="mt-1 text-xs text-emerald-700">{{ resumoMes.count ?? 0 }} fatura(s)</p>
+            <div class="mb-6 grid gap-3 sm:grid-cols-3">
+                <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-emerald-700">Vendas do mês</p>
+                    <p class="mt-1 text-2xl font-black text-emerald-900">{{ fmt(totalVendas) }}</p>
+                    <p class="mt-1 text-xs text-emerald-700">{{ resumoVendas.count ?? 0 }} venda(s)</p>
+                </div>
+                <div class="rounded-2xl border border-red-100 bg-red-50 p-5">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-red-700">Despesas do mês</p>
+                    <p class="mt-1 text-2xl font-black text-red-900">{{ fmt(totalDespesas) }}</p>
+                    <p class="mt-1 text-xs text-red-700">{{ resumoMes.count ?? 0 }} fatura(s)</p>
                     <p v-if="variacaoLabel" class="mt-1 text-xs font-medium" :class="variacaoLabel.cls">
                         {{ variacaoLabel.label }} vs mês anterior
                     </p>
                 </div>
+                <div class="rounded-2xl border p-5" :class="saldoMes >= 0 ? 'border-sky-200 bg-sky-50' : 'border-amber-200 bg-amber-50'">
+                    <p class="text-xs font-semibold uppercase tracking-wider" :class="saldoMes >= 0 ? 'text-sky-700' : 'text-amber-700'">Saldo da campanha</p>
+                    <p class="mt-1 text-2xl font-black" :class="saldoMes >= 0 ? 'text-sky-900' : 'text-amber-900'">{{ fmt(saldoMes) }}</p>
+                    <p class="mt-1 text-xs" :class="saldoMes >= 0 ? 'text-sky-700' : 'text-amber-700'">{{ activeCampaign?.nome ?? 'Campanha não definida' }}</p>
+                </div>
+            </div>
+
+            <div v-if="Object.keys(resumoMes.por_categoria ?? {}).length" class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <template v-for="(val, cat) in resumoMes.por_categoria" :key="cat">
                     <div v-if="val > 0" class="rounded-2xl border border-slate-200 bg-white p-4">
                         <p class="text-xs text-slate-500">{{ categoriaIcone(cat) }} {{ categoriaLabel(cat) }}</p>
@@ -364,6 +435,102 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                     <option value="">Todas as categorias</option>
                     <option v-for="cat in categorias" :key="cat" :value="cat">{{ categoriaLabel(cat) }}</option>
                 </select>
+            </div>
+
+            <div class="mb-6 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                <form v-if="can.create" @submit.prevent="submeterVenda" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div class="mb-4 flex items-center justify-between gap-3">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Vendas</p>
+                            <h3 class="mt-1 text-base font-bold text-slate-900">Registar entrada</h3>
+                        </div>
+                        <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                            {{ activeCampaign?.nome ?? 'Sem campanha' }}
+                        </span>
+                    </div>
+
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <div class="sm:col-span-2">
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Descrição *</label>
+                            <input v-model="vendaForm.descricao" type="text" required
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                                   placeholder="Ex: Venda tomate mercado" />
+                            <p v-if="vendaForm.errors.descricao" class="mt-1 text-xs text-red-600">{{ vendaForm.errors.descricao }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Tipo *</label>
+                            <select v-model="vendaForm.tipo" required
+                                    class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400">
+                                <option v-for="tipo in tiposVenda" :key="tipo" :value="tipo">{{ vendaTipoLabel(tipo) }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Valor *</label>
+                            <input v-model="vendaForm.valor" type="number" min="0.01" step="0.01" required
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
+                            <p v-if="vendaForm.errors.valor" class="mt-1 text-xs text-red-600">{{ vendaForm.errors.valor }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Data *</label>
+                            <input v-model="vendaForm.data_venda" type="date" required
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
+                            <p v-if="vendaForm.errors.data" class="mt-1 text-xs text-red-600">{{ vendaForm.errors.data }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Comprador</label>
+                            <input v-model="vendaForm.comprador_nome" type="text"
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Documento</label>
+                            <input v-model="vendaForm.documento" type="text"
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                                   placeholder="Fatura, recibo ou referência" />
+                        </div>
+                    </div>
+
+                    <button type="submit" :disabled="vendaForm.processing"
+                            class="mt-4 w-full rounded-full bg-emerald-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-60">
+                        {{ vendaForm.processing ? 'A guardar...' : 'Registar venda' }}
+                    </button>
+                </form>
+
+                <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Vendas do período</p>
+                            <p class="mt-1 text-sm text-slate-500">{{ fmt(totalVendas) }} no mês selecionado</p>
+                        </div>
+                    </div>
+                    <div v-if="vendas.length === 0" class="py-12 text-center">
+                        <p class="text-sm font-medium text-slate-600">Sem vendas neste mês</p>
+                        <p class="mt-1 text-xs text-slate-400">As vendas registadas entram no saldo da campanha.</p>
+                    </div>
+                    <ul v-else class="divide-y divide-slate-100">
+                        <li v-for="venda in vendas" :key="venda.id" class="flex items-start justify-between gap-4 px-5 py-4">
+                            <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <p class="truncate font-semibold text-slate-900">{{ venda.descricao }}</p>
+                                    <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                        {{ vendaTipoLabel(venda.tipo) }}
+                                    </span>
+                                </div>
+                                <div class="mt-1 flex flex-wrap gap-3 text-xs text-slate-500">
+                                    <span>{{ new Date(venda.data).toLocaleDateString('pt-PT') }}</span>
+                                    <span v-if="venda.comprador_nome">{{ venda.comprador_nome }}</span>
+                                    <span v-if="venda.documento">{{ venda.documento }}</span>
+                                </div>
+                            </div>
+                            <div class="flex flex-shrink-0 flex-col items-end gap-2">
+                                <p class="text-base font-black text-emerald-700">{{ fmt(venda.valor) }}</p>
+                                <button v-if="can.delete" type="button" @click="eliminarVenda(venda)"
+                                        class="rounded-full px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50">
+                                    Eliminar
+                                </button>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
             </div>
 
             <!-- lista -->

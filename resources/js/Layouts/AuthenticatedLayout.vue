@@ -3,7 +3,7 @@ import { computed, ref } from 'vue';
 import ApplicationLogo from '@/Components/ApplicationLogo.vue';
 import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
-import { Link, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 
 const page = usePage();
 const showingNavigationDropdown = ref(false);
@@ -69,6 +69,17 @@ const resourcesActive = computed(() => {
 });
 
 const resourcesPanelOpen = computed(() => showingResourcesDropdown.value || resourcesActive.value);
+const campaignOptions = computed(() => page.props.workingCampaign?.options ?? []);
+const activeCampaign = computed(() => page.props.workingCampaign?.active ?? null);
+
+function setActiveCampaign(event) {
+    router.post(route('app.campanha-ativa.update'), {
+        campanha_id: event.target.value || null,
+    }, {
+        preserveScroll: true,
+        preserveState: false,
+    });
+}
 </script>
 
 <template>
@@ -143,7 +154,20 @@ const resourcesPanelOpen = computed(() => showingResourcesDropdown.value || reso
                             </div>
                         </div>
 
-                        <div class="hidden sm:ms-6 sm:flex sm:items-center">
+                        <div class="hidden sm:ms-6 sm:flex sm:items-center sm:gap-3">
+                            <div v-if="campaignOptions.length" class="flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Campanha</span>
+                                <select
+                                    class="max-w-[190px] border-0 bg-transparent p-0 text-sm font-semibold text-slate-800 focus:ring-0"
+                                    :value="activeCampaign?.id ?? ''"
+                                    @change="setActiveCampaign"
+                                >
+                                    <option v-for="campanha in campaignOptions" :key="campanha.id" :value="campanha.id">
+                                        {{ campanha.nome }}
+                                    </option>
+                                </select>
+                            </div>
+
                             <div class="relative ms-3">
                                 <button
                                     type="button"
@@ -249,6 +273,18 @@ const resourcesPanelOpen = computed(() => showingResourcesDropdown.value || reso
                         </div>
 
                         <div class="mt-3 space-y-1">
+                            <div v-if="campaignOptions.length" class="px-4 py-2">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500">Campanha ativa</label>
+                                <select
+                                    class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                                    :value="activeCampaign?.id ?? ''"
+                                    @change="setActiveCampaign"
+                                >
+                                    <option v-for="campanha in campaignOptions" :key="campanha.id" :value="campanha.id">
+                                        {{ campanha.nome }}
+                                    </option>
+                                </select>
+                            </div>
                             <ResponsiveNavLink :href="route('profile.edit')">Perfil</ResponsiveNavLink>
                             <ResponsiveNavLink :href="route('logout')" method="post" as="button">Terminar sessão</ResponsiveNavLink>
                         </div>
