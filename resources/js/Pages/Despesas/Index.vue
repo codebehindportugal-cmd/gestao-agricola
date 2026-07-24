@@ -69,7 +69,7 @@ const form = useForm({
     numero_fatura: '',
     fornecedor: '',
     valor: '',
-    data: new Date().toISOString().split('T')[0],
+    data_despesa: new Date().toISOString().split('T')[0],
     categoria: 'outro',
     marca: 'horta_da_maria',
     notas: '',
@@ -123,7 +123,7 @@ function onProdutoChange(item) {
 function abrirCriar() {
     editingDespesa.value = null;
     form.reset();
-    form.data = new Date().toISOString().split('T')[0];
+    form.data_despesa = new Date().toISOString().split('T')[0];
     form.categoria = 'outro';
     form.marca = 'horta_da_maria';
     form.items = [];
@@ -138,7 +138,7 @@ function abrirEditar(despesa) {
     form.numero_fatura = despesa.numero_fatura ?? '';
     form.fornecedor = despesa.fornecedor ?? '';
     form.valor = despesa.total_fatura;
-    form.data = despesa.data;
+    form.data_despesa = despesa.data;
     form.categoria = despesa.categoria;
     form.marca = despesa.marca ?? 'horta_da_maria';
     form.notas = despesa.notas ?? '';
@@ -191,7 +191,21 @@ function submeter() {
         : route('app.despesas.store');
     const url = `${baseUrl}?mes=${mesAtual.value}&ano=${anoAtual.value}`;
 
-    const opts = { forceFormData: true, onSuccess: fecharModal };
+    const opts = {
+        forceFormData: true,
+        onSuccess: () => {
+            form.transform((data) => data);
+            fecharModal();
+        },
+        onFinish: () => form.transform((data) => data),
+    };
+
+    form.transform((data) => {
+        const payload = { ...data, data: data.data_despesa };
+        delete payload.data_despesa;
+
+        return payload;
+    });
 
     if (editingDespesa.value) {
         form.patch(url, opts);
@@ -237,7 +251,7 @@ async function tentarLerQR(file) {
 function preencherFromQR() {
     const qr = qrDetectado.value;
     if (!qr) return;
-    if (qr.data && !form.data) form.data = qr.data;
+    if (qr.data && !form.data_despesa) form.data_despesa = qr.data;
     if (qr.numero_fatura && !form.numero_fatura) form.numero_fatura = qr.numero_fatura;
     if (qr.nif_fornecedor && !form.fornecedor) form.fornecedor = `NIF: ${qr.nif_fornecedor}`;
     if (qr.total && !form.valor) form.valor = qr.total.toFixed(2);
@@ -653,8 +667,9 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
                                     <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Data *</label>
-                                    <input v-model="form.data" type="date" required
+                                    <input v-model="form.data_despesa" type="date" required
                                            class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
+                                    <p v-if="form.errors.data" class="mt-1 text-xs text-red-600">{{ form.errors.data }}</p>
                                 </div>
                                 <div>
                                     <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Categoria *</label>
