@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\ColheitaController;
 use App\Http\Controllers\Api\V1\CustoController;
 use App\Http\Controllers\Api\V1\PingController;
 use App\Http\Controllers\Api\V1\ReceitaController;
+use App\Http\Controllers\Api\V1\TesourariaController;
 
 /*
 |--------------------------------------------------------------------------
@@ -70,4 +71,7 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
 
     Route::post('receitas', [ReceitaController::class, 'store'])
         ->middleware(['throttle:api', 'abilities:receitas:write', 'api.write.role']);
+
+    Route::get('tesouraria', TesourariaController::class)
+        ->middleware(['throttle:api']);
 });
