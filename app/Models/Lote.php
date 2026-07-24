@@ -14,10 +14,12 @@ class Lote extends Model
 
     protected $fillable = [
         'colheita_id',
+        'terreno_id',
         'armazem_id',
         'numero_lote',
         'quantidade',
         'unidade_medida',
+        'data_colheita',
         'data_entrada',
         'data_saida',
         'localizacao_armazem',
@@ -29,6 +31,7 @@ class Lote extends Model
 
     protected $casts = [
         'quantidade' => 'decimal:2',
+        'data_colheita' => 'date',
         'data_entrada' => 'date',
         'data_saida' => 'date',
         'rastreabilidade' => 'json',
@@ -43,5 +46,10 @@ class Lote extends Model
     public function armazem(): BelongsTo
     {
         return $this->belongsTo(Armazem::class);
+    }
+
+    public function terreno(): BelongsTo
+    {
+        return $this->belongsTo(Terreno::class);
     }
 }

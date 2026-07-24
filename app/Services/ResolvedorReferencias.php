@@ -9,6 +9,7 @@ use App\Models\Maquina;
 use App\Models\Operacao;
 use App\Models\Parcela;
 use App\Models\Produto;
+use App\Models\Terreno;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -170,6 +171,23 @@ class ResolvedorReferencias
         );
 
         return $funcionario;
+    }
+
+    public function resolverTerreno(int|string|null $valor): Terreno
+    {
+        /** @var Terreno $terreno */
+        $terreno = $this->resolverModelo(
+            Terreno::query(),
+            $valor,
+            'terreno',
+            fn (Builder $query, string $texto) => $query->where('nome', $texto),
+            fn (Terreno $terreno) => [
+                'id' => $terreno->id,
+                'nome' => $terreno->nome,
+            ]
+        );
+
+        return $terreno;
     }
 
     /**

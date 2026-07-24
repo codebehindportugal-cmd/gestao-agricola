@@ -25,6 +25,7 @@ class Colheita extends Model
         'quantidade_perdas',
         'motivo_perdas',
         'operador_id',
+        'referencia_externa',
         'observacoes',
     ];
 

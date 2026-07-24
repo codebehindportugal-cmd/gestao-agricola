@@ -14,6 +14,7 @@ class EmitirTokenApi extends Command
     private const ABILITIES_PERMITIDAS = [
         'custos:write',
         'aplicacoes:write',
+        'colheitas:write',
     ];
 
     public function handle(): int
