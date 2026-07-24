@@ -66,6 +66,11 @@ const baseFormData = {
     latitude: '',
     longitude: '',
     poligono: [],
+    cultura_nome: '',
+    cultura_variedade: '',
+    cultura_tipo: '',
+    cultura_data_plantacao: '',
+    cultura_estado: 'em_crescimento',
 };
 
 const createForm = useForm({ ...baseFormData });
@@ -99,6 +104,8 @@ const openCreateModal = () => {
     createForm.reset();
     createForm.clearErrors();
     createForm.estado = 'livre';
+    createForm.tipo_ocupacao = 'culturas_anuais';
+    createForm.cultura_estado = 'em_crescimento';
     createForm.terreno_id = filterState.terreno_id || '';
     createModalOpen.value = true;
 };
@@ -126,6 +133,12 @@ const openEditModal = (parcela) => {
     editForm.latitude = parcela.latitude?.toString() ?? '';
     editForm.longitude = parcela.longitude?.toString() ?? '';
     editForm.poligono = parcela.poligono ?? [];
+    const cultura = parcela.culturas?.[0] ?? null;
+    editForm.cultura_nome = cultura?.nome ?? '';
+    editForm.cultura_variedade = cultura?.variedade ?? '';
+    editForm.cultura_tipo = cultura?.tipo ?? parcela.tipo_ocupacao ?? 'culturas_anuais';
+    editForm.cultura_data_plantacao = cultura?.data_plantacao ?? '';
+    editForm.cultura_estado = cultura?.estado ?? 'em_crescimento';
 };
 
 const closeEditModal = () => {
@@ -228,6 +241,22 @@ const estadoLabel = (estado) => ({
     em_preparacao: 'em preparação',
     pousio: 'pousio',
 }[estado] ?? estado);
+
+const culturaEstadoLabel = (estado) => ({
+    planejada: 'planeada',
+    em_crescimento: 'em crescimento',
+    madura: 'madura',
+    colhida: 'colhida',
+    cancelada: 'cancelada',
+}[estado] ?? estado);
+
+const tipoOcupacaoLabel = (tipo) => ({
+    culturas_anuais: 'culturas anuais',
+    pomar: 'pomar',
+    misto: 'misto',
+    estufa: 'estufa',
+    outro: 'outro',
+}[tipo] ?? tipo);
 
 const selectedCreateTerreno = computed(() =>
     props.terrenos.find((terreno) => String(terreno.id) === String(createForm.terreno_id)) ?? null,
@@ -451,6 +480,15 @@ const updateEditPolygonArea = (area) => {
                                 <p class="text-xs font-semibold uppercase tracking-[0.25em] text-emerald-500">Ocupação</p>
                                 <p class="mt-2 text-sm text-slate-700">{{ parcela.tipo_ocupacao || 'culturas_anuais' }}</p>
                             </div>
+                            <div class="rounded-3xl p-4" :class="parcela.culturas_count ? 'bg-emerald-50' : 'bg-amber-50'">
+                                <p class="text-xs font-semibold uppercase tracking-[0.25em]" :class="parcela.culturas_count ? 'text-emerald-500' : 'text-amber-600'">Cultura</p>
+                                <p class="mt-2 text-sm text-slate-700">
+                                    {{ parcela.culturas?.[0]?.label || 'Sem cultura registada' }}
+                                </p>
+                                <p v-if="parcela.culturas_count > 1" class="mt-1 text-xs text-slate-500">
+                                    +{{ parcela.culturas_count - 1 }} outra(s)
+                                </p>
+                            </div>
                             <div class="rounded-3xl bg-emerald-50 p-4">
                                 <p class="text-xs font-semibold uppercase tracking-[0.25em] text-emerald-500">Árvores</p>
                                 <p class="mt-2 text-sm text-slate-700">
@@ -579,6 +617,48 @@ const updateEditPolygonArea = (area) => {
                         </select>
                         <InputError class="mt-2" :message="createForm.errors.estado" />
                     </div>
+                    <div class="sm:col-span-2">
+                        <InputLabel value="Tipo de ocupação" />
+                        <select
+                            v-model="createForm.tipo_ocupacao"
+                            class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                        >
+                            <option value="culturas_anuais">Culturas anuais</option>
+                            <option value="pomar">Pomar</option>
+                            <option value="misto">Misto</option>
+                            <option value="estufa">Estufa</option>
+                            <option value="outro">Outro</option>
+                        </select>
+                        <InputError class="mt-2" :message="createForm.errors.tipo_ocupacao" />
+                    </div>
+                    <div class="sm:col-span-2 rounded-3xl border border-emerald-100 bg-emerald-50/70 p-4">
+                        <p class="text-sm font-semibold text-slate-800">Cultura / variedade principal</p>
+                        <p class="mt-1 text-xs leading-5 text-slate-500">
+                            Preenche para a parcela ficar pronta para operações e colheitas.
+                        </p>
+                        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <InputLabel value="Cultura" />
+                                <TextInput v-model="createForm.cultura_nome" class="mt-2 block w-full rounded-2xl bg-white" placeholder="Ex: Pereira, Tomate, Batata" />
+                                <InputError class="mt-2" :message="createForm.errors.cultura_nome" />
+                            </div>
+                            <div>
+                                <InputLabel value="Variedade" />
+                                <TextInput v-model="createForm.cultura_variedade" class="mt-2 block w-full rounded-2xl bg-white" placeholder="Ex: Rocha, Cherry, Agria" />
+                                <InputError class="mt-2" :message="createForm.errors.cultura_variedade" />
+                            </div>
+                            <div>
+                                <InputLabel value="Tipo" />
+                                <TextInput v-model="createForm.cultura_tipo" class="mt-2 block w-full rounded-2xl bg-white" :placeholder="tipoOcupacaoLabel(createForm.tipo_ocupacao)" />
+                                <InputError class="mt-2" :message="createForm.errors.cultura_tipo" />
+                            </div>
+                            <div>
+                                <InputLabel value="Data de plantação" />
+                                <TextInput v-model="createForm.cultura_data_plantacao" type="date" class="mt-2 block w-full rounded-2xl bg-white" />
+                                <InputError class="mt-2" :message="createForm.errors.cultura_data_plantacao" />
+                            </div>
+                        </div>
+                    </div>
                     <div>
                         <InputLabel value="Área total (ha)" />
                         <TextInput v-model="createForm.area_total" class="mt-2 block w-full rounded-2xl" />
@@ -690,6 +770,59 @@ const updateEditPolygonArea = (area) => {
                             </option>
                         </select>
                         <InputError class="mt-2" :message="editForm.errors.estado" />
+                    </div>
+                    <div class="sm:col-span-2">
+                        <InputLabel value="Tipo de ocupação" />
+                        <select
+                            v-model="editForm.tipo_ocupacao"
+                            class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                        >
+                            <option value="culturas_anuais">Culturas anuais</option>
+                            <option value="pomar">Pomar</option>
+                            <option value="misto">Misto</option>
+                            <option value="estufa">Estufa</option>
+                            <option value="outro">Outro</option>
+                        </select>
+                        <InputError class="mt-2" :message="editForm.errors.tipo_ocupacao" />
+                    </div>
+                    <div class="sm:col-span-2 rounded-3xl border border-emerald-100 bg-emerald-50/70 p-4">
+                        <p class="text-sm font-semibold text-slate-800">Cultura / variedade principal</p>
+                        <p class="mt-1 text-xs leading-5 text-slate-500">
+                            Atualiza a cultura usada por defeito nas operações e colheitas desta parcela.
+                        </p>
+                        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <InputLabel value="Cultura" />
+                                <TextInput v-model="editForm.cultura_nome" class="mt-2 block w-full rounded-2xl bg-white" placeholder="Ex: Pereira, Tomate, Batata" />
+                                <InputError class="mt-2" :message="editForm.errors.cultura_nome" />
+                            </div>
+                            <div>
+                                <InputLabel value="Variedade" />
+                                <TextInput v-model="editForm.cultura_variedade" class="mt-2 block w-full rounded-2xl bg-white" placeholder="Ex: Rocha, Cherry, Agria" />
+                                <InputError class="mt-2" :message="editForm.errors.cultura_variedade" />
+                            </div>
+                            <div>
+                                <InputLabel value="Tipo" />
+                                <TextInput v-model="editForm.cultura_tipo" class="mt-2 block w-full rounded-2xl bg-white" :placeholder="tipoOcupacaoLabel(editForm.tipo_ocupacao)" />
+                                <InputError class="mt-2" :message="editForm.errors.cultura_tipo" />
+                            </div>
+                            <div>
+                                <InputLabel value="Estado da cultura" />
+                                <select v-model="editForm.cultura_estado" class="mt-2 block w-full rounded-2xl border-slate-200 bg-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                    <option value="planejada">{{ culturaEstadoLabel('planejada') }}</option>
+                                    <option value="em_crescimento">{{ culturaEstadoLabel('em_crescimento') }}</option>
+                                    <option value="madura">{{ culturaEstadoLabel('madura') }}</option>
+                                    <option value="colhida">{{ culturaEstadoLabel('colhida') }}</option>
+                                    <option value="cancelada">{{ culturaEstadoLabel('cancelada') }}</option>
+                                </select>
+                                <InputError class="mt-2" :message="editForm.errors.cultura_estado" />
+                            </div>
+                            <div>
+                                <InputLabel value="Data de plantação" />
+                                <TextInput v-model="editForm.cultura_data_plantacao" type="date" class="mt-2 block w-full rounded-2xl bg-white" />
+                                <InputError class="mt-2" :message="editForm.errors.cultura_data_plantacao" />
+                            </div>
+                        </div>
                     </div>
                     <div>
                         <InputLabel value="Área total (ha)" />

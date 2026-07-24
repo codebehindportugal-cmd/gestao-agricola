@@ -37,6 +37,11 @@ class StoreParcelaRequest extends FormRequest
             'poligono.*' => 'array|size:2',
             'poligono.*.0' => 'numeric|between:-90,90',
             'poligono.*.1' => 'numeric|between:-180,180',
+            'cultura_nome' => 'nullable|string|max:255',
+            'cultura_variedade' => 'nullable|string|max:255',
+            'cultura_tipo' => 'nullable|string|max:255',
+            'cultura_data_plantacao' => 'nullable|date',
+            'cultura_estado' => 'nullable|in:planejada,em_crescimento,madura,colhida,cancelada',
         ];
     }
 
@@ -49,6 +54,8 @@ class StoreParcelaRequest extends FormRequest
             'compasso_planta_m' => $this->normalizeDecimal($this->input('compasso_planta_m')),
             'poligono' => $this->filledPolygon(),
             'tipo_ocupacao' => $this->input('tipo_ocupacao') ?: 'culturas_anuais',
+            'cultura_tipo' => $this->input('cultura_tipo') ?: $this->input('tipo_ocupacao') ?: 'culturas_anuais',
+            'cultura_estado' => $this->input('cultura_estado') ?: 'em_crescimento',
         ]);
     }
 

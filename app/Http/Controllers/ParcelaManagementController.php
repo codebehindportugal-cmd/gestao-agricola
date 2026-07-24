@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreParcelaRequest;
 use App\Http\Requests\UpdateParcelaRequest;
+use App\Models\Cultura;
 use App\Models\Parcela;
 use App\Models\Terreno;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -20,8 +22,8 @@ class ParcelaManagementController extends Controller
         $filters = $request->only(['search', 'estado', 'terreno_id']);
 
         $parcelas = Parcela::query()
-            ->with('terreno:id,nome')
-            ->withCount(['operacoes'])
+            ->with(['terreno:id,nome', 'culturas:id,parcela_id,nome,variedade,tipo,estado,data_plantacao'])
+            ->withCount(['operacoes', 'culturas'])
             ->when($filters['search'] ?? null, function ($query, $search) {
                 $query->where(function ($subQuery) use ($search) {
                     $subQuery
@@ -52,6 +54,16 @@ class ParcelaManagementController extends Controller
                 'latitude' => $parcela->latitude,
                 'longitude' => $parcela->longitude,
                 'poligono' => $parcela->poligono,
+                'culturas_count' => $parcela->culturas_count,
+                'culturas' => $parcela->culturas->map(fn (Cultura $cultura) => [
+                    'id' => $cultura->id,
+                    'nome' => $cultura->nome,
+                    'variedade' => $cultura->variedade,
+                    'tipo' => $cultura->tipo,
+                    'estado' => $cultura->estado,
+                    'data_plantacao' => optional($cultura->data_plantacao)?->format('Y-m-d'),
+                    'label' => $this->culturaLabel($cultura),
+                ])->values(),
                 'operacoes_count' => $parcela->operacoes_count,
                 'updated_at' => optional($parcela->updated_at)?->format('d/m/Y H:i'),
             ]);
@@ -107,7 +119,10 @@ class ParcelaManagementController extends Controller
         $this->authorize('create', Parcela::class);
 
         try {
-            Parcela::query()->create($this->normalizePayload($request));
+            DB::transaction(function () use ($request) {
+                $parcela = Parcela::query()->create($this->normalizePayload($request));
+                $this->syncCulturaPrincipal($parcela, $request);
+            });
         } catch (\Throwable $exception) {
             return $this->backWithError('Não foi possível criar a parcela. Verifique os dados e tente novamente.', $exception);
         }
@@ -122,7 +137,10 @@ class ParcelaManagementController extends Controller
         $this->authorize('update', $parcela);
 
         try {
-            $parcela->update($this->normalizePayload($request));
+            DB::transaction(function () use ($request, $parcela) {
+                $parcela->update($this->normalizePayload($request));
+                $this->syncCulturaPrincipal($parcela->fresh(), $request);
+            });
         } catch (\Throwable $exception) {
             return $this->backWithError('Não foi possível atualizar a parcela. Verifique os dados e tente novamente.', $exception);
         }
@@ -162,7 +180,44 @@ class ParcelaManagementController extends Controller
             $data['poligono'] = null;
         }
 
+        unset(
+            $data['cultura_nome'],
+            $data['cultura_variedade'],
+            $data['cultura_tipo'],
+            $data['cultura_data_plantacao'],
+            $data['cultura_estado'],
+        );
+
         return $data;
+    }
+
+    private function syncCulturaPrincipal(Parcela $parcela, Request $request): void
+    {
+        $nome = trim((string) $request->input('cultura_nome', ''));
+
+        if ($nome === '') {
+            return;
+        }
+
+        $cultura = $parcela->culturas()
+            ->orderByRaw("CASE WHEN estado IN ('em_crescimento', 'madura', 'planejada') THEN 0 ELSE 1 END")
+            ->orderBy('id')
+            ->first();
+
+        $payload = [
+            'nome' => $nome,
+            'tipo' => $request->input('cultura_tipo') ?: $parcela->tipo_ocupacao ?: 'culturas_anuais',
+            'variedade' => $request->input('cultura_variedade') ?: null,
+            'data_plantacao' => $request->input('cultura_data_plantacao') ?: now()->toDateString(),
+            'estado' => $request->input('cultura_estado') ?: 'em_crescimento',
+        ];
+
+        if ($cultura) {
+            $cultura->update($payload);
+            return;
+        }
+
+        $parcela->culturas()->create($payload);
     }
 
     private function serializeParcela(Parcela $parcela): array
@@ -183,7 +238,24 @@ class ParcelaManagementController extends Controller
             'latitude' => $parcela->latitude,
             'longitude' => $parcela->longitude,
             'poligono' => $parcela->poligono,
+            'culturas' => $parcela->culturas()
+                ->orderBy('nome')
+                ->get(['id', 'parcela_id', 'nome', 'variedade', 'tipo', 'estado', 'data_plantacao'])
+                ->map(fn (Cultura $cultura) => [
+                    'id' => $cultura->id,
+                    'nome' => $cultura->nome,
+                    'variedade' => $cultura->variedade,
+                    'tipo' => $cultura->tipo,
+                    'estado' => $cultura->estado,
+                    'data_plantacao' => optional($cultura->data_plantacao)?->format('Y-m-d'),
+                    'label' => $this->culturaLabel($cultura),
+                ])->values(),
         ];
+    }
+
+    private function culturaLabel(Cultura $cultura): string
+    {
+        return trim($cultura->nome.($cultura->variedade ? " - {$cultura->variedade}" : ''));
     }
 
     private function terrenosForSelect()
