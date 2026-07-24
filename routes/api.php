@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\AplicacaoController;
 use App\Http\Controllers\Api\V1\ColheitaController;
 use App\Http\Controllers\Api\V1\CustoController;
 use App\Http\Controllers\Api\V1\PingController;
+use App\Http\Controllers\Api\V1\ReceitaController;
 
 /*
 |--------------------------------------------------------------------------
@@ -66,4 +67,7 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
 
     Route::post('colheitas', [ColheitaController::class, 'store'])
         ->middleware(['throttle:api', 'abilities:colheitas:write', 'api.write.role']);
+
+    Route::post('receitas', [ReceitaController::class, 'store'])
+        ->middleware(['throttle:api', 'abilities:receitas:write', 'api.write.role']);
 });

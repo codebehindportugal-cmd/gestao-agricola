@@ -15,6 +15,7 @@ class EmitirTokenApi extends Command
         'custos:write',
         'aplicacoes:write',
         'colheitas:write',
+        'receitas:write',
     ];
 
     public function handle(): int

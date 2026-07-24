@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\Campanha;
+use App\Models\Colheita;
 use App\Models\Cultura;
 use App\Models\Funcionario;
+use App\Models\Lote;
 use App\Models\Maquina;
 use App\Models\Operacao;
 use App\Models\Parcela;
@@ -188,6 +190,41 @@ class ResolvedorReferencias
         );
 
         return $terreno;
+    }
+
+    public function resolverColheita(int|string|null $valor): Colheita
+    {
+        /** @var Colheita $colheita */
+        $colheita = $this->resolverModelo(
+            Colheita::query(),
+            $valor,
+            'colheita',
+            fn (Builder $query, string $texto) => $query->where('referencia_externa', $texto),
+            fn (Colheita $colheita) => [
+                'id' => $colheita->id,
+                'data' => $colheita->data_colheita?->toDateString(),
+                'referencia_externa' => $colheita->referencia_externa,
+            ]
+        );
+
+        return $colheita;
+    }
+
+    public function resolverLote(int|string|null $valor): Lote
+    {
+        /** @var Lote $lote */
+        $lote = $this->resolverModelo(
+            Lote::query(),
+            $valor,
+            'lote',
+            fn (Builder $query, string $texto) => $query->where('numero_lote', $texto),
+            fn (Lote $lote) => [
+                'id' => $lote->id,
+                'codigo' => $lote->numero_lote,
+            ]
+        );
+
+        return $lote;
     }
 
     /**
