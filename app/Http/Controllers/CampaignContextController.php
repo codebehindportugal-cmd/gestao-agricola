@@ -11,19 +11,17 @@ class CampaignContextController extends Controller
     public function update(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'campanha_id' => ['nullable', 'integer', 'exists:campanhas,id'],
+            'campanha_ano' => ['required', 'integer', 'exists:campanhas,ano'],
         ]);
 
-        if (empty($data['campanha_id'])) {
-            $request->session()->forget('campanha_ativa_id');
+        $request->session()->put('campanha_ativa_ano', (int) $data['campanha_ano']);
+        $request->session()->forget('campanha_ativa_id');
 
-            return back()->with('success', 'Campanha ativa removida.');
-        }
+        return back()->with('success', 'Campanha ativa: '.$this->seasonLabel((int) $data['campanha_ano']).'.');
+    }
 
-        $campanha = Campanha::query()->with('cultura:id,nome')->findOrFail($data['campanha_id']);
-
-        $request->session()->put('campanha_ativa_id', $campanha->id);
-
-        return back()->with('success', "Campanha ativa: {$campanha->cultura?->nome} {$campanha->ano}.");
+    private function seasonLabel(int $ano): string
+    {
+        return 'Campanha '.($ano - 1).'/'.$ano;
     }
 }

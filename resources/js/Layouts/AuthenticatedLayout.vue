@@ -74,7 +74,7 @@ const activeCampaign = computed(() => page.props.workingCampaign?.active ?? null
 
 function setActiveCampaign(event) {
     router.post(route('app.campanha-ativa.update'), {
-        campanha_id: event.target.value || null,
+        campanha_ano: event.target.value,
     }, {
         preserveScroll: true,
         preserveState: false,

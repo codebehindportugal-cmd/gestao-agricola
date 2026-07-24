@@ -37,24 +37,30 @@ class HandleInertiaRequests extends Middleware
         $campanhaAtiva = null;
 
         if ($user && Schema::hasTable('campanhas')) {
-            $campanhas = Campanha::query()
-                ->with('cultura:id,nome')
+            $campanhasBase = Campanha::query()
                 ->orderByDesc('ano')
                 ->orderByDesc('id')
-                ->limit(30)
-                ->get()
-                ->map(fn (Campanha $campanha) => [
-                    'id' => $campanha->id,
-                    'nome' => trim(($campanha->cultura?->nome ? $campanha->cultura->nome.' ' : '').$campanha->ano),
-                    'ano' => $campanha->ano,
-                    'status' => $campanha->status,
-                ]);
+                ->get(['id', 'ano', 'status']);
+
+            $campanhas = $campanhasBase
+                ->groupBy('ano')
+                ->map(fn ($campanhasAno, $ano) => [
+                    'id' => (int) $ano,
+                    'ano' => (int) $ano,
+                    'nome' => $this->seasonLabel((int) $ano),
+                    'status' => $campanhasAno->contains('status', 'em_curso') ? 'em_curso' : $campanhasAno->first()?->status,
+                ])
+                ->sortByDesc('ano')
+                ->values()
+                ->take(12);
 
             $defaultCampaign = $campanhas->firstWhere('status', 'em_curso') ?? $campanhas->first();
-            $activeId = $request->session()->get('campanha_ativa_id') ?: ($defaultCampaign['id'] ?? null);
+            $activeYear = $request->session()->get('campanha_ativa_ano')
+                ?: optional($campanhasBase->firstWhere('id', $request->session()->get('campanha_ativa_id')))->ano
+                ?: ($defaultCampaign['ano'] ?? null);
 
-            $campanhaAtiva = $activeId
-                ? $campanhas->firstWhere('id', (int) $activeId)
+            $campanhaAtiva = $activeYear
+                ? $campanhas->firstWhere('ano', (int) $activeYear)
                 : null;
 
             if (! $campanhaAtiva && $defaultCampaign) {
@@ -77,5 +83,10 @@ class HandleInertiaRequests extends Middleware
                 'options' => $campanhas,
             ],
         ];
+    }
+
+    private function seasonLabel(int $ano): string
+    {
+        return 'Campanha '.($ano - 1).'/'.$ano;
     }
 }
