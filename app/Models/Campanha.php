@@ -55,6 +55,16 @@ class Campanha extends Model
         return $this->hasMany(Custo::class);
     }
 
+    public function receitas(): HasMany
+    {
+        return $this->hasMany(Receita::class);
+    }
+
+    public function getReceitaTotalAttribute(): float
+    {
+        return round((float) $this->receitas()->sum('valor'), 2);
+    }
+
     public function getCustoPorKgAttribute(): float
     {
         $totalKg = (float) $this->colheitas->sum('quantidade_total');
