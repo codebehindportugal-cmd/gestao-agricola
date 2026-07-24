@@ -18,12 +18,6 @@
         .kpi-value { font-size:15px; font-weight:700; margin-top:2px; }
         .kpi-sub { font-size:8px; color:#94a3b8; margin-top:1px; }
         .analytics-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:18px; }
-        .marca-bar { display:flex; gap:0; margin-bottom:18px; border:1px solid #bfdbfe; border-radius:6px; overflow:hidden; }
-        .marca-cell { flex:1; padding:9px 10px; background:#eff6ff; }
-        .marca-cell.grupo { background:#1e40af; color:#fff; flex:0 0 140px; }
-        .marca-cell.grupo .kpi-label { color:#bfdbfe; }
-        .marca-cell.grupo .kpi-value { font-size:14px; }
-        .marca-cell + .marca-cell { border-left:1px solid #bfdbfe; }
         .ana-card { border:1px solid #e2e8f0; border-radius:6px; padding:10px; }
         .ana-card ul { margin:6px 0 0; padding:0; list-style:none; }
         .ana-card li { display:flex; justify-content:space-between; font-size:9px; padding:2px 0; border-bottom:1px solid #f1f5f9; }
@@ -55,27 +49,6 @@
         <h1>Resumo de Despesas</h1>
         <div class="muted">{{ $nomeMes }} &mdash; Horta da Maria / Gestão Agrícola</div>
     </header>
-
-    <!-- Grupo Ateneya — consolidado por marca -->
-    @if(!empty($resumo['por_marca']) && array_sum($resumo['por_marca']) > 0)
-    <div class="marca-bar">
-        <div class="marca-cell grupo">
-            <div class="kpi-label">Grupo Ateneya</div>
-            <div class="kpi-value">{{ number_format($resumo['total'], 2, ',', '.') }} €</div>
-            <div class="kpi-sub">consolidado</div>
-        </div>
-        @foreach($resumo['por_marca'] as $marcaKey => $marcaVal)
-            @if($marcaVal > 0)
-            <div class="marca-cell">
-                <div class="kpi-label">{{ $marcas[$marcaKey] ?? $marcaKey }}</div>
-                <div class="kpi-value" style="color:#1e40af">{{ number_format($marcaVal, 2, ',', '.') }} €</div>
-                <div class="kpi-sub">{{ $resumo['total'] > 0 ? number_format($marcaVal / $resumo['total'] * 100, 0) : 0 }}%</div>
-            </div>
-            @endif
-        @endforeach
-    </div>
-    @endif
-
     <!-- KPIs -->
     <div class="kpi-grid">
         <div class="kpi">
@@ -172,7 +145,6 @@
                     @if($d['fornecedor'] !== '-') &mdash; {{ $d['fornecedor'] }} @endif
                     @if($d['numero_fatura'] !== '-') &mdash; # {{ $d['numero_fatura'] }} @endif
                     &mdash; <span class="badge">{{ str_replace('_', ' ', $d['categoria']) }}</span>
-                    &mdash; <span class="badge" style="background:#dbeafe;color:#1e40af">{{ $d['marca_label'] ?? 'Horta da Maria' }}</span>
                 </div>
             </div>
             <div class="fatura-total">

@@ -30,17 +30,11 @@ class DespesaManagementController extends Controller
 
     public const TAXAS_IVA = [0, 6, 13, 23];
 
-    public const MARCAS = [
-        'horta_da_maria' => 'Horta da Maria',
-        'extravaganty'   => 'Extravaganty',
-        'ateneya_geral'  => 'Ateneya (geral)',
-    ];
-
     public function index(Request $request): Response
     {
         $this->authorize('viewAny', Despesa::class);
 
-        $filters = $request->only(['search', 'categoria', 'mes', 'ano', 'marca']);
+        $filters = $request->only(['search', 'categoria', 'mes', 'ano']);
         $mes = (int) ($filters['mes'] ?? now()->month);
         $ano = (int) ($filters['ano'] ?? now()->year);
 
@@ -53,7 +47,6 @@ class DespesaManagementController extends Controller
                     ->orWhereHas('items', fn ($qi) => $qi->where('descricao', 'like', "%{$s}%"));
             }))
             ->when($filters['categoria'] ?? null, fn ($q, $cat) => $q->where('categoria', $cat))
-            ->when($filters['marca'] ?? null, fn ($q, $m) => $q->where('marca', $m))
             ->whereYear('data', $ano)
             ->whereMonth('data', $mes)
             ->orderByDesc('data')
@@ -69,7 +62,6 @@ class DespesaManagementController extends Controller
             'filters'           => array_merge($filters, ['mes' => $mes, 'ano' => $ano]),
             'categorias'        => self::CATEGORIAS,
             'taxasIva'          => self::TAXAS_IVA,
-            'marcas'            => self::MARCAS,
             'resumoMes'         => $this->buildResumoMes($mes, $ano),
             'resumoMesAnterior' => $this->buildResumoMes($mesAnt, $anoAnt),
             'analytics'         => $this->buildAnalytics($mes, $ano),
@@ -186,8 +178,6 @@ class DespesaManagementController extends Controller
 
         $mes    = (int) ($request->query('mes', now()->month));
         $ano    = (int) ($request->query('ano', now()->year));
-        $marcas = self::MARCAS;
-
         $resumo    = $this->buildResumoMes($mes, $ano);
         $analytics = $this->buildAnalytics($mes, $ano);
 
@@ -202,8 +192,6 @@ class DespesaManagementController extends Controller
                 'fornecedor'    => $d->fornecedor ?? '-',
                 'numero_fatura' => $d->numero_fatura ?? '-',
                 'categoria'     => $d->categoria,
-                'marca'         => $d->marca ?? 'horta_da_maria',
-                'marca_label'   => self::MARCAS[$d->marca ?? 'horta_da_maria'] ?? ($d->marca ?? '-'),
                 'valor'         => $d->total_fatura,
                 'subtotal'      => $d->subtotal_calculado,
                 'iva'           => $d->iva_calculado,
@@ -221,7 +209,7 @@ class DespesaManagementController extends Controller
 
         $nomeMes = \Carbon\Carbon::create($ano, $mes, 1)->translatedFormat('F Y');
 
-        return view('despesas.resumo_mensal', compact('resumo', 'analytics', 'despesas', 'nomeMes', 'mes', 'ano', 'marcas'));
+        return view('despesas.resumo_mensal', compact('resumo', 'analytics', 'despesas', 'nomeMes', 'mes', 'ano'));
     }
 
     public function exportarCsv(Request $request)
@@ -250,14 +238,12 @@ class DespesaManagementController extends Controller
             $handle = fopen('php://output', 'w');
             fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
 
-            fputcsv($handle, ['Data', 'Título', 'Marca', 'Fornecedor', 'Nº Fatura', 'Categoria', 'Subtotal s/ IVA', 'IVA', 'Total c/ IVA', 'Notas'], ';');
+            fputcsv($handle, ['Data', 'Título', 'Fornecedor', 'Nº Fatura', 'Categoria', 'Subtotal s/ IVA', 'IVA', 'Total c/ IVA', 'Notas'], ';');
 
             foreach ($despesas as $d) {
-                $marcaLabel = self::MARCAS[$d->marca ?? 'horta_da_maria'] ?? ($d->marca ?? '');
                 fputcsv($handle, [
                     $d->data?->format('d/m/Y'),
                     $d->titulo,
-                    $marcaLabel,
                     $d->fornecedor ?? '',
                     $d->numero_fatura ?? '',
                     $d->categoria,
@@ -407,7 +393,6 @@ class DespesaManagementController extends Controller
             ],
             'data'      => ['required', 'date'],
             'categoria' => ['required', 'string', 'in:' . implode(',', self::CATEGORIAS)],
-            'marca'     => ['required', 'string', 'in:' . implode(',', array_keys(self::MARCAS))],
             'notas'     => ['nullable', 'string'],
             'ficheiro'  => ['nullable', 'file', 'mimes:jpeg,jpg,png,webp,pdf', 'max:20480'],
             'items'     => ['nullable', 'array'],
@@ -430,7 +415,6 @@ class DespesaManagementController extends Controller
             'valor'          => (float) $d->valor,
             'data'           => $d->data?->format('Y-m-d'),
             'categoria'      => $d->categoria,
-            'marca'          => $d->marca ?? 'horta_da_maria',
             'ficheiro_path'  => $d->ficheiro_path,
             'ficheiro_url'   => $d->ficheiro_path ? Storage::disk('public')->url($d->ficheiro_path) : null,
             'notas'          => $d->notas,
@@ -467,13 +451,10 @@ class DespesaManagementController extends Controller
 
     private function buildResumoMes(int $mes, int $ano): array
     {
-        $hasMarca = Schema::hasColumn('despesas', 'marca');
-        $columns  = $hasMarca ? ['valor', 'categoria', 'marca'] : ['valor', 'categoria'];
-
         $despesas = Despesa::query()
             ->whereYear('data', $ano)
             ->whereMonth('data', $mes)
-            ->get($columns);
+            ->get(['valor', 'categoria']);
 
         $total = (float) $despesas->sum('valor');
 
@@ -481,19 +462,12 @@ class DespesaManagementController extends Controller
             $cat => (float) $despesas->where('categoria', $cat)->sum('valor'),
         ])->all();
 
-        $porMarca = $hasMarca
-            ? collect(array_keys(self::MARCAS))->mapWithKeys(fn ($m) => [
-                $m => (float) $despesas->where('marca', $m)->sum('valor'),
-            ])->all()
-            : [];
-
         return [
             'mes'           => $mes,
             'ano'           => $ano,
             'total'         => $total,
             'total_grupo'   => $total,
             'por_categoria' => $porCategoria,
-            'por_marca'     => $porMarca,
             'count'         => $despesas->count(),
         ];
     }
@@ -506,7 +480,6 @@ class DespesaManagementController extends Controller
             'subtotal'       => 0,
             'por_fornecedor' => [],
             'top_descricoes' => [],
-            'por_marca'      => [],
         ];
 
         if (! Schema::hasTable('fatura_items')) {
@@ -522,12 +495,9 @@ class DespesaManagementController extends Controller
             return $empty;
         }
 
-        $hasMarca     = Schema::hasColumn('despesas', 'marca');
-        $despesaSelect = $hasMarca ? 'id,fornecedor,marca' : 'id,fornecedor';
-
         $items = FaturaItem::query()
             ->whereIn('despesa_id', $despesaIds)
-            ->with("despesa:{$despesaSelect}")
+            ->with('despesa:id,fornecedor')
             ->get();
 
         if ($items->isEmpty()) {
@@ -561,27 +531,12 @@ class DespesaManagementController extends Controller
             ->take(10)
             ->all();
 
-        $porMarca = $hasMarca
-            ? $items
-                ->groupBy(fn ($i) => $i->despesa?->marca ?? 'horta_da_maria')
-                ->map(fn ($group, $marca) => [
-                    'marca' => $marca,
-                    'label' => self::MARCAS[$marca] ?? $marca,
-                    'total' => round((float) $group->sum(fn ($i) => $i->total_com_iva), 2),
-                    'iva'   => round((float) $group->sum(fn ($i) => $i->total_iva_valor), 2),
-                    'count' => $group->count(),
-                ])
-                ->values()
-                ->all()
-            : [];
-
         return [
             'tem_items'      => true,
             'iva_total'      => $ivaTotal,
             'subtotal'       => $subtotal,
             'por_fornecedor' => $porFornecedor,
             'top_descricoes' => $topDescricoes,
-            'por_marca'      => $porMarca,
         ];
     }
 }
