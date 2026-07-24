@@ -740,11 +740,14 @@ const formatNumber = (value) => {
                         :exploracao-dados="exploracaoDados"
                         :tipo-options="tipoOptions"
                         :estado-options="estadoOptions"
+                        :operacao-id="editingOperacao?.id"
+                        :image-path="editingOperacao?.image_path"
                         submit-label="Atualizar operação"
                         submit-button-class="bg-slate-900 hover:bg-slate-800 focus:bg-slate-800"
                         @submit="submitEdit"
                         @cancel="closeEditModal"
                         @open-product-modal="openProductModal"
+                        @image-uploaded="(path) => { if (editingOperacao) editingOperacao.image_path = path; }"
                     />
                 </div>
             </div>

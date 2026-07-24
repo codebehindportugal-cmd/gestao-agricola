@@ -27,9 +27,120 @@ const props = defineProps({
         type: String,
         default: 'bg-emerald-700 hover:bg-emerald-600 focus:bg-emerald-600',
     },
+    operacaoId: { type: [Number, String], default: null },
+    imagePath: { type: String, default: null },
 });
 
-const emit = defineEmits(['submit', 'cancel', 'openProductModal']);
+const extracting = ref(false);
+const extractError = ref(null);
+const extractSuccess = ref(false);
+
+const uploading = ref(false);
+const uploadError = ref(null);
+const currentImageUrl = ref(null);
+const fileInputRef = ref(null);
+
+const canUpload = computed(
+    () => props.operacaoId && isTratamentoFitossanitario(props.form.tipo),
+);
+
+const uploadImagem = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    uploading.value = true;
+    uploadError.value = null;
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+    try {
+        const response = await fetch(`/operacoes/${props.operacaoId}/upload-imagem`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken ?? '',
+            },
+            body: formData,
+        });
+
+        const json = await response.json();
+
+        if (!response.ok) {
+            uploadError.value = json.errors?.image?.[0] ?? json.error ?? 'Erro ao carregar imagem.';
+            return;
+        }
+
+        currentImageUrl.value = json.image_url;
+        emit('imageUploaded', json.image_path);
+    } catch {
+        uploadError.value = 'Erro de ligação ao servidor.';
+    } finally {
+        uploading.value = false;
+        if (fileInputRef.value) fileInputRef.value.value = '';
+    }
+};
+
+const canExtract = computed(
+    () => props.operacaoId && props.imagePath && isTratamentoFitossanitario(props.form.tipo),
+);
+
+const extrairDadosImagem = async () => {
+    extracting.value = true;
+    extractError.value = null;
+    extractSuccess.value = false;
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+    try {
+        const response = await fetch(`/operacoes/${props.operacaoId}/extrair-imagem`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken ?? '',
+            },
+        });
+
+        const json = await response.json();
+
+        if (!response.ok) {
+            extractError.value = json.error ?? 'Erro ao extrair dados.';
+            return;
+        }
+
+        const dados = json.dados ?? {};
+
+        if (dados.aplicador_nome) props.form.aplicador_nome = dados.aplicador_nome;
+        if (dados.aplicador_numero_autorizacao) props.form.aplicador_numero_autorizacao = dados.aplicador_numero_autorizacao;
+        if (dados.data_aplicacao && !props.form.data_hora_inicio) {
+            props.form.data_hora_inicio = dados.data_aplicacao + 'T08:00';
+        }
+
+        if (props.form.produtos?.length > 0) {
+            const p = props.form.produtos[0];
+            if (dados.dose != null) p.dose = String(dados.dose);
+            if (dados.dose_unidade) p.dose_unidade = dados.dose_unidade;
+            if (dados.area_tratada != null) p.area_tratada = String(dados.area_tratada);
+            if (dados.volume_calda != null) p.volume_calda = String(dados.volume_calda);
+            if (dados.finalidade) p.finalidade = dados.finalidade;
+            if (dados.intervalo_seguranca_dias != null) p.intervalo_seguranca_dias = String(dados.intervalo_seguranca_dias);
+            if (dados.estabelecimento_venda_nome) p.estabelecimento_venda_nome = dados.estabelecimento_venda_nome;
+            if (dados.estabelecimento_venda_autorizacao) p.estabelecimento_venda_autorizacao = dados.estabelecimento_venda_autorizacao;
+        }
+
+        extractSuccess.value = true;
+        setTimeout(() => { extractSuccess.value = false; }, 4000);
+    } catch {
+        extractError.value = 'Erro de ligação ao servidor.';
+    } finally {
+        extracting.value = false;
+    }
+};
+
+const emit = defineEmits(['submit', 'cancel', 'openProductModal', 'imageUploaded']);
 
 const activeTab = ref('geral');
 
@@ -197,6 +308,15 @@ const selectedParcela = computed(() => {
 
     return props.parcelas.find((item) => String(item.id) === String(parcelaId)) ?? null;
 });
+const selectedParcelaCulturas = computed(() => {
+    const parcelaId = String(selectedParcela.value?.id ?? '');
+
+    if (!parcelaId) {
+        return [];
+    }
+
+    return props.culturas.filter((cultura) => String(cultura.parcela_id) === parcelaId);
+});
 const selectedParcelaArea = computed(() => {
     if (props.allowMultipleParcelas) {
         const selectedIds = (props.form.parcela_ids ?? []).filter(Boolean).map(String);
@@ -223,6 +343,10 @@ const syncCampanhaFromCultura = (form) => {
     form.campanha_id = String((currentCampanha ?? campanhas[0]).id);
 };
 
+const culturaLabel = (cultura) => cultura?.label
+    ?? [cultura?.nome, cultura?.variedade].filter(Boolean).join(' - ')
+    ?? '';
+
 const syncContextFromParcela = (form) => {
     const selectedParcelas = props.allowMultipleParcelas
         ? (form.parcela_ids ?? []).filter(Boolean)
@@ -248,7 +372,7 @@ const syncContextFromParcela = (form) => {
     }
 
     const currentCultura = culturas.find((cultura) => String(cultura.id) === String(form.cultura_id));
-    form.cultura_id = String((currentCultura ?? culturas[0]).id);
+    form.cultura_id = String((currentCultura ?? (culturas.length === 1 ? culturas[0] : null))?.id ?? '');
     syncCampanhaFromCultura(form);
 };
 
@@ -391,6 +515,12 @@ watch(() => props.form.produtos, () => {
     syncCalculatedProductQuantities(props.form);
 }, { deep: true });
 
+watch(() => props.imagePath, (path) => {
+    if (path && !currentImageUrl.value) {
+        currentImageUrl.value = `/storage/${path}`;
+    }
+}, { immediate: true });
+
 onMounted(() => {
     activeTab.value = 'geral';
     syncContextFromParcela(props.form);
@@ -480,6 +610,24 @@ const setActiveTab = (tabId) => {
                         <option v-for="estado in estadoOptions" :key="estado" :value="estado">{{ estadoLabel(estado) }}</option>
                     </select>
                     <InputError class="mt-2" :message="form.errors.estado" />
+                </div>
+
+                <div v-if="selectedParcelaCulturas.length" class="sm:col-span-2">
+                    <InputLabel :value="selectedParcelaCulturas.length > 1 ? 'Cultura / variedade' : 'Cultura'" />
+                    <select v-model="form.cultura_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                        <option value="">Selecionar cultura</option>
+                        <option v-for="cultura in selectedParcelaCulturas" :key="cultura.id" :value="String(cultura.id)">
+                            {{ culturaLabel(cultura) }}
+                        </option>
+                    </select>
+                    <p v-if="selectedParcelaCulturas.length > 1" class="mt-2 text-xs leading-5 text-slate-500">
+                        Esta parcela tem várias culturas/variedades. Escolhe exatamente a que estás a trabalhar.
+                    </p>
+                    <InputError class="mt-2" :message="form.errors.cultura_id" />
+                </div>
+                <div v-else-if="selectedParcela && isColheita(form.tipo)" class="sm:col-span-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    Esta parcela ainda não tem uma cultura/variedade registada. Cria primeiro a cultura para conseguires guardar a colheita.
+                    <InputError class="mt-2" :message="form.errors.cultura_id" />
                 </div>
 
                 <div>
@@ -647,6 +795,75 @@ const setActiveTab = (tabId) => {
                             <InputError class="mt-2" :message="form.errors.exploracao_freguesia" />
                         </div>
                     </div>
+                </div>
+
+                <div v-if="canUpload" class="rounded-3xl border border-slate-200 bg-slate-50/60 p-4">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
+                        <div class="flex-1">
+                            <p class="text-sm font-semibold text-slate-800">Imagem da ficha de aplicação</p>
+                            <p class="mt-1 text-xs leading-5 text-slate-500">
+                                Fotografia da ficha DGAV para extração automática de dados com IA.
+                                Formatos aceites: JPEG, PNG, WebP, HEIC · Máx. 15 MB.
+                            </p>
+                            <label class="mt-3 flex cursor-pointer items-center gap-2 text-sm font-medium text-emerald-700 hover:text-emerald-600">
+                                <input
+                                    ref="fileInputRef"
+                                    type="file"
+                                    accept="image/jpeg,image/jpg,image/png,image/webp,image/heic"
+                                    class="sr-only"
+                                    :disabled="uploading"
+                                    @change="uploadImagem"
+                                >
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                {{ uploading ? 'A carregar…' : (currentImageUrl ? 'Substituir imagem' : 'Carregar imagem') }}
+                            </label>
+                            <p v-if="uploadError" class="mt-2 text-xs font-medium text-red-700">{{ uploadError }}</p>
+                        </div>
+
+                        <div v-if="currentImageUrl" class="shrink-0">
+                            <a :href="currentImageUrl" target="_blank" rel="noopener">
+                                <img
+                                    :src="currentImageUrl"
+                                    alt="Ficha de aplicação"
+                                    class="h-24 w-24 rounded-2xl object-cover shadow-sm ring-1 ring-slate-200 transition hover:opacity-90"
+                                >
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="canExtract" class="rounded-3xl border border-violet-100 bg-violet-50/60 p-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p class="text-sm font-semibold text-violet-900">Extração automática de imagem</p>
+                            <p class="mt-1 text-xs leading-5 text-violet-700">
+                                Analisa a imagem da ficha de aplicação e preenche automaticamente os campos com IA.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            :disabled="extracting"
+                            class="flex shrink-0 items-center gap-2 rounded-full bg-violet-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-600 disabled:opacity-60"
+                            @click="extrairDadosImagem"
+                        >
+                            <svg v-if="!extracting" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                            </svg>
+                            <svg v-else class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                            </svg>
+                            {{ extracting ? 'A analisar imagem…' : 'Extrair dados da imagem' }}
+                        </button>
+                    </div>
+                    <p v-if="extractSuccess" class="mt-3 rounded-2xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800">
+                        Dados extraídos com sucesso. Verifica os campos preenchidos antes de guardar.
+                    </p>
+                    <p v-if="extractError" class="mt-3 rounded-2xl bg-red-100 px-4 py-2 text-sm font-medium text-red-800">
+                        {{ extractError }}
+                    </p>
                 </div>
 
                 <div class="rounded-3xl border border-emerald-100 bg-emerald-50/60 p-4">

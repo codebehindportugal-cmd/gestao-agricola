@@ -19,9 +19,12 @@ use App\Models\User;
 use App\Models\Custo;
 use App\Support\OperacaoDuration;
 use App\Support\StockConsumption;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -38,7 +41,7 @@ class OperacaoManagementController extends Controller
         $operacoes = Operacao::query()
             ->with([
                 'parcela.terreno:id,nome',
-                'cultura:id,nome',
+                'cultura:id,nome,variedade',
                 'campanha:id,cultura_id,ano,data_inicio,data_fim,status',
                 'colheita:id,operacao_id,quantidade_total,quantidade_perdas,qualidade',
                 'maquina:id,nome,tipo,consumo_combustivel',
@@ -97,7 +100,7 @@ class OperacaoManagementController extends Controller
                 'estado' => $operacao->estado,
                 'parcela_nome' => $operacao->parcela?->nome,
                 'terreno_nome' => $operacao->parcela?->terreno?->nome,
-                'cultura_nome' => $operacao->cultura?->nome,
+                'cultura_nome' => $this->culturaLabel($operacao->cultura),
                 'campanha_nome' => $operacao->campanha ? "Campanha {$operacao->campanha->ano}" : null,
                 'maquina_nome' => $operacao->maquina?->nome,
                 'alfaia_nome' => $operacao->alfaia?->nome,
@@ -137,6 +140,7 @@ class OperacaoManagementController extends Controller
                     'observacoes' => $produto->pivot->observacoes,
                 ])->values(),
                 'observacoes' => $operacao->observacoes,
+                'image_path' => $operacao->image_path,
                 'can_update' => $user->can('update', $operacao),
                 'can_delete' => $user->can('delete', $operacao),
                 'updated_at' => optional($operacao->updated_at)?->format('d/m/Y H:i'),
@@ -169,11 +173,14 @@ class OperacaoManagementController extends Controller
                 ]),
             'culturas' => Cultura::query()
                 ->orderBy('nome')
-                ->get(['id', 'parcela_id', 'nome'])
+                ->get(['id', 'parcela_id', 'nome', 'variedade', 'estado'])
                 ->map(fn (Cultura $cultura) => [
                     'id' => $cultura->id,
                     'parcela_id' => $cultura->parcela_id,
                     'nome' => $cultura->nome,
+                    'variedade' => $cultura->variedade,
+                    'estado' => $cultura->estado,
+                    'label' => $this->culturaLabel($cultura),
                 ]),
             'maquinas' => Maquina::query()
                 ->orderBy('nome')
@@ -212,13 +219,13 @@ class OperacaoManagementController extends Controller
                 ->orderBy('nome')
                 ->get(['id', 'nome']),
             'campanhas' => Campanha::query()
-                ->with('cultura:id,nome')
+                ->with('cultura:id,nome,variedade')
                 ->orderByDesc('ano')
                 ->get(['id', 'cultura_id', 'ano', 'data_inicio', 'data_fim', 'status'])
                 ->map(fn (Campanha $campanha) => [
                     'id' => $campanha->id,
                     'cultura_id' => $campanha->cultura_id,
-                    'nome' => "{$campanha->cultura?->nome} - {$campanha->ano}",
+                    'nome' => "{$this->culturaLabel($campanha->cultura)} - {$campanha->ano}",
                     'ano' => $campanha->ano,
                     'status' => $campanha->status,
                 ]),
@@ -284,6 +291,13 @@ class OperacaoManagementController extends Controller
                 $produtos = $this->extractProdutosPayload($request);
                 $previousProducts = StockConsumption::productsFromOperation($operacao);
                 $previousFuel = $operacao->combustivel_gasto_l === null ? null : (float) $operacao->combustivel_gasto_l;
+
+                if (! empty($data['parcela_id'])) {
+                    $data['cultura_id'] = $this->culturaIdForOperationParcela(
+                        (int) $data['parcela_id'],
+                        $data['cultura_id'] ?? null,
+                    );
+                }
 
                 $data['campanha_id'] = $this->resolveCampanhaId($data);
 
@@ -377,6 +391,117 @@ class OperacaoManagementController extends Controller
             ->with('success', 'Dados da exploração atualizados.');
     }
 
+    public function extrairImagem(Request $request, Operacao $operacao): JsonResponse
+    {
+        $this->authorize('update', $operacao);
+
+        if (! $operacao->image_path) {
+            return response()->json(['error' => 'Esta operação não tem imagem associada.'], 422);
+        }
+
+        $imagePath = $this->resolveImagePath($operacao->image_path);
+
+        if (! $imagePath) {
+            return response()->json(['error' => 'Imagem não encontrada no servidor.'], 404);
+        }
+
+        $apiKey = config('services.anthropic.api_key');
+
+        if (! $apiKey) {
+            return response()->json(['error' => 'API Claude não configurada. Adicione ANTHROPIC_API_KEY ao ficheiro .env.'], 503);
+        }
+
+        $imageData = base64_encode(file_get_contents($imagePath));
+        $mimeType = mime_content_type($imagePath) ?: 'image/jpeg';
+
+        $response = Http::timeout(60)->withHeaders([
+            'x-api-key' => $apiKey,
+            'anthropic-version' => '2023-06-01',
+        ])->post('https://api.anthropic.com/v1/messages', [
+            'model' => 'claude-opus-4-8',
+            'max_tokens' => 1024,
+            'messages' => [[
+                'role' => 'user',
+                'content' => [
+                    [
+                        'type' => 'image',
+                        'source' => [
+                            'type' => 'base64',
+                            'media_type' => $mimeType,
+                            'data' => $imageData,
+                        ],
+                    ],
+                    [
+                        'type' => 'text',
+                        'text' => 'Esta imagem é uma ficha de aplicação fitofarmacêutica do caderno de campo agrícola português. Extrai os dados e devolve APENAS um JSON puro (sem texto adicional, sem blocos de código markdown) com estas chaves exatas:
+
+{"produto_nome":null,"dose":null,"dose_unidade":null,"area_tratada":null,"volume_calda":null,"finalidade":null,"intervalo_seguranca_dias":null,"aplicador_nome":null,"aplicador_numero_autorizacao":null,"data_aplicacao":null,"estabelecimento_venda_nome":null,"estabelecimento_venda_autorizacao":null}
+
+Regras: dose, area_tratada, volume_calda devem ser números ou null; intervalo_seguranca_dias deve ser inteiro ou null; data_aplicacao no formato YYYY-MM-DD ou null; os restantes campos são strings ou null. Devolve SOMENTE o JSON.',
+                    ],
+                ],
+            ]],
+        ]);
+
+        if (! $response->successful()) {
+            return response()->json(['error' => 'Erro ao chamar a API Claude.'], 502);
+        }
+
+        $text = trim($response->json('content.0.text', ''));
+        $text = preg_replace('/^```(?:json)?\s*/m', '', $text);
+        $text = preg_replace('/\s*```$/m', '', $text);
+        $text = trim($text);
+
+        $dados = json_decode($text, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return response()->json(['error' => 'Não foi possível interpretar a resposta da API.'], 422);
+        }
+
+        return response()->json(['dados' => $dados]);
+    }
+
+    public function uploadImagem(Request $request, Operacao $operacao): JsonResponse
+    {
+        $this->authorize('update', $operacao);
+
+        $request->validate([
+            'image' => ['required', 'file', 'image', 'mimes:jpeg,jpg,png,webp,heic', 'max:15360'],
+        ], [
+            'image.required' => 'Seleciona uma imagem para carregar.',
+            'image.image' => 'O ficheiro deve ser uma imagem.',
+            'image.mimes' => 'Formatos aceites: JPEG, PNG, WebP, HEIC.',
+            'image.max' => 'A imagem não pode ter mais de 15 MB.',
+        ]);
+
+        if ($operacao->image_path && Storage::disk('public')->exists($operacao->image_path)) {
+            Storage::disk('public')->delete($operacao->image_path);
+        }
+
+        $path = $request->file('image')->store("operacoes/{$operacao->id}", 'public');
+        $operacao->update(['image_path' => $path]);
+
+        return response()->json([
+            'image_path' => $path,
+            'image_url' => Storage::disk('public')->url($path),
+        ]);
+    }
+
+    private function resolveImagePath(string $path): ?string
+    {
+        if (file_exists($path)) {
+            return $path;
+        }
+
+        foreach (['public', 'local'] as $disk) {
+            if (Storage::disk($disk)->exists($path)) {
+                return Storage::disk($disk)->path($path);
+            }
+        }
+
+        return null;
+    }
+
     private function syncColheita(Operacao $operacao, Request $request): void
     {
         if ($operacao->tipo !== 'colheita') {
@@ -437,7 +562,7 @@ class OperacaoManagementController extends Controller
     {
         $requestedCultura = empty($requestedCulturaId)
             ? null
-            : Cultura::query()->find($requestedCulturaId, ['id', 'nome', 'parcela_id']);
+            : Cultura::query()->find($requestedCulturaId, ['id', 'nome', 'variedade', 'parcela_id']);
 
         if ($requestedCultura && (int) $requestedCultura->parcela_id === $parcelaId) {
             return (int) $requestedCultura->id;
@@ -447,6 +572,7 @@ class OperacaoManagementController extends Controller
             $matchingCultureId = Cultura::query()
                 ->where('parcela_id', $parcelaId)
                 ->where('nome', $requestedCultura->nome)
+                ->when($requestedCultura->variedade, fn ($query) => $query->where('variedade', $requestedCultura->variedade))
                 ->orderBy('id')
                 ->value('id');
 
@@ -835,53 +961,13 @@ class OperacaoManagementController extends Controller
             ->toString();
     }
 
-    private function cadernoCampoResumo()
+    private function culturaLabel(?Cultura $cultura): ?string
     {
-        return Campanha::query()
-            ->with(['cultura:id,nome'])
-            ->orderByDesc('ano')
-            ->limit(8)
-            ->get(['id', 'cultura_id', 'ano', 'status', 'producao_real', 'custo_real'])
-            ->map(function (Campanha $campanha) {
-                $operacoes = Operacao::query()
-                    ->with(['produtos:id,nome,tipo'])
-                    ->where('campanha_id', $campanha->id)
-                    ->where('tipo', 'tratamento fitossanitário')
-                    ->get();
+        if (! $cultura) {
+            return null;
+        }
 
-                $custoProdutosTratamentos = (float) $operacoes
-                    ->flatMap(fn (Operacao $operacao) => $operacao->produtos)
-                    ->sum(fn (Produto $produto) => (float) ($produto->pivot->custo_total ?? 0));
-                $custoProdutos = (float) Operacao::query()
-                    ->with(['produtos:id,nome,tipo'])
-                    ->where('campanha_id', $campanha->id)
-                    ->get()
-                    ->flatMap(fn (Operacao $operacao) => $operacao->produtos)
-                    ->sum(fn (Produto $produto) => (float) ($produto->pivot->custo_total ?? 0));
-                $custoOperacoes = (float) Operacao::query()
-                    ->where('campanha_id', $campanha->id)
-                    ->sum('custo_real');
-                $custoOutros = (float) Custo::query()
-                    ->where('campanha_id', $campanha->id)
-                    ->sum('valor');
-                $custoTotal = ($campanha->custo_real ?? null) !== null
-                    ? (float) $campanha->custo_real
-                    : $custoOperacoes + $custoProdutos + $custoOutros;
-                $producaoReal = (float) Colheita::query()
-                    ->where('campanha_id', $campanha->id)
-                    ->sum('quantidade_total') ?: (float) ($campanha->producao_real ?? 0);
-
-                return [
-                    'id' => $campanha->id,
-                    'nome' => "{$campanha->cultura?->nome} - {$campanha->ano}",
-                    'tratamentos' => $operacoes->count(),
-                    'producao_real' => $producaoReal,
-                    'custo_operacoes' => $custoOperacoes,
-                    'custo_produtos' => $custoProdutosTratamentos,
-                    'custo_outros' => $custoOutros,
-                    'custo_total' => $custoTotal,
-                    'custo_por_unidade' => $producaoReal > 0 ? round($custoTotal / $producaoReal, 4) : null,
-                ];
-            });
+        return trim($cultura->nome.($cultura->variedade ? " - {$cultura->variedade}" : ''));
     }
+
 }

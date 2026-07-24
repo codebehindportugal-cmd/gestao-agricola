@@ -137,7 +137,19 @@ class StoreOperacaoRequest extends FormRequest
             }
 
             if ($tipo === 'colheita' && ! $this->filled('cultura_id')) {
-                $validator->errors()->add('cultura_id', 'A colheita precisa de uma cultura associada.');
+                $culturasNaParcela = $selectedParcelIds->count() === 1
+                    ? Cultura::query()
+                        ->where('parcela_id', $selectedParcelIds->first())
+                        ->count()
+                    : 0;
+
+                if ($culturasNaParcela === 0) {
+                    $validator->errors()->add('cultura_id', 'A colheita precisa de uma cultura associada.');
+                }
+
+                if ($culturasNaParcela > 1) {
+                    $validator->errors()->add('cultura_id', 'Escolhe a cultura/variedade que estás a colher nesta parcela.');
+                }
             }
 
             if ($tipo === 'colheita' && blank($this->input('colheita_quantidade_total'))) {

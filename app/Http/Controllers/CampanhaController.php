@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Campanha;
+use App\Models\Custo;
 use App\Models\Cultura;
 use App\Models\Operacao;
 use App\Models\Produto;
@@ -67,10 +68,7 @@ class CampanhaController extends Controller
             'summary' => [
                 'total' => Campanha::query()->count(),
                 'concluidas' => Campanha::query()->where('status', 'concluida')->count(),
-                'custo_total' => Campanha::query()
-                    ->with(['custos:id,campanha_id,valor', 'operacoes.produtos:id,nome'])
-                    ->get()
-                    ->sum(fn (Campanha $campanha) => $campanha->custo_total_calculado),
+                'custo_total' => (float) Campanha::query()->whereNotNull('custo_real')->sum('custo_real'),
             ],
             'can' => [
                 'create' => $request->user()->can('create', Campanha::class),
@@ -79,6 +77,170 @@ class CampanhaController extends Controller
             'anos' => Campanha::query()->distinct()->pluck('ano')->sort()->values(),
             'culturas' => Cultura::query()->orderBy('nome')->get(['id', 'nome']),
         ]);
+    }
+
+    public function show(Request $request, Campanha $campanha): Response
+    {
+        $this->authorize('view', $campanha);
+
+        $campanha->load([
+            'cultura.parcela.terreno',
+            'colheitas',
+            'custos' => fn ($q) => $q->orderByRaw('data_custo IS NULL, data_custo ASC'),
+            'operacoes' => fn ($q) => $q
+                ->with([
+                    'parcela:id,nome',
+                    'maquina:id,nome',
+                    'alfaia:id,nome',
+                    'funcionario:id,nome',
+                    'operador:id,name',
+                    'produtos',
+                ])
+                ->orderBy('data_hora_inicio'),
+        ]);
+
+        $operacoes = $campanha->operacoes;
+        $custoOperacoes = round((float) $operacoes->sum('custo_real'), 2);
+        $custoProdutos = round((float) $operacoes
+            ->flatMap(fn ($op) => $op->produtos)
+            ->sum(fn ($produto) => $this->produtoPivotCost($produto)), 2);
+        $custoDiretos = round((float) $campanha->custos->sum('valor'), 2);
+        $custoTotal = round($custoOperacoes + $custoProdutos + $custoDiretos, 2);
+
+        $producaoReal = (float) $campanha->colheitas->sum('quantidade_total')
+            ?: (float) ($campanha->producao_real ?? 0);
+        $area = (float) ($campanha->cultura?->parcela?->area_util
+            ?: $campanha->cultura?->parcela?->area_total
+            ?: 0);
+
+        return Inertia::render('Campanhas/Show', [
+            'campanha' => [
+                'id' => $campanha->id,
+                'ano' => $campanha->ano,
+                'status' => $campanha->status,
+                'data_inicio' => optional($campanha->data_inicio)?->format('Y-m-d'),
+                'data_fim' => optional($campanha->data_fim)?->format('Y-m-d'),
+                'producao_esperada' => $campanha->producao_esperada,
+                'custo_estimado' => $campanha->custo_estimado,
+                'observacoes' => $campanha->observacoes,
+                'cultura_nome' => $campanha->cultura?->nome,
+                'parcela_nome' => $campanha->cultura?->parcela?->nome,
+                'terreno_nome' => $campanha->cultura?->parcela?->terreno?->nome,
+                'area_ha' => $area,
+            ],
+            'operacoes' => $operacoes->map(fn ($op) => [
+                'id' => $op->id,
+                'tipo' => $op->tipo,
+                'estado' => $op->estado,
+                'data' => optional($op->data_hora_inicio)?->format('d/m/Y'),
+                'parcela_nome' => $op->parcela?->nome,
+                'maquina_nome' => $op->maquina?->nome,
+                'responsavel' => $op->funcionario?->nome ?? $op->operador?->name,
+                'custo_real' => (float) ($op->custo_real ?? 0),
+                'custo_produtos' => round((float) $op->produtos->sum(fn ($p) => $this->produtoPivotCost($p)), 2),
+                'produtos_nomes' => $op->produtos->pluck('nome')->join(', '),
+            ])->values(),
+            'colheitas' => $campanha->colheitas->map(fn ($c) => [
+                'id' => $c->id,
+                'data_colheita' => optional($c->data_colheita)?->format('d/m/Y'),
+                'quantidade_total' => (float) ($c->quantidade_total ?? 0),
+                'quantidade_perdas' => (float) ($c->quantidade_perdas ?? 0),
+                'qualidade' => $c->qualidade,
+                'observacoes' => $c->observacoes,
+            ])->values(),
+            'custos' => $campanha->custos->map(fn ($c) => [
+                'id' => $c->id,
+                'tipo' => $c->tipo,
+                'descricao' => $c->descricao,
+                'valor' => (float) ($c->valor ?? 0),
+                'data_custo' => optional($c->data_custo)?->format('Y-m-d'),
+                'observacoes' => $c->observacoes,
+            ])->values(),
+            'resumo' => [
+                'custo_operacoes' => $custoOperacoes,
+                'custo_produtos' => $custoProdutos,
+                'custo_diretos' => $custoDiretos,
+                'custo_total' => $custoTotal,
+                'producao_real' => $producaoReal,
+                'custo_por_kg' => $producaoReal > 0 ? round($custoTotal / $producaoReal, 4) : 0,
+                'area_ha' => $area,
+                'custo_por_ha' => $area > 0 ? round($custoTotal / $area, 2) : 0,
+            ],
+            'can' => [
+                'update' => $request->user()->can('update', $campanha),
+                'manage_custos' => $request->user()->can('update', $campanha),
+            ],
+            'tiposCusto' => ['material', 'mao_obra', 'maquinaria', 'energia', 'manutencao', 'outro'],
+        ]);
+    }
+
+    public function storeCusto(Request $request, Campanha $campanha): \Illuminate\Http\RedirectResponse
+    {
+        $this->authorize('update', $campanha);
+
+        $data = $request->validate([
+            'tipo' => ['required', 'string', 'in:material,mao_obra,maquinaria,energia,manutencao,outro'],
+            'descricao' => ['required', 'string', 'max:255'],
+            'valor' => ['required', 'numeric', 'min:0.01'],
+            'data_custo' => ['nullable', 'date'],
+            'observacoes' => ['nullable', 'string'],
+        ], [
+            'tipo.required' => 'O tipo de custo é obrigatório.',
+            'tipo.in' => 'Selecione um tipo de custo válido.',
+            'descricao.required' => 'A descrição é obrigatória.',
+            'valor.required' => 'O valor é obrigatório.',
+            'valor.min' => 'O valor deve ser superior a zero.',
+        ]);
+
+        $campanha->custos()->create($data);
+
+        return redirect()
+            ->route('app.campanhas.show', $campanha)
+            ->with('success', 'Custo adicionado com sucesso.');
+    }
+
+    public function updateCusto(Request $request, Campanha $campanha, Custo $custo): \Illuminate\Http\RedirectResponse
+    {
+        $this->authorize('update', $campanha);
+
+        if ($custo->campanha_id !== $campanha->id) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'tipo' => ['required', 'string', 'in:material,mao_obra,maquinaria,energia,manutencao,outro'],
+            'descricao' => ['required', 'string', 'max:255'],
+            'valor' => ['required', 'numeric', 'min:0.01'],
+            'data_custo' => ['nullable', 'date'],
+            'observacoes' => ['nullable', 'string'],
+        ], [
+            'tipo.required' => 'O tipo de custo é obrigatório.',
+            'tipo.in' => 'Selecione um tipo de custo válido.',
+            'descricao.required' => 'A descrição é obrigatória.',
+            'valor.required' => 'O valor é obrigatório.',
+            'valor.min' => 'O valor deve ser superior a zero.',
+        ]);
+
+        $custo->update($data);
+
+        return redirect()
+            ->route('app.campanhas.show', $campanha)
+            ->with('success', 'Custo atualizado com sucesso.');
+    }
+
+    public function destroyCusto(Campanha $campanha, Custo $custo): \Illuminate\Http\RedirectResponse
+    {
+        $this->authorize('update', $campanha);
+
+        if ($custo->campanha_id !== $campanha->id) {
+            abort(403);
+        }
+
+        $custo->delete();
+
+        return redirect()
+            ->route('app.campanhas.show', $campanha)
+            ->with('success', 'Custo removido com sucesso.');
     }
 
     public function exportarCadernoCampo(Campanha $campanha)
