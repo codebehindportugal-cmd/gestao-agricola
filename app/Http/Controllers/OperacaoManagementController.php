@@ -418,7 +418,7 @@ class OperacaoManagementController extends Controller
             'x-api-key' => $apiKey,
             'anthropic-version' => '2023-06-01',
         ])->post('https://api.anthropic.com/v1/messages', [
-            'model' => 'claude-opus-4-8',
+            'model' => config('services.anthropic.model', 'claude-opus-4-8'),
             'max_tokens' => 1024,
             'messages' => [[
                 'role' => 'user',
