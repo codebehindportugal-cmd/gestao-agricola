@@ -5,10 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Campanha;
 use App\Models\Despesa;
 use App\Models\FaturaItem;
-use App\Models\MovimentoStock;
 use App\Models\Produto;
 use App\Models\Receita;
-use App\Models\Stock;
+use App\Services\MovimentoStockService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -347,99 +346,12 @@ class DespesaManagementController extends Controller
 
     private function processarMovimentosStock(Despesa $despesa): array
     {
-        if (! Schema::hasTable('movimento_stocks') || ! Schema::hasTable('stocks')) {
-            return [];
-        }
-
-        $itemsComProduto = $despesa->items->filter(fn ($i) => $i->produto_id !== null);
-
-        if ($itemsComProduto->isEmpty()) {
-            return [];
-        }
-
-        $movimentos = [];
-        $referencia = $this->buildReferencia($despesa);
-
-        foreach ($itemsComProduto as $item) {
-            $produto = $item->produto ?? Produto::find($item->produto_id);
-            if (! $produto) {
-                continue;
-            }
-
-            // Upsert stock record (armazem_id = null = stock geral)
-            $stock = Stock::firstOrCreate(
-                ['produto_id' => $item->produto_id, 'armazem_id' => null],
-                [
-                    'quantidade'      => 0,
-                    'unidade_medida'  => $produto->unidade_medida ?? 'un',
-                    'data_atualizado' => now()->toDateString(),
-                ]
-            );
-
-            $stock->update([
-                'quantidade'      => max(0, (float) $stock->quantidade + (float) $item->quantidade),
-                'data_atualizado' => now()->toDateString(),
-            ]);
-
-            MovimentoStock::create([
-                'produto_id'      => $item->produto_id,
-                'tipo'            => 'entrada',
-                'quantidade'      => (float) $item->quantidade,
-                'unidade_medida'  => $produto->unidade_medida ?? 'un',
-                'custo_unitario'  => (float) $item->preco_unitario,
-                'referencia'      => $referencia,
-                'despesa_id'      => $despesa->id,
-                'fatura_item_id'  => $item->id,
-                'notas'           => "Entrada automática via fatura: {$referencia}",
-            ]);
-
-            $movimentos[] = [
-                'produto'    => $produto->nome,
-                'quantidade' => (float) $item->quantidade,
-                'unidade'    => $produto->unidade_medida ?? 'un',
-            ];
-        }
-
-        return $movimentos;
+        return app(MovimentoStockService::class)->processarEntradas($despesa);
     }
 
     private function reverterMovimentosAnteriores(Despesa $despesa): void
     {
-        if (! Schema::hasTable('movimento_stocks')) {
-            return;
-        }
-
-        $movimentos = MovimentoStock::where('despesa_id', $despesa->id)
-            ->where('tipo', 'entrada')
-            ->get();
-
-        foreach ($movimentos as $mov) {
-            $stock = Stock::where('produto_id', $mov->produto_id)
-                ->whereNull('armazem_id')
-                ->first();
-
-            if ($stock) {
-                $stock->update([
-                    'quantidade'      => max(0, (float) $stock->quantidade - (float) $mov->quantidade),
-                    'data_atualizado' => now()->toDateString(),
-                ]);
-            }
-
-            $mov->delete();
-        }
-    }
-
-    private function buildReferencia(Despesa $despesa): string
-    {
-        $parts = [];
-        if ($despesa->numero_fatura) {
-            $parts[] = "Fatura {$despesa->numero_fatura}";
-        }
-        if ($despesa->fornecedor) {
-            $parts[] = "de {$despesa->fornecedor}";
-        }
-
-        return implode(' ', $parts) ?: "Fatura #{$despesa->id}";
+        app(MovimentoStockService::class)->reverterEntradas($despesa);
     }
 
     // ── Validation & formatting ──────────────────────────────────────────────

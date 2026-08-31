@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\Alfaia;
 use App\Models\Campanha;
 use App\Models\Colheita;
 use App\Models\Cultura;
+use App\Models\Equipa;
 use App\Models\Funcionario;
 use App\Models\Lote;
 use App\Models\Maquina;
@@ -225,6 +227,40 @@ class ResolvedorReferencias
         );
 
         return $lote;
+    }
+
+    public function resolverAlfaia(int|string|null $valor): Alfaia
+    {
+        /** @var Alfaia $alfaia */
+        $alfaia = $this->resolverModelo(
+            Alfaia::query(),
+            $valor,
+            'alfaia',
+            fn (Builder $query, string $texto) => $query->where('nome', $texto),
+            fn (Alfaia $alfaia) => [
+                'id' => $alfaia->id,
+                'nome' => $alfaia->nome,
+            ]
+        );
+
+        return $alfaia;
+    }
+
+    public function resolverEquipa(int|string|null $valor): Equipa
+    {
+        /** @var Equipa $equipa */
+        $equipa = $this->resolverModelo(
+            Equipa::query(),
+            $valor,
+            'equipa',
+            fn (Builder $query, string $texto) => $query->where('nome', $texto),
+            fn (Equipa $equipa) => [
+                'id' => $equipa->id,
+                'nome' => $equipa->nome,
+            ]
+        );
+
+        return $equipa;
     }
 
     /**

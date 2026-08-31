@@ -9,20 +9,23 @@ use App\Http\Controllers\OperacaoController;
 use App\Http\Controllers\MaquinaController;
 use App\Http\Controllers\AlfaiaController;
 use App\Http\Controllers\Api\V1\AplicacaoController;
+use App\Http\Controllers\Api\V1\CatalogoController;
 use App\Http\Controllers\Api\V1\ColheitaController;
 use App\Http\Controllers\Api\V1\CustoController;
+use App\Http\Controllers\Api\V1\FaturaController;
 use App\Http\Controllers\Api\V1\PingController;
 use App\Http\Controllers\Api\V1\ReceitaController;
 use App\Http\Controllers\Api\V1\TesourariaController;
+use App\Http\Controllers\Api\V1\TrabalhoController;
 
 /*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
 |
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
+| Toda a API v1 exige um token Sanctum. As leituras precisam so de token
+| valido; as escritas exigem tambem role de escrita (api.write.role) e, nos
+| endpoints de ingestao, a ability correspondente.
 |
 */
 
@@ -30,48 +33,68 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
-// Routes publiques (sem autenticação)
-Route::prefix('v1')->group(function () {
+Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->group(function () {
 
-    // Terrenos
-    Route::apiResource('terrenos', TerrenoController::class);
-    Route::post('terrenos/{terreno}/restore', [TerrenoController::class, 'restore']);
-
-    // Parcelas
-    Route::apiResource('parcelas', ParcelaController::class);
-
-    // Culturas
-    Route::apiResource('culturas', CulturaController::class);
-
-    // Operações
-    Route::apiResource('operacoes', OperacaoController::class);
-    Route::get('operacoes-tipos', [OperacaoController::class, 'tipos']);
-
-    // Máquinas
-    Route::apiResource('maquinas', MaquinaController::class);
-    Route::get('maquinas-tipos', [MaquinaController::class, 'tipos']);
-
-    // Alfaias
-    Route::apiResource('alfaias', AlfaiaController::class);
-    Route::get('alfaias-tipos', [AlfaiaController::class, 'tipos']);
-});
-
-// Routes protegidas (com autenticação - implementar depois)
-Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
     Route::get('ping', PingController::class);
 
+    /*
+    |----------------------------------------------------------------------
+    | Cadastro - leitura
+    |----------------------------------------------------------------------
+    */
+    Route::apiResource('terrenos', TerrenoController::class)->only(['index', 'show']);
+    Route::apiResource('parcelas', ParcelaController::class)->only(['index', 'show']);
+    Route::apiResource('culturas', CulturaController::class)->only(['index', 'show']);
+    Route::apiResource('operacoes', OperacaoController::class)->only(['index', 'show']);
+    Route::apiResource('maquinas', MaquinaController::class)->only(['index', 'show']);
+    Route::apiResource('alfaias', AlfaiaController::class)->only(['index', 'show']);
+
+    Route::get('operacoes-tipos', [OperacaoController::class, 'tipos']);
+    Route::get('maquinas-tipos', [MaquinaController::class, 'tipos']);
+    Route::get('alfaias-tipos', [AlfaiaController::class, 'tipos']);
+
+    Route::get('campanhas', [CatalogoController::class, 'campanhas']);
+    Route::get('funcionarios', [CatalogoController::class, 'funcionarios']);
+    Route::get('equipas', [CatalogoController::class, 'equipas']);
+    Route::get('produtos', [CatalogoController::class, 'produtos']);
+
+    Route::get('tesouraria', TesourariaController::class);
+
+    /*
+    |----------------------------------------------------------------------
+    | Cadastro - escrita (exige role de escrita)
+    |----------------------------------------------------------------------
+    */
+    Route::middleware('api.write.role')->group(function () {
+        Route::apiResource('terrenos', TerrenoController::class)->except(['index', 'show']);
+        Route::post('terrenos/{terreno}/restore', [TerrenoController::class, 'restore']);
+        Route::apiResource('parcelas', ParcelaController::class)->except(['index', 'show']);
+        Route::apiResource('culturas', CulturaController::class)->except(['index', 'show']);
+        Route::apiResource('operacoes', OperacaoController::class)->except(['index', 'show']);
+        Route::apiResource('maquinas', MaquinaController::class)->except(['index', 'show']);
+        Route::apiResource('alfaias', AlfaiaController::class)->except(['index', 'show']);
+    });
+
+    /*
+    |----------------------------------------------------------------------
+    | Ingestao (exige ability + role de escrita)
+    |----------------------------------------------------------------------
+    */
     Route::post('custos', [CustoController::class, 'store'])
-        ->middleware(['throttle:api', 'abilities:custos:write', 'api.write.role']);
+        ->middleware(['abilities:custos:write', 'api.write.role']);
 
     Route::post('aplicacoes', [AplicacaoController::class, 'store'])
-        ->middleware(['throttle:api', 'abilities:aplicacoes:write', 'api.write.role']);
+        ->middleware(['abilities:aplicacoes:write', 'api.write.role']);
+
+    Route::post('trabalhos', [TrabalhoController::class, 'store'])
+        ->middleware(['ability:trabalhos:write,custos:write', 'api.write.role']);
+
+    Route::post('faturas', [FaturaController::class, 'store'])
+        ->middleware(['ability:faturas:write,custos:write', 'api.write.role']);
 
     Route::post('colheitas', [ColheitaController::class, 'store'])
-        ->middleware(['throttle:api', 'abilities:colheitas:write', 'api.write.role']);
+        ->middleware(['abilities:colheitas:write', 'api.write.role']);
 
     Route::post('receitas', [ReceitaController::class, 'store'])
-        ->middleware(['throttle:api', 'abilities:receitas:write', 'api.write.role']);
-
-    Route::get('tesouraria', TesourariaController::class)
-        ->middleware(['throttle:api']);
+        ->middleware(['abilities:receitas:write', 'api.write.role']);
 });
