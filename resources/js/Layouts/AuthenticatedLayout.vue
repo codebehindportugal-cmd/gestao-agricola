@@ -41,6 +41,7 @@ const primaryLinks = [
     { label: 'Terrenos', routeName: 'app.terrenos.index', active: 'app.terrenos.*' },
     { label: 'Parcelas', routeName: 'app.parcelas.index', active: 'app.parcelas.*' },
     { label: 'Custos', routeName: 'app.campanhas.index', active: 'app.campanhas.*' },
+    { label: 'Calendário', routeName: 'app.calendario.index', active: 'app.calendario.*' },
 ];
 
 const resourceLinks = [

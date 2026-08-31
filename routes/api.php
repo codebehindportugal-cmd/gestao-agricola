@@ -11,6 +11,7 @@ use App\Http\Controllers\AlfaiaController;
 use App\Http\Controllers\Api\V1\AplicacaoController;
 use App\Http\Controllers\Api\V1\CatalogoController;
 use App\Http\Controllers\Api\V1\ColheitaController;
+use App\Http\Controllers\Api\V1\CompromissoController;
 use App\Http\Controllers\Api\V1\CustoController;
 use App\Http\Controllers\Api\V1\FaturaController;
 use App\Http\Controllers\Api\V1\PingController;
@@ -58,6 +59,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->group(functio
     Route::get('equipas', [CatalogoController::class, 'equipas']);
     Route::get('produtos', [CatalogoController::class, 'produtos']);
 
+    Route::get('compromissos', [CompromissoController::class, 'index']);
     Route::get('tesouraria', TesourariaController::class);
 
     /*
@@ -91,6 +93,12 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->group(functio
 
     Route::post('faturas', [FaturaController::class, 'store'])
         ->middleware(['ability:faturas:write,custos:write', 'api.write.role']);
+
+    Route::post('compromissos', [CompromissoController::class, 'store'])
+        ->middleware(['ability:compromissos:write,custos:write', 'api.write.role']);
+
+    Route::post('compromissos/{compromisso}/concluir', [CompromissoController::class, 'concluir'])
+        ->middleware(['ability:compromissos:write,custos:write', 'api.write.role']);
 
     Route::post('colheitas', [ColheitaController::class, 'store'])
         ->middleware(['abilities:colheitas:write', 'api.write.role']);
