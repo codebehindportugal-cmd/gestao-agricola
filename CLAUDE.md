@@ -96,7 +96,13 @@ php artisan make:migration add_campo_to_tabela_table
 ## API de Ingestao (v1)
 - Autenticacao por token pessoal Sanctum no header `Authorization: Bearer <token>`.
 - Emitir tokens com `php artisan agri:emitir-token {email} --nome=integracao --abilities=custos:write --abilities=aplicacoes:write --abilities=colheitas:write --abilities=receitas:write`.
-- Rotas protegidas em `/api/v1`: `POST /custos` exige `custos:write`; `POST /aplicacoes` exige `aplicacoes:write`; `POST /colheitas` exige `colheitas:write`; `POST /receitas` exige `receitas:write`; `GET /tesouraria` exige autenticacao Sanctum.
+- **Toda** a `/api/v1` exige token Sanctum, incluindo as leituras de cadastro. Escritas exigem tambem role `admin`, `gestor_agricola` ou `operador` (`api.write.role`).
+- Ingestao: `POST /custos` exige `custos:write`; `POST /aplicacoes` exige `aplicacoes:write`; `POST /trabalhos` exige `trabalhos:write` ou `custos:write`; `POST /colheitas` exige `colheitas:write`; `POST /receitas` exige `receitas:write`.
+- Leitura de cadastro (so token): `GET /terrenos` `/parcelas` `/culturas` `/operacoes` `/maquinas` `/alfaias` `/campanhas` `/funcionarios` `/equipas` `/produtos` `/tesouraria`.
+- `POST /aplicacoes` aceita `parcelas` (uma operacao por parcela) e os meios `maquina`, `alfaia`, `funcionario`, `equipa`, `duracao_horas`, `combustivel_gasto_l`. O tipo por omissao e `tratamento fitossanitário`, o valor que o caderno de campo filtra.
+- `POST /trabalhos` regista mao de obra: cria a Operacao, uma Jornada por pessoa e por dia, e um Custo agregado `mao_obra` (o que a tesouraria conta).
+- Calendario (`compromissos`): tarefas, pagamentos (IMI, seguros, seguranca social), manutencoes e prazos legais, com recorrencia. Pagina em `/calendario` (`Calendario/Index.vue`). `GET/POST /api/v1/compromissos` e `POST /api/v1/compromissos/{id}/concluir`. Concluir com valor cria o `Custo` ligado e gera a proxima ocorrencia da serie. Comando `agri:gerar-compromissos`.
+- `POST /faturas` regista faturas de compra: Despesa + FaturaItem + resolucao/criacao de Produtos + entrada em stock (via `MovimentoStockService`, partilhado com o ecra de despesas) + Custo. Idempotente por `numero_fatura`.
 - Todas as respostas novas usam envelope JSON: `{ "sucesso": bool, "dados": {...}|null, "avisos": [], "erros": [] }`.
 - Idempotencia: quando `referencia_externa` ja existe, o endpoint devolve o registo existente e nao cria duplicado.
 - Referencias podem ser enviadas por ID ou nome/codigo; se houver ambiguidade, a API devolve 422 com candidatos.
