@@ -530,16 +530,41 @@ class CampanhaController extends Controller
                     return;
                 }
 
-                $query->orWhere(function ($orfas) use ($campanha, $parcelaIds) {
+                // A epoca atravessa dois anos civis - poda-se em 2025 para
+                // apanhar em 2026 - por isso o criterio e o intervalo da
+                // campanha e nao o ano da apanha.
+                [$de, $ate] = $this->intervaloDaCampanha($campanha);
+
+                $query->orWhere(function ($orfas) use ($parcelaIds, $de, $ate) {
                     $orfas->whereNull('campanha_id')
                         ->whereIn('parcela_id', $parcelaIds)
-                        ->whereYear('data_hora_inicio', (int) $campanha->ano);
+                        ->whereBetween('data_hora_inicio', [$de, $ate]);
                 });
             })
             ->orderBy('data_hora_inicio')
             ->get()
             ->unique('id')
             ->values();
+    }
+
+    /**
+     * Intervalo coberto pela campanha. Por omissao a epoca vai de 1 de Outubro
+     * do ano anterior a 30 de Setembro do ano da apanha, que e como a
+     * aplicacao ja rotula as campanhas (2025/2026).
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function intervaloDaCampanha(Campanha $campanha): array
+    {
+        $de = $campanha->data_inicio
+            ? $campanha->data_inicio->copy()->startOfDay()
+            : \Carbon\CarbonImmutable::create((int) $campanha->ano - 1, 10, 1)->startOfDay();
+
+        $ate = $campanha->data_fim
+            ? $campanha->data_fim->copy()->endOfDay()
+            : \Carbon\CarbonImmutable::create((int) $campanha->ano, 9, 30)->endOfDay();
+
+        return [(string) $de, (string) $ate];
     }
 
     private function normaliseText(?string $value): string

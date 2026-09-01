@@ -104,6 +104,54 @@ class CampanhaGeralTest extends TestCase
         $this->assertDatabaseMissing('campanhas', ['nome' => 'Pereiras 2026']);
     }
 
+    public function test_epoca_atravessa_dois_anos_e_apanha_a_poda_do_ano_anterior(): void
+    {
+        $terreno = Terreno::query()->create(['nome' => 'Terreno A', 'area_total' => 10]);
+        $parcela = Parcela::query()->create(['terreno_id' => $terreno->id, 'nome' => 'Norte', 'area_total' => 1]);
+        Cultura::query()->create([
+            'parcela_id' => $parcela->id, 'nome' => 'Pereira Norte', 'tipo' => 'Pereira',
+            'data_plantacao' => '2020-01-01',
+        ]);
+
+        // Poda feita em Dezembro de 2025, sem campanha atribuída.
+        $poda = Operacao::query()->create([
+            'parcela_id' => $parcela->id, 'tipo' => 'poda',
+            'data_hora_inicio' => '2025-12-10 08:00:00', 'estado' => 'concluida',
+        ]);
+        // Apanha em Agosto de 2026, também órfã.
+        $apanha = Operacao::query()->create([
+            'parcela_id' => $parcela->id, 'tipo' => 'colheita',
+            'data_hora_inicio' => '2026-08-15 08:00:00', 'estado' => 'concluida',
+        ]);
+        // Fora da época: pertence à campanha anterior.
+        $anterior = Operacao::query()->create([
+            'parcela_id' => $parcela->id, 'tipo' => 'poda',
+            'data_hora_inicio' => '2025-03-01 08:00:00', 'estado' => 'concluida',
+        ]);
+
+        $this->artisan('agri:migrar-campanhas', ['--ano' => 2026, '--confirmar' => true])->assertSuccessful();
+
+        $geral = Campanha::query()->where('nome', 'Pereiras 2026')->firstOrFail();
+        $this->assertSame('2025-10-01', $geral->data_inicio->toDateString());
+        $this->assertSame('2026-09-30', $geral->data_fim->toDateString());
+
+        $ids = $this->operacoesDoRelatorio($geral);
+
+        $this->assertContains($poda->id, $ids, 'a poda de Dezembro de 2025 pertence à campanha de 2026');
+        $this->assertContains($apanha->id, $ids);
+        $this->assertNotContains($anterior->id, $ids, 'Março de 2025 é da época anterior');
+    }
+
+    /** @return array<int, int> */
+    private function operacoesDoRelatorio(Campanha $campanha): array
+    {
+        $metodo = new \ReflectionMethod(\App\Http\Controllers\CampanhaController::class, 'reportOperationsForGeneralCampaign');
+        $metodo->setAccessible(true);
+
+        return $metodo->invoke(app(\App\Http\Controllers\CampanhaController::class), $campanha)
+            ->pluck('id')->all();
+    }
+
     /** @return array<int, Parcela> */
     private function criarParcelas(): array
     {

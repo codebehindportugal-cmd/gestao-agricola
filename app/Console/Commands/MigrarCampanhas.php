@@ -10,6 +10,7 @@ use App\Models\Custo;
 use App\Models\Despesa;
 use App\Models\Operacao;
 use App\Models\Receita;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -23,7 +24,9 @@ use Illuminate\Support\Facades\Schema;
 class MigrarCampanhas extends Command
 {
     protected $signature = 'agri:migrar-campanhas
-        {--ano= : Ano a migrar (por omissão o ano corrente)}
+        {--ano= : Ano da apanha (por omissão o ano corrente)}
+        {--inicio= : Início da época, AAAA-MM-DD (por omissão 1 de Outubro do ano anterior)}
+        {--fim= : Fim da época, AAAA-MM-DD (por omissão 30 de Setembro do ano da apanha)}
         {--confirmar : Aplica as alterações; sem esta opção apenas mostra o plano}';
 
     protected $description = 'Agrupa as campanhas por espécie e ano numa campanha geral que cobre todas as parcelas.';
@@ -32,6 +35,11 @@ class MigrarCampanhas extends Command
     {
         $ano = (int) ($this->option('ano') ?: now()->year);
         $aplicar = (bool) $this->option('confirmar');
+
+        // A epoca atravessa dois anos civis: poda-se no ano anterior e apanha-se
+        // no ano da campanha. E como a aplicacao ja rotula as campanhas (2025/2026).
+        $inicio = $this->option('inicio') ?: CarbonImmutable::create($ano - 1, 10, 1)->toDateString();
+        $fim = $this->option('fim') ?: CarbonImmutable::create($ano, 9, 30)->toDateString();
 
         $culturas = Cultura::query()->with('parcela')->get()
             ->filter(fn (Cultura $c) => filled($c->tipo) && $c->parcela !== null);
@@ -45,6 +53,7 @@ class MigrarCampanhas extends Command
         $porEspecie = $culturas->groupBy(fn (Cultura $c) => $this->normalizarEspecie($c->tipo));
 
         $this->info($aplicar ? "A migrar campanhas de {$ano}..." : "PLANO para {$ano} (nada será alterado sem --confirmar)");
+        $this->line("Época: {$inicio} a {$fim}");
         $this->newLine();
 
         $totais = ['gerais' => 0, 'parcelas' => 0, 'antigas' => 0, 'registos' => 0];
@@ -78,13 +87,13 @@ class MigrarCampanhas extends Command
                 continue;
             }
 
-            DB::transaction(function () use ($nome, $ano, $parcelaIds, $antigas, $culturasDaEspecie): void {
+            DB::transaction(function () use ($nome, $ano, $inicio, $fim, $parcelaIds, $antigas, $culturasDaEspecie): void {
                 $geral = Campanha::query()->firstOrCreate(
                     ['nome' => $nome, 'ano' => $ano],
                     [
                         'cultura_id' => null,
-                        'data_inicio' => $antigas->min('data_inicio') ?? now()->startOfYear()->toDateString(),
-                        'data_fim' => $antigas->max('data_fim'),
+                        'data_inicio' => $inicio,
+                        'data_fim' => $fim,
                         'status' => 'em_curso',
                         'observacoes' => 'Campanha geral de '.$this->plural($this->normalizarEspecie($culturasDaEspecie->first()->tipo)).'.',
                     ]
