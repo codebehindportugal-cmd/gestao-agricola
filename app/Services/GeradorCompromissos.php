@@ -108,7 +108,7 @@ class GeradorCompromissos
             'estado' => 'pendente',
             'recorrencia' => 'nenhuma',
             'compromisso_pai_id' => $serie->id,
-            'antecedencia_aviso_dias' => $serie->antecedencia_aviso_dias,
+            'antecedencia_aviso_dias' => $serie->antecedencia_aviso_dias ?? 7,
             'campanha_id' => $serie->campanha_id,
             'parcela_id' => $serie->parcela_id,
             'cultura_id' => $serie->cultura_id,

@@ -61,8 +61,12 @@ class CompromissoController extends Controller
 
     public function store(StoreCompromissoApiRequest $request): JsonResponse
     {
-        $data = $request->validated();
-        $itens = $data['compromissos'] ?? [$request->all()];
+        // Nao usar validated(): para um lote, o Laravel devolve apenas as chaves
+        // nomeadas nas regras (titulo, categoria, data), pelo que recorrencia,
+        // valor, tipo e referencia_externa eram silenciosamente deitados fora.
+        // Cada item e validado a serio mais abaixo com regrasItem().
+        $request->validated();
+        $itens = $request->input('compromissos') ?? [$request->all()];
 
         $criados = [];
         $ignorados = [];

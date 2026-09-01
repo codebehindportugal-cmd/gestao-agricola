@@ -51,6 +51,18 @@ class Compromisso extends Model
 
     protected $table = 'compromissos';
 
+    /**
+     * Os defaults da migracao so existem na base de dados: um modelo acabado de
+     * criar sem estes campos ficava com null em memoria, o que devolvia
+     * estado=null na API e fazia o gerador inserir null numa coluna NOT NULL.
+     */
+    protected $attributes = [
+        'categoria' => 'pagamento',
+        'estado' => 'pendente',
+        'recorrencia' => 'nenhuma',
+        'antecedencia_aviso_dias' => 7,
+    ];
+
     protected $fillable = [
         'titulo',
         'descricao',

@@ -6,6 +6,7 @@ use App\Models\Campanha;
 use App\Models\Cultura;
 use App\Models\Equipa;
 use App\Models\Funcionario;
+use App\Models\Jornada;
 use App\Models\Parcela;
 use App\Models\Role;
 use App\Models\Terreno;
@@ -46,12 +47,14 @@ class TrabalhoIngestaoTest extends TestCase
             ->assertJsonPath('dados.operacao.tipo', 'colheita');
 
         $this->assertDatabaseCount('jornadas', 6);
-        $this->assertDatabaseHas('jornadas', [
-            'funcionario_id' => $ana->id,
-            'data' => '2026-08-14',
-            'horas_trabalhadas' => 8,
-            'tarefa' => 'Apanha da fruta',
-        ]);
+        $this->assertTrue(
+            Jornada::query()
+                ->where('funcionario_id', $ana->id)
+                ->whereDate('data', '2026-08-14')
+                ->where('horas_trabalhadas', 8)
+                ->where('tarefa', 'Apanha da fruta')
+                ->exists()
+        );
         $this->assertDatabaseHas('custos', [
             'tipo' => 'mao_obra',
             'valor' => 264,
@@ -84,9 +87,9 @@ class TrabalhoIngestaoTest extends TestCase
             ->assertJsonPath('dados.dias_trabalhados', 2)
             ->assertJsonPath('dados.jornadas', 2);
 
-        $this->assertDatabaseHas('jornadas', ['data' => '2026-08-14']);
-        $this->assertDatabaseHas('jornadas', ['data' => '2026-08-17']);
-        $this->assertDatabaseMissing('jornadas', ['data' => '2026-08-15']);
+        $this->assertTrue(Jornada::query()->whereDate('data', '2026-08-14')->exists());
+        $this->assertTrue(Jornada::query()->whereDate('data', '2026-08-17')->exists());
+        $this->assertFalse(Jornada::query()->whereDate('data', '2026-08-15')->exists());
     }
 
     public function test_equipa_traz_os_funcionarios_associados(): void
