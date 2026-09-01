@@ -34,7 +34,7 @@ class CatalogoController extends Controller
         $campanhas = $query->orderByDesc('ano')->orderBy('id')->get()
             ->map(fn (Campanha $campanha) => [
                 'id' => $campanha->id,
-                'nome' => trim(($campanha->cultura?->nome ? $campanha->cultura->nome.' ' : '').$campanha->ano),
+                'nome' => $campanha->nome_completo,
                 'ano' => $campanha->ano,
                 'status' => $campanha->status,
                 'data_inicio' => $campanha->data_inicio?->toDateString(),

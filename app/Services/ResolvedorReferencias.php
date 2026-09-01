@@ -29,23 +29,31 @@ class ResolvedorReferencias
             $valor,
             'campanha',
             function (Builder $query, string $texto) use ($ano): void {
-                $anoResolvido = $ano ?? $this->extrairAno($texto);
+                // Uma campanha geral tem nome proprio ("Pereiras 2026"); as
+                // antigas derivam o nome da cultura + ano.
+                $query->where(function (Builder $externo) use ($texto, $ano): void {
+                    $externo->where('nome', $texto);
 
-                if ($anoResolvido !== null) {
-                    $query->where('ano', $anoResolvido);
-                }
+                    $externo->orWhere(function (Builder $porCultura) use ($texto, $ano): void {
+                        $anoResolvido = $ano ?? $this->extrairAno($texto);
 
-                $nomeCultura = trim((string) preg_replace('/\b\d{4}\b/', '', $texto));
+                        if ($anoResolvido !== null) {
+                            $porCultura->where('ano', $anoResolvido);
+                        }
 
-                if ($nomeCultura !== '') {
-                    $query->whereHas('cultura', function (Builder $query) use ($nomeCultura): void {
-                        $query->where('nome', $nomeCultura);
+                        $nomeCultura = trim((string) preg_replace('/\b\d{4}\b/', '', $texto));
+
+                        if ($nomeCultura !== '') {
+                            $porCultura->whereHas('cultura', function (Builder $query) use ($nomeCultura): void {
+                                $query->where('nome', $nomeCultura);
+                            });
+                        }
                     });
-                }
+                });
             },
             fn (Campanha $campanha) => [
                 'id' => $campanha->id,
-                'nome' => trim(($campanha->cultura?->nome ? $campanha->cultura->nome.' ' : '').$campanha->ano),
+                'nome' => $campanha->nome_completo,
                 'ano' => $campanha->ano,
             ]
         );

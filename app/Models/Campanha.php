@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -14,6 +15,7 @@ class Campanha extends Model
     protected $table = 'campanhas';
 
     protected $fillable = [
+        'nome',
         'cultura_id',
         'ano',
         'data_inicio',
@@ -38,6 +40,61 @@ class Campanha extends Model
     public function cultura(): BelongsTo
     {
         return $this->belongsTo(Cultura::class);
+    }
+
+    /** Parcelas cobertas por uma campanha geral. */
+    public function parcelas(): BelongsToMany
+    {
+        return $this->belongsToMany(Parcela::class, 'campanha_parcela')->withTimestamps();
+    }
+
+    public function ehGeral(): bool
+    {
+        return $this->cultura_id === null;
+    }
+
+    /**
+     * As parcelas que a campanha realmente cobre: as ligadas explicitamente
+     * numa campanha geral, ou a unica parcela da cultura numa campanha antiga.
+     */
+    public function parcelasEfetivas(): \Illuminate\Support\Collection
+    {
+        if ($this->parcelas->isNotEmpty()) {
+            return $this->parcelas;
+        }
+
+        $parcela = $this->cultura?->parcela;
+
+        return $parcela ? collect([$parcela]) : collect();
+    }
+
+    public function getNomeCompletoAttribute(): string
+    {
+        if (filled($this->nome)) {
+            return $this->nome;
+        }
+
+        return trim(($this->cultura?->nome ? $this->cultura->nome.' ' : '').$this->ano);
+    }
+
+    /** Area da campanha: a soma das parcelas que cobre. */
+    public function getAreaTotalHaAttribute(): float
+    {
+        return round((float) $this->parcelasEfetivas()->sum(
+            fn (Parcela $parcela) => (float) ($parcela->area_util ?: $parcela->area_total ?: 0)
+        ), 4);
+    }
+
+    /** Nomes dos terrenos abrangidos, para o caderno de campo. */
+    public function getExploracaoNomeAttribute(): string
+    {
+        $nomes = $this->parcelasEfetivas()
+            ->map(fn (Parcela $parcela) => $parcela->terreno?->nome)
+            ->filter()
+            ->unique()
+            ->values();
+
+        return $nomes->isEmpty() ? 'N/A' : $nomes->implode(', ');
     }
 
     public function colheitas(): HasMany

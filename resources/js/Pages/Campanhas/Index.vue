@@ -138,7 +138,7 @@ const statusBadgeClass = (status) => ({
                         <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                             <div>
                                 <div class="flex flex-wrap items-center gap-3">
-                                    <h2 class="text-2xl font-black text-slate-900">{{ campanha.cultura_nome }} · {{ campanha.ano }}</h2>
+                                    <h2 class="text-2xl font-black text-slate-900">{{ campanha.cultura_nome }}</h2>
                                     <span class="rounded-full px-3 py-1 text-xs font-semibold" :class="statusBadgeClass(campanha.status)">
                                         {{ statusLabel(campanha.status) }}
                                     </span>

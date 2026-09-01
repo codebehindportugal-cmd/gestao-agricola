@@ -195,7 +195,7 @@ class CompromissoController extends Controller
             'referencia_externa' => $c->referencia_externa,
             'campanha' => $c->campanha ? [
                 'id' => $c->campanha->id,
-                'nome' => trim(($c->campanha->cultura?->nome ? $c->campanha->cultura->nome.' ' : '').$c->campanha->ano),
+                'nome' => $c->campanha->nome_completo,
             ] : null,
             'parcela' => $c->parcela ? ['id' => $c->parcela->id, 'nome' => $c->parcela->nome] : null,
             'maquina' => $c->maquina ? ['id' => $c->maquina->id, 'nome' => $c->maquina->nome] : null,

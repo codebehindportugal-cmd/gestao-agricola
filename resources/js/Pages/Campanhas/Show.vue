@@ -127,7 +127,7 @@ function deleteCusto(custo) {
 </script>
 
 <template>
-    <Head :title="`${campanha.cultura_nome} · ${campanha.ano}`" />
+    <Head :title="campanha.cultura_nome" />
 
     <AuthenticatedLayout>
         <template #header>
@@ -138,7 +138,7 @@ function deleteCusto(custo) {
                         Campanhas
                     </Link>
                     <div class="flex flex-wrap items-center gap-3">
-                        <h1 class="text-3xl font-black text-slate-900">{{ campanha.cultura_nome }} · {{ campanha.ano }}</h1>
+                        <h1 class="text-3xl font-black text-slate-900">{{ campanha.cultura_nome }}</h1>
                         <span class="rounded-full px-3 py-1 text-xs font-semibold" :class="statusBadgeClass(campanha.status)">
                             {{ statusLabel(campanha.status) }}
                         </span>

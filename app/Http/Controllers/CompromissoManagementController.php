@@ -89,7 +89,7 @@ class CompromissoManagementController extends Controller
                 'campanhas' => Campanha::query()->with('cultura:id,nome')->orderByDesc('ano')->get()
                     ->map(fn (Campanha $c) => [
                         'id' => $c->id,
-                        'nome' => trim(($c->cultura?->nome ? $c->cultura->nome.' ' : '').$c->ano),
+                        'nome' => $c->nome_completo,
                     ])->values(),
                 'parcelas' => Parcela::query()->orderBy('nome')->get(['id', 'nome']),
                 'culturas' => Cultura::query()->orderBy('nome')->get(['id', 'nome']),

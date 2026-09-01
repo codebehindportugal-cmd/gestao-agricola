@@ -46,7 +46,7 @@ class CampanhaController extends Controller
             ->withQueryString()
             ->through(fn (Campanha $campanha) => [
                 'id' => $campanha->id,
-                'cultura_nome' => $campanha->cultura?->nome,
+                'cultura_nome' => $campanha->nome_completo,
                 'ano' => $campanha->ano,
                 'data_inicio' => optional($campanha->data_inicio)?->format('Y-m-d'),
                 'data_fim' => optional($campanha->data_fim)?->format('Y-m-d'),
@@ -109,9 +109,7 @@ class CampanhaController extends Controller
 
         $producaoReal = (float) $campanha->colheitas->sum('quantidade_total')
             ?: (float) ($campanha->producao_real ?? 0);
-        $area = (float) ($campanha->cultura?->parcela?->area_util
-            ?: $campanha->cultura?->parcela?->area_total
-            ?: 0);
+        $area = $campanha->area_total_ha;
 
         return Inertia::render('Campanhas/Show', [
             'campanha' => [
@@ -123,9 +121,9 @@ class CampanhaController extends Controller
                 'producao_esperada' => $campanha->producao_esperada,
                 'custo_estimado' => $campanha->custo_estimado,
                 'observacoes' => $campanha->observacoes,
-                'cultura_nome' => $campanha->cultura?->nome,
-                'parcela_nome' => $campanha->cultura?->parcela?->nome,
-                'terreno_nome' => $campanha->cultura?->parcela?->terreno?->nome,
+                'cultura_nome' => $campanha->nome_completo,
+                'parcela_nome' => $campanha->parcelasEfetivas()->pluck('nome')->implode(', ') ?: null,
+                'terreno_nome' => $campanha->exploracao_nome === 'N/A' ? null : $campanha->exploracao_nome,
                 'area_ha' => $area,
             ],
             'operacoes' => $operacoes->map(fn ($op) => [
@@ -254,8 +252,10 @@ class CampanhaController extends Controller
         ]);
         $campanha->setRelation('operacoes', $this->reportOperationsForCampaign($campanha, ['parcela.terreno', 'cultura', 'produtos', 'custos']));
 
-        $exploracao = $campanha->cultura?->parcela?->terreno?->nome ?? 'N/A';
-        $cultura = $campanha->cultura?->nome ?? 'N/A';
+        // Numa campanha geral a exploracao abrange varios terrenos; o caderno
+        // de campo tem de os listar, e nao dizer 'N/A'.
+        $exploracao = $campanha->exploracao_nome;
+        $cultura = $campanha->cultura?->nome ?? $campanha->nome ?? 'N/A';
         $periodo = (optional($campanha->data_inicio)->format('d/m/Y') ?? 'N/A') . ' - ' . (optional($campanha->data_fim)->format('d/m/Y') ?? 'N/A');
 
         $producao = [
@@ -273,7 +273,7 @@ class CampanhaController extends Controller
             ->sum(fn (Produto $produto) => $this->produtoPivotCost($produto));
         $custoTotal = (float) $campanha->custos->sum('valor') + (float) $campanha->operacoes->sum('custo_real') + $custoProdutos;
         $custoPorKg = $campanha->custo_por_kg;
-        $areaTotal = $campanha->cultura?->parcela?->area_util ?? 0;
+        $areaTotal = $campanha->area_total_ha;
         $custoPorHa = $areaTotal > 0 ? round($custoTotal / $areaTotal, 2) : 0;
 
         $financeiro = [
@@ -306,7 +306,7 @@ class CampanhaController extends Controller
 
                         return [
                             'parcela' => trim(($operacao->parcela?->terreno?->nome ? "{$operacao->parcela->terreno->nome} - " : '').($operacao->parcela?->nome ?? '')),
-                            'cultura' => $operacao->cultura?->nome ?? $operacao->campanha?->cultura?->nome ?? '',
+                            'cultura' => $operacao->cultura?->nome ?? $operacao->campanha?->cultura?->nome ?? $operacao->campanha?->nome ?? '',
                             'area_tratada' => $areaTratada > 0 ? number_format($areaTratada, 2, ',', ' ') : '',
                             'inimigo_efeito' => $produto->pivot->finalidade ?? '',
                             'produto' => $produto->nome,
@@ -431,7 +431,7 @@ class CampanhaController extends Controller
         $custoTotal = $totalOperacoes + $totalProdutos + $totalCustosAvulsos;
         $producaoReal = (float) $campanha->colheitas->sum('quantidade_total') ?: (float) ($campanha->producao_real ?? 0);
         $custoPorKg = $producaoReal > 0 ? round($custoTotal / $producaoReal, 2) : 0;
-        $areaTotal = (float) ($campanha->cultura?->parcela?->area_util ?? $campanha->cultura?->parcela?->area_total ?? 0);
+        $areaTotal = $campanha->area_total_ha;
         $custoPorHa = $areaTotal > 0 ? round($custoTotal / $areaTotal, 2) : 0;
 
         $resumo = [
@@ -472,6 +472,10 @@ class CampanhaController extends Controller
 
     private function reportOperationsForCampaign(Campanha $campanha, array $with = []): Collection
     {
+        if ($campanha->ehGeral()) {
+            return $this->reportOperationsForGeneralCampaign($campanha, $with);
+        }
+
         $cultura = $campanha->cultura;
         $parcelaId = $cultura?->parcela_id;
         $culturaNome = $cultura?->nome;
@@ -498,6 +502,38 @@ class CampanhaController extends Controller
                                 $scopeQuery->orWhereHas('cultura', fn ($culturaQuery) => $culturaQuery->where('nome', $culturaNome));
                             }
                         });
+                });
+            })
+            ->orderBy('data_hora_inicio')
+            ->get()
+            ->unique('id')
+            ->values();
+    }
+
+    /**
+     * Numa campanha geral nao ha cultura nem parcela unica: apanha o que lhe
+     * esta explicitamente ligado, mais o que ficou orfao nas suas parcelas
+     * naquele ano. Operacoes de outra campanha ficam de fora de proposito -
+     * de contrario uma campanha geral roubava-as e o custo era contado duas
+     * vezes.
+     */
+    private function reportOperationsForGeneralCampaign(Campanha $campanha, array $with = []): Collection
+    {
+        $parcelaIds = $campanha->parcelasEfetivas()->pluck('id')->all();
+
+        return Operacao::query()
+            ->with($with)
+            ->where(function ($query) use ($campanha, $parcelaIds) {
+                $query->where('campanha_id', $campanha->id);
+
+                if ($parcelaIds === []) {
+                    return;
+                }
+
+                $query->orWhere(function ($orfas) use ($campanha, $parcelaIds) {
+                    $orfas->whereNull('campanha_id')
+                        ->whereIn('parcela_id', $parcelaIds)
+                        ->whereYear('data_hora_inicio', (int) $campanha->ano);
                 });
             })
             ->orderBy('data_hora_inicio')
