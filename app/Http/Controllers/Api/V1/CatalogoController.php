@@ -122,7 +122,7 @@ class CatalogoController extends Controller
                 'custo_unitario' => $produto->custo_unitario,
                 'unidade_medida' => $produto->unidade_medida,
                 'estabelecimento_venda_nome' => $produto->estabelecimento_venda_nome,
-                'conforme_dgav' => $produto->tipo !== 'fitofarmaceutico' || filled($produto->numero_autorizacao_dgav),
+                'conforme_dgav' => ! $produto->ehFitofarmaco() || filled($produto->numero_autorizacao_dgav),
             ])->values();
 
         return $this->ok(['produtos' => $produtos->all()]);

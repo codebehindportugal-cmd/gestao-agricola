@@ -293,7 +293,7 @@ class AplicacaoController extends Controller
 
     private function validarConformidadeDgav(Produto $produto, string $prefixo, int $indice): void
     {
-        if ($produto->tipo === 'fitofarmaceutico' && blank($produto->numero_autorizacao_dgav)) {
+        if ($produto->ehFitofarmaco() && blank($produto->numero_autorizacao_dgav)) {
             throw ValidationException::withMessages([
                 "{$prefixo}.{$indice}.produto" => [
                     'Produto fitofarmaceutico sem numero_autorizacao_dgav; registo nao conforme DGAV.',

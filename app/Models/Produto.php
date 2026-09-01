@@ -14,6 +14,38 @@ class Produto extends Model
 
     protected $table = 'produtos';
 
+    /**
+     * O tipo canonico usado pela aplicacao e 'fitofarmaco' - e o que a UI grava
+     * e o que o Stock e o formulario de operacoes filtram. A API aceitava
+     * 'fitofarmaceutico', pelo que a validacao DGAV passava ao lado de todos os
+     * produtos criados pelo ecra.
+     */
+    public const TIPO_FITOFARMACO = 'fitofarmaco';
+
+    public static function normalizarTipo(?string $tipo): ?string
+    {
+        $normalizado = strtr(mb_strtolower(trim((string) $tipo)), [
+            'á' => 'a', 'â' => 'a', 'ã' => 'a', 'à' => 'a',
+            'é' => 'e', 'ê' => 'e', 'í' => 'i',
+            'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ú' => 'u', 'ç' => 'c',
+        ]);
+
+        return match ($normalizado) {
+            'fitofarmaceutico', 'fitofarmaco', 'produto fitofarmaceutico' => self::TIPO_FITOFARMACO,
+            'fertilizacao', 'fertilizante', 'adubo', 'adubos' => 'fertilizante',
+            'combustivel', 'combustiveis', 'gasoleo', 'diesel' => 'combustivel',
+            'sementes', 'semente' => 'semente',
+            'plantas', 'planta' => 'planta',
+            '' => null,
+            default => $normalizado,
+        };
+    }
+
+    public function ehFitofarmaco(): bool
+    {
+        return self::normalizarTipo($this->tipo) === self::TIPO_FITOFARMACO;
+    }
+
     protected $fillable = [
         'nome',
         'tipo',
