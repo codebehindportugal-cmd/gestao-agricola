@@ -27,6 +27,7 @@ class StoreFaturaApiRequest extends FormRequest
             'valor' => ['nullable', 'numeric', 'min:0'],
             'categoria' => ['nullable', 'string', Rule::in(DespesaManagementController::CATEGORIAS)],
             'campanha' => ['nullable'],
+            'maquina' => ['nullable'],
             'notas' => ['nullable', 'string'],
 
             'criar_produtos' => ['nullable', 'boolean'],
@@ -36,6 +37,7 @@ class StoreFaturaApiRequest extends FormRequest
 
             'linhas' => ['required', 'array', 'min:1'],
             'linhas.*.produto' => ['nullable'],
+            'linhas.*.codigo' => ['nullable', 'string', 'max:255'],
             'linhas.*.descricao' => ['required', 'string', 'max:255'],
             'linhas.*.quantidade' => ['required', 'numeric', 'gt:0'],
             'linhas.*.preco_unitario' => ['required', 'numeric', 'min:0'],
@@ -43,6 +45,8 @@ class StoreFaturaApiRequest extends FormRequest
             'linhas.*.tipo_produto' => ['nullable', 'string', 'max:255'],
             'linhas.*.numero_autorizacao_dgav' => ['nullable', 'string', 'max:255'],
             'linhas.*.unidade_medida' => ['nullable', 'string', 'max:50'],
+            'linhas.*.estabelecimento_venda_nome' => ['nullable', 'string', 'max:255'],
+            'linhas.*.estabelecimento_venda_autorizacao' => ['nullable', 'string', 'max:255'],
             'linhas.*.notas' => ['nullable', 'string'],
         ];
     }

@@ -318,19 +318,21 @@ const fmtN = (v, d = 2) => new Intl.NumberFormat('pt-PT', { minimumFractionDigit
 
 const categoriaLabel = (cat) => ({
     combustivel: 'Combustível', sementes: 'Sementes', fertilizantes: 'Fertilizantes',
-    fitofarmaceuticos: 'Fitofarmacêuticos', equipamento: 'Equipamento', mao_obra: 'Mão de obra', outro: 'Outro',
+    fitofarmaceuticos: 'Fitofarmacêuticos', equipamento: 'Equipamento', pecas: 'Peças',
+    mao_obra: 'Mão de obra', outro: 'Outro',
 }[cat] ?? cat);
 
 const categoriaBadge = (cat) => ({
     combustivel: 'bg-orange-100 text-orange-700', sementes: 'bg-green-100 text-green-700',
     fertilizantes: 'bg-lime-100 text-lime-700', fitofarmaceuticos: 'bg-violet-100 text-violet-700',
-    equipamento: 'bg-sky-100 text-sky-700', mao_obra: 'bg-amber-100 text-amber-700',
+    equipamento: 'bg-sky-100 text-sky-700', pecas: 'bg-zinc-100 text-zinc-700',
+    mao_obra: 'bg-amber-100 text-amber-700',
     outro: 'bg-slate-100 text-slate-600',
 }[cat] ?? 'bg-slate-100 text-slate-600');
 
 const categoriaIcone = (cat) => ({
     combustivel: '⛽', sementes: '🌱', fertilizantes: '🧪', fitofarmaceuticos: '💊',
-    equipamento: '🔧', mao_obra: '👷', outro: '📦',
+    equipamento: '🔧', pecas: '⚙️', mao_obra: '👷', outro: '📦',
 }[cat] ?? '📦');
 
 const variacaoLabel = computed(() => {

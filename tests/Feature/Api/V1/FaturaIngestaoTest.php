@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api\V1;
 
+use App\Models\Maquina;
 use App\Models\Produto;
 use App\Models\Role;
 use App\Models\User;
@@ -215,6 +216,118 @@ class FaturaIngestaoTest extends TestCase
         ])->assertStatus(422)
             ->assertJsonPath('sucesso', false)
             ->assertJsonFragment(['Taxa de IVA invalida. Valores aceites: 0, 6, 13, 23.']);
+    }
+
+    public function test_fatura_de_pecas_liga_o_custo_a_maquina(): void
+    {
+        $this->autenticarApi();
+        $landini = Maquina::query()->create([
+            'nome' => 'Landini',
+            'tipo' => 'trator',
+            'marca' => 'Landini',
+            'modelo' => 'Rex 100',
+        ]);
+
+        $this->postJson('/api/v1/faturas', [
+            'numero_fatura' => 'FT 2026/900',
+            'fornecedor' => 'Oficina do Zé',
+            'data' => '2026-08-20',
+            'categoria' => 'pecas',
+            'maquina' => 'Landini',
+            'linhas' => [
+                [
+                    'descricao' => 'Filtro de óleo',
+                    'quantidade' => 2,
+                    'preco_unitario' => 15,
+                    'iva_percentagem' => 23,
+                ],
+            ],
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('custos', [
+            'tipo' => 'manutencao',
+            'maquina_id' => $landini->id,
+            'valor' => 36.90,
+        ]);
+    }
+
+    public function test_guarda_o_estabelecimento_de_venda_no_produto(): void
+    {
+        $this->autenticarApi();
+
+        $this->postJson('/api/v1/faturas', [
+            'numero_fatura' => '136375',
+            'fornecedor' => 'Casa Queridos',
+            'data' => '2026-08-07',
+            'categoria' => 'fitofarmaceuticos',
+            'linhas' => [
+                [
+                    'produto' => 'ERUNE',
+                    'descricao' => 'ERUNE pirimetanil - 5 LT',
+                    'quantidade' => 5,
+                    'preco_unitario' => 20.70,
+                    'iva_percentagem' => 6,
+                    'tipo_produto' => 'fitofarmaceutico',
+                    'numero_autorizacao_dgav' => '1761',
+                    'unidade_medida' => 'L',
+                    'estabelecimento_venda_autorizacao' => '889-V-R',
+                ],
+            ],
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('produtos', [
+            'nome' => 'ERUNE',
+            'numero_autorizacao_dgav' => '1761',
+            'unidade_medida' => 'L',
+            // o nome do estabelecimento cai para o fornecedor da fatura
+            'estabelecimento_venda_nome' => 'Casa Queridos',
+            'estabelecimento_venda_autorizacao' => '889-V-R',
+        ]);
+        $this->assertDatabaseHas('stocks', ['quantidade' => 5, 'unidade_medida' => 'L']);
+    }
+
+    public function test_produto_criado_fica_com_o_tipo_canonico_da_aplicacao(): void
+    {
+        $this->autenticarApi();
+
+        $this->postJson('/api/v1/faturas', [
+            'numero_fatura' => 'FT 2026/901',
+            'data' => '2026-08-20',
+            'linhas' => [[
+                'produto' => 'Fito Com DGAV',
+                'descricao' => 'Fito Com DGAV 5L',
+                'quantidade' => 5,
+                'preco_unitario' => 20,
+                // grafia da API; a aplicacao usa 'fitofarmaco'
+                'tipo_produto' => 'fitofarmaceutico',
+                'numero_autorizacao_dgav' => '9999',
+            ]],
+        ])->assertCreated();
+
+        // Guardado como 'fitofarmaco', senao o Stock e o formulario de
+        // operacoes nao o encontram nos filtros.
+        $this->assertDatabaseHas('produtos', [
+            'nome' => 'Fito Com DGAV',
+            'tipo' => 'fitofarmaco',
+        ]);
+    }
+
+    public function test_fitofarmaco_existente_sem_dgav_e_recusado_na_aplicacao(): void
+    {
+        $this->autenticarApi();
+
+        // Tipo tal como a UI o grava.
+        $produto = Produto::query()->create([
+            'nome' => 'Sem DGAV',
+            'tipo' => 'fitofarmaco',
+            'unidade_medida' => 'L',
+        ]);
+
+        $this->assertTrue($produto->ehFitofarmaco());
+        $this->assertFalse(Produto::query()->create([
+            'nome' => 'Adubo qualquer',
+            'tipo' => 'fertilizante',
+        ])->ehFitofarmaco());
     }
 
     private function autenticarApi(): User

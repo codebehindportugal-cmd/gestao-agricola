@@ -32,6 +32,7 @@ class FaturaController extends Controller
         'fertilizantes' => 'material',
         'fitofarmaceuticos' => 'material',
         'equipamento' => 'maquinaria',
+        'pecas' => 'manutencao',
         'mao_obra' => 'mao_obra',
         'outro' => 'outro',
     ];
@@ -67,9 +68,16 @@ class FaturaController extends Controller
                 $avisos = [];
 
                 $campanha = null;
+                $maquina = null;
 
                 if (! empty($data['campanha'])) {
                     $campanha = $this->resolvedor->resolverCampanha($this->valorReferencia($data['campanha']));
+                }
+
+                // Faturas de pecas ligam-se a maquina, para o custo entrar no
+                // desgaste daquele tractor e nao num saco geral.
+                if (! empty($data['maquina'])) {
+                    $maquina = $this->resolvedor->resolverMaquina($this->valorReferencia($data['maquina']));
                 }
 
                 $criarProdutos = $data['criar_produtos'] ?? true;
@@ -79,13 +87,35 @@ class FaturaController extends Controller
                 $totalCalculado = 0.0;
 
                 foreach ($data['linhas'] as $indice => $linha) {
+                    // O estabelecimento que vendeu o produto e campo do caderno
+                    // de campo; por omissao e o fornecedor da propria fatura.
+                    $linha['estabelecimento_venda_nome'] ??= $data['fornecedor'] ?? null;
+
                     $produto = $this->resolverProduto($linha, $criarProdutos, $indice, $avisos);
 
-                    if ($produto !== null && $actualizarCusto) {
-                        $precoUnitario = (float) $linha['preco_unitario'];
+                    if ($produto !== null) {
+                        $actualizacoes = [];
 
-                        if ((float) $produto->custo_unitario !== $precoUnitario) {
-                            $produto->update(['custo_unitario' => $precoUnitario]);
+                        if ($actualizarCusto) {
+                            $precoUnitario = (float) $linha['preco_unitario'];
+
+                            if ((float) $produto->custo_unitario !== $precoUnitario) {
+                                $actualizacoes['custo_unitario'] = $precoUnitario;
+                            }
+                        }
+
+                        if (! empty($linha['codigo']) && blank($produto->codigo_interno)) {
+                            $actualizacoes['codigo_interno'] = $linha['codigo'];
+                        }
+
+                        foreach (['estabelecimento_venda_nome', 'estabelecimento_venda_autorizacao'] as $campo) {
+                            if (! empty($linha[$campo]) && blank($produto->{$campo})) {
+                                $actualizacoes[$campo] = $linha[$campo];
+                            }
+                        }
+
+                        if ($actualizacoes !== []) {
+                            $produto->update($actualizacoes);
                         }
                     }
 
@@ -153,6 +183,7 @@ class FaturaController extends Controller
                         'valor' => $valor,
                         'data_custo' => $data['data'],
                         'campanha_id' => $campanha?->id,
+                        'maquina_id' => $maquina?->id,
                         'referencia_externa' => 'fatura-'.$despesa->id,
                     ]);
                 }
@@ -171,7 +202,10 @@ class FaturaController extends Controller
 
     private function resolverProduto(array $linha, bool $criarProdutos, int $indice, array &$avisos): ?Produto
     {
+        // O codigo da fatura e a referencia mais fiavel para reencontrar o
+        // produto na proxima fatura do mesmo fornecedor.
         $referencia = $this->valorReferencia($linha['produto'] ?? null)
+            ?? $linha['codigo']
             ?? $linha['numero_autorizacao_dgav']
             ?? null;
 
@@ -196,10 +230,10 @@ class FaturaController extends Controller
             }
         }
 
-        $tipo = $linha['tipo_produto'] ?? 'outro';
+        $tipo = Produto::normalizarTipo($linha['tipo_produto'] ?? null) ?? 'outro';
         $dgav = $linha['numero_autorizacao_dgav'] ?? null;
 
-        if ($tipo === 'fitofarmaceutico' && blank($dgav)) {
+        if ($tipo === Produto::TIPO_FITOFARMACO && blank($dgav)) {
             throw ValidationException::withMessages([
                 "linhas.{$indice}.numero_autorizacao_dgav" => [
                     'Produto fitofarmaceutico novo precisa de numero_autorizacao_dgav para ser criado (conformidade DGAV).',
@@ -207,15 +241,24 @@ class FaturaController extends Controller
             ]);
         }
 
+        // Se a referencia usada foi o codigo da fatura, o nome do produto deve
+        // ser a descricao e nao o codigo.
+        $nome = (! empty($linha['codigo']) && (string) $referencia === (string) $linha['codigo'])
+            ? ($linha['descricao'] ?? (string) $referencia)
+            : (string) $referencia;
+
         $produto = Produto::query()->create([
-            'nome' => (string) $referencia,
+            'nome' => $nome,
             'tipo' => $tipo,
             'numero_autorizacao_dgav' => $dgav,
+            'codigo_interno' => $linha['codigo'] ?? null,
             'unidade_medida' => $linha['unidade_medida'] ?? 'un',
             'custo_unitario' => (float) $linha['preco_unitario'],
+            'estabelecimento_venda_nome' => $linha['estabelecimento_venda_nome'] ?? null,
+            'estabelecimento_venda_autorizacao' => $linha['estabelecimento_venda_autorizacao'] ?? null,
         ]);
 
-        $avisos[] = "produto criado: {$produto->nome} (tipo {$tipo}).";
+        $avisos[] = "produto criado: {$produto->nome} (tipo {$tipo}".($produto->codigo_interno ? ", codigo {$produto->codigo_interno}" : '').").";
 
         return $produto;
     }

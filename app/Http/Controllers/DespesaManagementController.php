@@ -25,6 +25,7 @@ class DespesaManagementController extends Controller
         'fertilizantes',
         'fitofarmaceuticos',
         'equipamento',
+        'pecas',
         'mao_obra',
         'outro',
     ];

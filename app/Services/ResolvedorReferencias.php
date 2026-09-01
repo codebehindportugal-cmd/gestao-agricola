@@ -122,6 +122,7 @@ class ResolvedorReferencias
                 'produto',
                 fn (Builder $query, string $texto) => $query
                     ->where('numero_autorizacao_dgav', $texto)
+                    ->orWhere('codigo_interno', $texto)
                     ->orWhere('nome', $texto),
                 fn (Produto $produto) => [
                     'id' => $produto->id,
