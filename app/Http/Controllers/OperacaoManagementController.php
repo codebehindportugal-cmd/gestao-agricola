@@ -16,7 +16,6 @@ use App\Models\Operacao;
 use App\Models\Parcela;
 use App\Models\Produto;
 use App\Models\User;
-use App\Models\Custo;
 use App\Support\OperacaoDuration;
 use App\Support\StockConsumption;
 use Illuminate\Http\JsonResponse;
@@ -221,11 +220,11 @@ class OperacaoManagementController extends Controller
             'campanhas' => Campanha::query()
                 ->with('cultura:id,nome,variedade')
                 ->orderByDesc('ano')
-                ->get(['id', 'cultura_id', 'ano', 'data_inicio', 'data_fim', 'status'])
+                ->get(['id', 'nome', 'cultura_id', 'ano', 'data_inicio', 'data_fim', 'status'])
                 ->map(fn (Campanha $campanha) => [
                     'id' => $campanha->id,
                     'cultura_id' => $campanha->cultura_id,
-                    'nome' => "{$this->culturaLabel($campanha->cultura)} - {$campanha->ano}",
+                    'nome' => $campanha->nome_completo,
                     'ano' => $campanha->ano,
                     'status' => $campanha->status,
                 ]),
@@ -908,38 +907,36 @@ Regras: dose, area_tratada, volume_calda devem ser números ou null; intervalo_s
     private function cadernoCampoResumoNormalizado()
     {
         return Campanha::query()
-            ->with(['cultura:id,nome'])
+            ->with([
+                'cultura:id,nome',
+                'operacoes:id,campanha_id,tipo,custo_real',
+                'operacoes.produtos:id,nome,tipo',
+                // operacao_id e obrigatorio aqui: e o que distingue um custo ja
+                // representado na operacao de um custo avulso.
+                'custos:id,campanha_id,operacao_id,valor',
+                'colheitas:id,campanha_id,quantidade_total',
+            ])
             ->orderByDesc('ano')
             ->limit(8)
-            ->get(['id', 'cultura_id', 'ano', 'status', 'producao_real', 'custo_real'])
+            ->get(['id', 'nome', 'cultura_id', 'ano', 'status', 'producao_real', 'custo_real'])
             ->map(function (Campanha $campanha) {
-                $operacoes = Operacao::query()
-                    ->with(['produtos:id,nome,tipo'])
-                    ->where('campanha_id', $campanha->id)
-                    ->get();
-                $tratamentos = $operacoes
+                $tratamentos = $campanha->operacoes
                     ->filter(fn (Operacao $operacao) => $this->normaliseText($operacao->tipo) === 'tratamento fitossanitario');
 
                 $custoProdutosTratamentos = (float) $tratamentos
                     ->flatMap(fn (Operacao $operacao) => $operacao->produtos)
                     ->sum(fn (Produto $produto) => (float) ($produto->pivot->custo_total ?? 0));
-                $custoProdutos = (float) $operacoes
-                    ->flatMap(fn (Operacao $operacao) => $operacao->produtos)
-                    ->sum(fn (Produto $produto) => (float) ($produto->pivot->custo_total ?? 0));
-                $custoOperacoes = (float) $operacoes->sum('custo_real');
-                $custoOutros = (float) Custo::query()
-                    ->where('campanha_id', $campanha->id)
-                    ->sum('valor');
+                $custoOperacoes = $campanha->custo_operacoes;
+                $custoOutros = $campanha->custo_diretos;
                 $custoTotal = ($campanha->custo_real ?? null) !== null
                     ? (float) $campanha->custo_real
-                    : $custoOperacoes + $custoProdutos + $custoOutros;
-                $producaoReal = (float) Colheita::query()
-                    ->where('campanha_id', $campanha->id)
-                    ->sum('quantidade_total') ?: (float) ($campanha->producao_real ?? 0);
+                    : $campanha->custo_total_calculado;
+                $producaoReal = (float) $campanha->colheitas->sum('quantidade_total')
+                    ?: (float) ($campanha->producao_real ?? 0);
 
                 return [
                     'id' => $campanha->id,
-                    'nome' => "{$campanha->cultura?->nome} - {$campanha->ano}",
+                    'nome' => $campanha->nome_completo,
                     'tratamentos' => $tratamentos->count(),
                     'producao_real' => $producaoReal,
                     'custo_operacoes' => $custoOperacoes,

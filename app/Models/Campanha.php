@@ -152,12 +152,63 @@ class Campanha extends Model
             });
     }
 
+    /**
+     * Custo das operacoes sem duplicar os custos que ja lhes estao ligados.
+     *
+     * Um Custo com operacao_id representa a mesma despesa que a operacao ja
+     * regista em custo_real - e o que a /api/v1/trabalhos grava para a mao de
+     * obra - por isso conta-se o maior dos dois e nunca a soma. Se a operacao
+     * nao tiver custo_real, valem os custos ligados; se nao tiver custos
+     * ligados, vale o custo_real.
+     */
+    public function getCustoOperacoesAttribute(): float
+    {
+        return round((float) $this->operacoes->sum(
+            fn (Operacao $operacao) => $this->custoEfetivoOperacao($operacao)
+        ), 2);
+    }
+
+    /** Custo proprio de uma operacao, sem duplicar os custos que lhe estao ligados. */
+    public function custoEfetivoOperacao(Operacao $operacao): float
+    {
+        return round(max(
+            (float) ($operacao->custo_real ?? 0),
+            (float) $this->custosLigadosPorOperacao()->get($operacao->id, 0)
+        ), 2);
+    }
+
+    /** Custos que nao pertencem a nenhuma operacao desta campanha (faturas, IMI, seguros). */
+    public function getCustoDiretosAttribute(): float
+    {
+        return round((float) $this->custosAvulsos()->sum('valor'), 2);
+    }
+
+    /** @return \Illuminate\Support\Collection<int,float> valor total por operacao_id */
+    private function custosLigadosPorOperacao(): \Illuminate\Support\Collection
+    {
+        return $this->custos
+            ->filter(fn (Custo $custo) => $custo->operacao_id !== null)
+            ->groupBy('operacao_id')
+            ->map(fn ($grupo) => (float) $grupo->sum('valor'));
+    }
+
+    /** Custos desta campanha que nao estao ligados a nenhuma das suas operacoes. */
+    public function custosAvulsos(): \Illuminate\Support\Collection
+    {
+        $idsOperacoes = $this->operacoes->pluck('id')->all();
+
+        return $this->custos->filter(
+            fn (Custo $custo) => $custo->operacao_id === null
+                || ! in_array($custo->operacao_id, $idsOperacoes)
+        )->values();
+    }
+
     public function getCustoTotalCalculadoAttribute(): float
     {
         return round(
-            (float) $this->operacoes->sum('custo_real')
+            $this->custo_operacoes
             + $this->custo_produtos
-            + (float) $this->custos->sum('valor'),
+            + $this->custo_diretos,
             2
         );
     }

@@ -39,7 +39,7 @@ class OperacaoController extends Controller
             ->when(request('data_inicio'), fn ($query) => $query->whereDate('data_hora_inicio', '>=', request('data_inicio')))
             ->when(request('data_fim'), fn ($query) => $query->whereDate('data_hora_inicio', '<=', request('data_fim')))
             ->orderBy('data_hora_inicio', 'desc')
-            ->paginate(15);
+            ->paginate(min(max((int) request('per_page', 15), 1), 200));
 
         return response()->json($operacoes);
     }

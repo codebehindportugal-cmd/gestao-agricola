@@ -24,7 +24,7 @@ class AlfaiaController extends Controller
             ->when(request('estado'), function ($query) {
                 $query->where('estado', request('estado'));
             })
-            ->paginate(15);
+            ->paginate(min(max((int) request('per_page', 15), 1), 200));
 
         return response()->json($alfaias);
     }

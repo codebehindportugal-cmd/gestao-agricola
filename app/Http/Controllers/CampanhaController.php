@@ -25,7 +25,7 @@ class CampanhaController extends Controller
             ->with([
                 'cultura:id,nome',
                 'colheitas:id,campanha_id,quantidade_total',
-                'custos:id,campanha_id,valor',
+                'custos:id,campanha_id,operacao_id,valor',
                 'operacoes' => fn ($query) => $query
                     ->select('id', 'campanha_id', 'custo_real')
                     ->with('produtos:id,nome'),
@@ -100,11 +100,12 @@ class CampanhaController extends Controller
         ]);
 
         $operacoes = $campanha->operacoes;
-        $custoOperacoes = round((float) $operacoes->sum('custo_real'), 2);
+        // custo_operacoes / custo_diretos nao duplicam os custos ligados a operacoes.
+        $custoOperacoes = $campanha->custo_operacoes;
         $custoProdutos = round((float) $operacoes
             ->flatMap(fn ($op) => $op->produtos)
             ->sum(fn ($produto) => $this->produtoPivotCost($produto)), 2);
-        $custoDiretos = round((float) $campanha->custos->sum('valor'), 2);
+        $custoDiretos = $campanha->custo_diretos;
         $custoTotal = round($custoOperacoes + $custoProdutos + $custoDiretos, 2);
 
         $producaoReal = (float) $campanha->colheitas->sum('quantidade_total')
@@ -134,7 +135,7 @@ class CampanhaController extends Controller
                 'parcela_nome' => $op->parcela?->nome,
                 'maquina_nome' => $op->maquina?->nome,
                 'responsavel' => $op->funcionario?->nome ?? $op->operador?->name,
-                'custo_real' => (float) ($op->custo_real ?? 0),
+                'custo_real' => $campanha->custoEfetivoOperacao($op),
                 'custo_produtos' => round((float) $op->produtos->sum(fn ($p) => $this->produtoPivotCost($p)), 2),
                 'produtos_nomes' => $op->produtos->pluck('nome')->join(', '),
             ])->values(),
@@ -271,7 +272,7 @@ class CampanhaController extends Controller
         $custoProdutos = $campanha->operacoes
             ->flatMap(fn ($operacao) => $operacao->produtos)
             ->sum(fn (Produto $produto) => $this->produtoPivotCost($produto));
-        $custoTotal = (float) $campanha->custos->sum('valor') + (float) $campanha->operacoes->sum('custo_real') + $custoProdutos;
+        $custoTotal = $campanha->custo_diretos + $campanha->custo_operacoes + $custoProdutos;
         $custoPorKg = $campanha->custo_por_kg;
         $areaTotal = $campanha->area_total_ha;
         $custoPorHa = $areaTotal > 0 ? round($custoTotal / $areaTotal, 2) : 0;
@@ -379,9 +380,10 @@ class CampanhaController extends Controller
         ]);
         $campanha->setRelation('operacoes', $this->reportOperationsForCampaign($campanha, ['parcela.terreno', 'maquina', 'alfaia', 'operador', 'funcionario', 'equipa', 'produtos']));
 
-        $operacoes = $campanha->operacoes->map(function ($operacao) {
+        $operacoes = $campanha->operacoes->map(function ($operacao) use ($campanha) {
             $custoProdutos = (float) $operacao->produtos
                 ->sum(fn (Produto $produto) => $this->produtoPivotCost($produto));
+            $custoOperacao = $campanha->custoEfetivoOperacao($operacao);
 
             return [
                 'data' => optional($operacao->data_hora_inicio)?->format('d/m/Y') ?? 'N/A',
@@ -393,9 +395,9 @@ class CampanhaController extends Controller
                 'equipa' => $operacao->equipa?->nome,
                 'duracao_horas' => (float) ($operacao->duracao_horas ?? 0),
                 'combustivel_gasto_l' => (float) ($operacao->combustivel_gasto_l ?? 0),
-                'custo_real' => (float) ($operacao->custo_real ?? 0),
+                'custo_real' => $custoOperacao,
                 'custo_produtos' => $custoProdutos,
-                'custo_total' => (float) ($operacao->custo_real ?? 0) + $custoProdutos,
+                'custo_total' => $custoOperacao + $custoProdutos,
                 'produtos' => $operacao->produtos->map(fn (Produto $produto) => [
                     'nome' => $produto->nome,
                     'tipo' => $produto->tipo,
@@ -418,14 +420,18 @@ class CampanhaController extends Controller
             ]))
             ->values();
 
-        $custosAvulsos = $campanha->custos->map(fn ($custo) => [
-            'data' => optional($custo->data_custo ?? null)?->format('d/m/Y') ?? 'N/A',
-            'tipo' => $custo->tipo ?? 'Outro',
-            'descricao' => $custo->descricao ?? $custo->observacoes ?? '',
-            'valor' => (float) ($custo->valor ?? 0),
-        ]);
+        // Os custos ligados a uma operacao ja aparecem na linha dessa operacao;
+        // lista-los outra vez aqui contava-os duas vezes no total.
+        $custosAvulsos = $campanha->custosAvulsos()
+            ->map(fn ($custo) => [
+                'data' => optional($custo->data_custo ?? null)?->format('d/m/Y') ?? 'N/A',
+                'tipo' => $custo->tipo ?? 'Outro',
+                'descricao' => $custo->descricao ?? $custo->observacoes ?? '',
+                'valor' => (float) ($custo->valor ?? 0),
+            ])
+            ->values();
 
-        $totalOperacoes = (float) $operacoes->sum('custo_real');
+        $totalOperacoes = $campanha->custo_operacoes;
         $totalProdutos = (float) $operacoes->sum('custo_produtos');
         $totalCustosAvulsos = (float) $custosAvulsos->sum('valor');
         $custoTotal = $totalOperacoes + $totalProdutos + $totalCustosAvulsos;

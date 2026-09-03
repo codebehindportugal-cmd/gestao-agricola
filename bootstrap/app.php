@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -23,6 +24,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'abilities' => \Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
             'ability' => \Laravel\Sanctum\Http\Middleware\CheckForAnyAbility::class,
         ]);
+    })
+    ->withSchedule(function (Schedule $schedule): void {
+        // Aviso ntfy dos compromissos do calendario, todas as manhas as 07:00.
+        $schedule->command('ntfy:compromissos')
+            ->dailyAt('07:00')
+            ->timezone('Europe/Lisbon')
+            ->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

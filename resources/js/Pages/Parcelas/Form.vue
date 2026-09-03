@@ -35,6 +35,24 @@ const props = defineProps({
 const isEditing = computed(() => props.mode === 'edit');
 const title = computed(() => isEditing.value ? `Editar ${props.parcela?.nome ?? 'parcela'}` : 'Nova parcela');
 
+// Culturas já registadas nesta parcela (histórico) e a "principal" (para pré-preencher os campos).
+const culturasList = computed(() => props.parcela?.culturas ?? []);
+const culturaEstadoOptions = [
+    { value: 'planejada', label: 'Planeada' },
+    { value: 'em_crescimento', label: 'Em crescimento' },
+    { value: 'madura', label: 'Madura' },
+    { value: 'colhida', label: 'Colhida' },
+    { value: 'cancelada', label: 'Cancelada' },
+];
+const culturaEstadoLabel = (estado) =>
+    culturaEstadoOptions.find((opt) => opt.value === estado)?.label ?? estado;
+
+const initialCultura = (() => {
+    const list = props.parcela?.culturas ?? [];
+    const ativos = ['em_crescimento', 'madura', 'planejada'];
+    return list.find((cultura) => ativos.includes(cultura.estado)) ?? list[0] ?? null;
+})();
+
 const form = useForm({
     terreno_id: props.parcela?.terreno_id?.toString() ?? props.filters.terreno_id ?? '',
     nome: props.parcela?.nome ?? '',
@@ -50,6 +68,11 @@ const form = useForm({
     latitude: props.parcela?.latitude?.toString() ?? '',
     longitude: props.parcela?.longitude?.toString() ?? '',
     poligono: props.parcela?.poligono ?? [],
+    cultura_nome: initialCultura?.nome ?? '',
+    cultura_variedade: initialCultura?.variedade ?? '',
+    cultura_tipo: initialCultura?.tipo ?? '',
+    cultura_data_plantacao: initialCultura?.data_plantacao ?? '',
+    cultura_estado: initialCultura?.estado ?? 'em_crescimento',
 });
 const errorMessages = computed(() => Object.values(form.errors));
 
@@ -272,6 +295,61 @@ const submit = () => {
                             <InputLabel value="Descrição" />
                             <textarea v-model="form.descricao" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500" rows="5" />
                             <InputError class="mt-2" :message="form.errors.descricao" />
+                        </div>
+
+                        <div class="sm:col-span-2 rounded-3xl border border-amber-200 bg-amber-50/60 p-4">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-800">Cultura da parcela</p>
+                                    <p class="mt-1 text-xs leading-5 text-slate-500">
+                                        Define a cultura/variedade desta parcela. É necessária para conseguires registar colheitas nesta parcela.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div v-if="isEditing && culturasList.length" class="mt-3 flex flex-wrap gap-2">
+                                <span
+                                    v-for="cultura in culturasList"
+                                    :key="cultura.id"
+                                    class="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-xs text-slate-600 shadow-sm"
+                                >
+                                    {{ cultura.label }}
+                                    <span class="text-slate-400">· {{ culturaEstadoLabel(cultura.estado) }}</span>
+                                </span>
+                            </div>
+
+                            <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                                <div>
+                                    <InputLabel value="Nome da cultura" />
+                                    <TextInput v-model="form.cultura_nome" class="mt-2 block w-full rounded-2xl" placeholder="Ex.: Oliveira" />
+                                    <InputError class="mt-2" :message="form.errors.cultura_nome" />
+                                </div>
+                                <div>
+                                    <InputLabel value="Variedade" />
+                                    <TextInput v-model="form.cultura_variedade" class="mt-2 block w-full rounded-2xl" placeholder="Ex.: Galega" />
+                                    <InputError class="mt-2" :message="form.errors.cultura_variedade" />
+                                </div>
+                                <div>
+                                    <InputLabel value="Tipo" />
+                                    <TextInput v-model="form.cultura_tipo" class="mt-2 block w-full rounded-2xl" placeholder="Ex.: Oliveira" />
+                                    <InputError class="mt-2" :message="form.errors.cultura_tipo" />
+                                </div>
+                                <div>
+                                    <InputLabel value="Data de plantação" />
+                                    <TextInput v-model="form.cultura_data_plantacao" type="date" class="mt-2 block w-full rounded-2xl" />
+                                    <InputError class="mt-2" :message="form.errors.cultura_data_plantacao" />
+                                </div>
+                                <div>
+                                    <InputLabel value="Estado da cultura" />
+                                    <select v-model="form.cultura_estado" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                        <option v-for="opt in culturaEstadoOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                                    </select>
+                                    <InputError class="mt-2" :message="form.errors.cultura_estado" />
+                                </div>
+                            </div>
+                            <p class="mt-3 text-xs leading-5 text-slate-500">
+                                Deixa o nome vazio se não quiseres associar cultura. Se preencheres, é criada/atualizada a cultura principal da parcela ao guardar.
+                            </p>
                         </div>
                     </div>
 

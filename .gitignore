@@ -27,3 +27,6 @@ Thumbs.db
 /plano.txt
 /plano-culturas.txt
 /enviar-para-github.bat
+
+/_local/
+/snapshot-claude.tar.gz

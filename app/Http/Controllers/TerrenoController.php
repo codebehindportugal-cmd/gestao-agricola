@@ -15,7 +15,7 @@ class TerrenoController extends Controller
     public function index(): JsonResponse
     {
         $terrenos = Terreno::with('parcelas')
-            ->paginate(15);
+            ->paginate(min(max((int) request('per_page', 15), 1), 200));
 
         return response()->json($terrenos);
     }
