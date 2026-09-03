@@ -94,15 +94,59 @@ rm -rf _local .claude .agents 2>/dev/null || true
 rm -f ./*.bat 2>/dev/null || true
 find storage/logs -name "*.log" -mtime +30 -delete 2>/dev/null || true
 
-# 5. Dependencias, migracoes e caches.
+# 5. Dependencias PHP.
 composer install --no-dev --optimize-autoloader --quiet
+
+# 6. Assets. public/build esta no .gitignore, por isso NAO vem no pull: se este
+#    passo nao correr, o site fica a servir o build antigo e qualquer pagina
+#    nova (o calendario, por exemplo) aparece em branco.
+#    Atencao: o Vue e o Vite estao em devDependencies — "npm ci --omit=dev"
+#    instala sem eles e o build rebenta. Tem mesmo de ser o npm ci completo.
+if command -v npm >/dev/null 2>&1; then
+  echo "==> npm ci ($(node -v))"
+  npm ci --no-audit --no-fund
+  echo "==> npm run build"
+  # 4 GB de heap: o vite build morre com "JavaScript heap out of memory" em
+  # VPS pequenas e o erro nao diz que foi falta de memoria.
+  NODE_OPTIONS="--max-old-space-size=4096" npm run build
+  test -f public/build/manifest.json || { echo "ERRO: build nao gerou manifest.json" >&2; exit 1; }
+else
+  echo "AVISO: npm nao existe no servidor; os assets NAO foram recompilados." >&2
+  echo "       Instalar Node 20+ ou fazer o build localmente e enviar public/build." >&2
+fi
+
+# 7. Copia de seguranca da base de dados ANTES de migrar.
+#    Uma migracao que corre mal sem isto nao tem volta.
+if [ -f .env ] && grep -q '^DB_CONNECTION=mysql' .env && command -v mysqldump >/dev/null 2>&1; then
+  ler_env() { grep -E "^$1=" .env | head -1 | cut -d= -f2- | tr -d '"'"'"'' | tr -d '\r'; }
+  DB_NAME="$(ler_env DB_DATABASE)"
+  DB_USER="$(ler_env DB_USERNAME)"
+  DB_PASS="$(ler_env DB_PASSWORD)"
+  DB_HOST_V="$(ler_env DB_HOST)"
+  mkdir -p storage/backups
+  DUMP="storage/backups/${DB_NAME}-$(date +%Y%m%d-%H%M%S).sql.gz"
+  if MYSQL_PWD="$DB_PASS" mysqldump --single-transaction --quick --no-tablespaces \
+       -h "${DB_HOST_V:-127.0.0.1}" -u "$DB_USER" "$DB_NAME" | gzip > "$DUMP"; then
+    echo "==> Backup da BD: $DUMP ($(du -h "$DUMP" | cut -f1))"
+    # Guardar so os 10 mais recentes.
+    ls -1t storage/backups/*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm -f
+  else
+    echo "ERRO: o mysqldump falhou; nao vou migrar as cegas." >&2
+    rm -f "$DUMP"
+    exit 1
+  fi
+else
+  echo "AVISO: sem backup da BD (nao e mysql ou falta o mysqldump)." >&2
+fi
+
+# 8. Migracoes e caches.
 php artisan migrate --force
 php artisan optimize:clear
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
-# 6. Permissoes.
+# 9. Permissoes.
 # Em Plesk o PHP corre como o utilizador da subscricao (andre.mendes), NAO como
 # www-data ou root. Ficheiros a root partem o deploy seguinte do painel Plesk,
 # por isso herda-se o dono/grupo do proprio directorio da app.
@@ -111,7 +155,7 @@ echo "==> Dono da app: $APP_OWNER"
 chown -R "$APP_OWNER" . 2>/dev/null || true
 chmod -R ug+rwX storage bootstrap/cache 2>/dev/null || true
 
-# 7. O agendador. Sem esta linha no cron, o aviso ntfy das 07:00 nunca dispara.
+# 10. O agendador. Sem esta linha no cron, o aviso ntfy das 07:00 nunca dispara.
 if crontab -l 2>/dev/null | grep -q "schedule:run"; then
   echo "==> Agendador: cron encontrado."
 else
