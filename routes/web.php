@@ -98,6 +98,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/despesas/{despesa}', [DespesaManagementController::class, 'destroy'])->name('app.despesas.destroy');
     Route::post('/despesas/vendas', [DespesaManagementController::class, 'storeReceita'])->name('app.despesas.vendas.store');
     Route::delete('/despesas/vendas/{receita}', [DespesaManagementController::class, 'destroyReceita'])->name('app.despesas.vendas.destroy');
+    Route::post('/despesas/partilhados', [DespesaManagementController::class, 'storePartilhado'])->name('app.despesas.partilhados.store');
+    Route::delete('/despesas/partilhados/{custo}', [DespesaManagementController::class, 'destroyPartilhado'])->name('app.despesas.partilhados.destroy');
     Route::get('/despesas/resumo-pdf', [DespesaManagementController::class, 'exportarResumoMensal'])->name('app.despesas.resumo-pdf');
     Route::get('/despesas/exportar-csv', [DespesaManagementController::class, 'exportarCsv'])->name('app.despesas.exportar-csv');
 

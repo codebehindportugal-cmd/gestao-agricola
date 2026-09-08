@@ -16,6 +16,8 @@ const props = defineProps({
     colheitas: { type: Array, default: () => [] },
     custos: { type: Array, default: () => [] },
     resumo: { type: Object, required: true },
+    rateio: { type: Array, default: () => [] },
+    vendas: { type: Array, default: () => [] },
     can: { type: Object, required: true },
     tiposCusto: { type: Array, default: () => [] },
 });
@@ -74,8 +76,15 @@ const custoBreakdown = computed(() => {
         { label: 'Operações', valor: props.resumo.custo_operacoes, pct: pct(props.resumo.custo_operacoes), color: 'bg-emerald-500' },
         { label: 'Produtos aplicados', valor: props.resumo.custo_produtos, pct: pct(props.resumo.custo_produtos), color: 'bg-amber-400' },
         { label: 'Custos diretos', valor: props.resumo.custo_diretos, pct: pct(props.resumo.custo_diretos), color: 'bg-blue-500' },
+        { label: 'Partilhados (luz, frio)', valor: props.resumo.custo_rateado ?? 0, pct: pct(props.resumo.custo_rateado ?? 0), color: 'bg-purple-500' },
     ];
 });
+
+const baseRateioLabel = (base) => ({
+    kg: 'por quilo colhido',
+    area: 'por hectare',
+    igual: 'em partes iguais',
+}[base] ?? base);
 
 // ── Modal de custos ──────────────────────────────────────────────────────────
 
@@ -207,6 +216,59 @@ function deleteCusto(custo) {
                         </p>
                         <p class="mt-1 text-xs text-slate-400">{{ campanha.area_ha > 0 ? `${formatNumber(campanha.area_ha)} ha` : 'área não definida' }}</p>
                     </article>
+                </section>
+
+                <!-- Vendas e margem -->
+                <section class="grid grid-cols-2 gap-4 md:grid-cols-4">
+                    <article class="rounded-[28px] bg-white p-5 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Vendas</p>
+                        <p class="mt-2 text-2xl font-black text-emerald-700">{{ formatCurrency(resumo.receita_total ?? 0) }}</p>
+                        <p class="mt-1 text-xs text-slate-400">{{ vendas.length }} registo(s)</p>
+                    </article>
+                    <article class="rounded-[28px] bg-white p-5 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Preço médio</p>
+                        <p class="mt-2 text-2xl font-black text-slate-900">
+                            {{ resumo.preco_medio_venda > 0 ? formatCurrency(resumo.preco_medio_venda) : '—' }}
+                        </p>
+                        <p class="mt-1 text-xs text-slate-400">
+                            {{ resumo.quantidade_vendida > 0 ? `${formatNumber(resumo.quantidade_vendida, 0)} kg vendidos` : 'sem quantidade registada' }}
+                        </p>
+                    </article>
+                    <article class="rounded-[28px] bg-white p-5 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Margem</p>
+                        <p class="mt-2 text-2xl font-black" :class="(resumo.margem ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-600'">
+                            {{ formatCurrency(resumo.margem ?? 0) }}
+                        </p>
+                        <p class="mt-1 text-xs text-slate-400">vendas menos custos</p>
+                    </article>
+                    <article class="rounded-[28px] bg-white p-5 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Margem / kg</p>
+                        <p class="mt-2 text-2xl font-black text-slate-900">
+                            {{ resumo.preco_medio_venda > 0 && resumo.custo_por_kg > 0
+                                ? formatCurrency(resumo.preco_medio_venda - resumo.custo_por_kg)
+                                : '—' }}
+                        </p>
+                        <p class="mt-1 text-xs text-slate-400">preço médio menos custo/kg</p>
+                    </article>
+                </section>
+
+                <!-- Custos partilhados imputados -->
+                <section v-if="rateio.length" class="rounded-[32px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <h2 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Custos partilhados imputados</h2>
+                    <p class="mt-1 text-xs text-slate-400">
+                        Gastos da exploração inteira — luz das regas, câmaras frigoríficas, encargos fixos — repartidos por todas as campanhas do período.
+                    </p>
+                    <ul class="mt-4 divide-y divide-slate-100">
+                        <li v-for="linha in rateio" :key="linha.id" class="flex items-start justify-between gap-4 py-3">
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-medium text-slate-700">{{ linha.descricao }}</p>
+                                <p class="text-xs text-slate-400">
+                                    {{ linha.data }} · fatura de {{ formatCurrency(linha.valor_total) }} · repartida {{ baseRateioLabel(linha.base) }}
+                                </p>
+                            </div>
+                            <p class="shrink-0 text-sm font-black text-purple-700">{{ formatCurrency(linha.valor) }}</p>
+                        </li>
+                    </ul>
                 </section>
 
                 <!-- Decomposição do custo -->

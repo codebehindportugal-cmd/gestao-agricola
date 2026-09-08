@@ -75,10 +75,22 @@ class ReceitaController extends Controller
 
     private function payloadReceita(array $item): array
     {
+        $quantidade = isset($item['quantidade']) ? (float) $item['quantidade'] : null;
+        $preco = isset($item['preco_unitario']) ? (float) $item['preco_unitario'] : null;
+
+        // Quem regista uma venda de fruta sabe os quilos e o preco; o preco
+        // por quilo deduz-se do total quando so vem o total.
+        if ($preco === null && $quantidade > 0) {
+            $preco = round((float) $item['valor'] / $quantidade, 4);
+        }
+
         return [
             'descricao' => $item['descricao'],
             'tipo' => $item['tipo'],
             'valor' => $item['valor'],
+            'quantidade' => $quantidade,
+            'unidade' => $item['unidade'] ?? ($quantidade > 0 ? 'kg' : null),
+            'preco_unitario' => $preco,
             'data' => $item['data'],
             'referencia_externa' => $item['referencia_externa'] ?? null,
             'comprador_nome' => $item['comprador_nome'] ?? null,

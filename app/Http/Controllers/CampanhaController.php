@@ -106,7 +106,10 @@ class CampanhaController extends Controller
             ->flatMap(fn ($op) => $op->produtos)
             ->sum(fn ($produto) => $this->produtoPivotCost($produto)), 2);
         $custoDiretos = $campanha->custo_diretos;
-        $custoTotal = round($custoOperacoes + $custoProdutos + $custoDiretos, 2);
+        // Parte da luz das regas, do frio e dos encargos fixos que cabe a esta campanha.
+        $rateio = $campanha->detalheRateio();
+        $custoRateado = round(array_sum(array_column($rateio, 'valor')), 2);
+        $custoTotal = round($custoOperacoes + $custoProdutos + $custoDiretos + $custoRateado, 2);
 
         $producaoReal = (float) $campanha->colheitas->sum('quantidade_total')
             ?: (float) ($campanha->producao_real ?? 0);
@@ -155,15 +158,35 @@ class CampanhaController extends Controller
                 'data_custo' => optional($c->data_custo)?->format('Y-m-d'),
                 'observacoes' => $c->observacoes,
             ])->values(),
+            'rateio' => $rateio,
+            'vendas' => $campanha->receitas()
+                ->orderByDesc('data')
+                ->get()
+                ->map(fn ($r) => [
+                    'id' => $r->id,
+                    'descricao' => $r->descricao,
+                    'tipo' => $r->tipo,
+                    'valor' => (float) $r->valor,
+                    'quantidade' => $r->quantidade !== null ? (float) $r->quantidade : null,
+                    'unidade' => $r->unidade,
+                    'preco_unitario' => $r->preco_efetivo,
+                    'comprador_nome' => $r->comprador_nome,
+                    'data' => optional($r->data)?->format('d/m/Y'),
+                ])->values(),
             'resumo' => [
                 'custo_operacoes' => $custoOperacoes,
                 'custo_produtos' => $custoProdutos,
                 'custo_diretos' => $custoDiretos,
+                'custo_rateado' => $custoRateado,
                 'custo_total' => $custoTotal,
                 'producao_real' => $producaoReal,
                 'custo_por_kg' => $producaoReal > 0 ? round($custoTotal / $producaoReal, 4) : 0,
                 'area_ha' => $area,
                 'custo_por_ha' => $area > 0 ? round($custoTotal / $area, 2) : 0,
+                'receita_total' => $campanha->receita_total,
+                'quantidade_vendida' => $campanha->quantidade_vendida,
+                'preco_medio_venda' => $campanha->preco_medio_venda,
+                'margem' => round($campanha->receita_total - $custoTotal, 2),
             ],
             'can' => [
                 'update' => $request->user()->can('update', $campanha),

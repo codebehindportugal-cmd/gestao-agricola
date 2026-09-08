@@ -20,6 +20,11 @@ const props = defineProps({
     resumoMesAnterior: { type: Object, default: () => ({}) },
     analytics: { type: Object, default: () => ({ tem_items: false }) },
     produtos: { type: Array, default: () => [] },
+    lotes: { type: Array, default: () => [] },
+    partilhados: { type: Array, default: () => [] },
+    resumoPartilhados: { type: Object, default: () => ({}) },
+    tiposCustoPartilhado: { type: Array, default: () => [] },
+    basesRateio: { type: Array, default: () => ['kg', 'area'] },
     can: { type: Object, default: () => ({}) },
 });
 
@@ -232,11 +237,30 @@ function eliminar() {
 const vendaForm = useForm({
     descricao: '',
     tipo: 'venda_colheita',
+    quantidade: '',
+    unidade: 'kg',
+    preco_unitario: '',
     valor: '',
+    lote_id: '',
     data_venda: new Date().toISOString().split('T')[0],
     comprador_nome: '',
     documento: '',
     observacoes: '',
+});
+
+// Quilos x preço dá o valor. Quem vende fruta sabe o preço a que a vendeu;
+// o total é conta que a aplicação faz, mas continua editável à mão.
+const valorCalculadoVenda = computed(() => {
+    const kg = Number(vendaForm.quantidade);
+    const preco = Number(vendaForm.preco_unitario);
+
+    if (!kg || !preco) return null;
+
+    return Math.round(kg * preco * 100) / 100;
+});
+
+watch(valorCalculadoVenda, (valor) => {
+    if (valor !== null) vendaForm.valor = valor;
 });
 
 const vendaTipoLabel = (tipo) => ({
@@ -266,6 +290,7 @@ function submeterVenda() {
             vendaForm.transform((data) => data);
             vendaForm.reset();
             vendaForm.tipo = 'venda_colheita';
+            vendaForm.unidade = 'kg';
             vendaForm.data_venda = new Date().toISOString().split('T')[0];
         },
         onFinish: () => vendaForm.transform((data) => data),
@@ -276,6 +301,55 @@ function eliminarVenda(venda) {
     if (!window.confirm(`Eliminar a venda "${venda.descricao}"?`)) return;
 
     router.delete(`${route('app.despesas.vendas.destroy', venda.id)}?mes=${mesAtual.value}&ano=${anoAtual.value}`, {
+        preserveScroll: true,
+    });
+}
+
+// ─── custos partilhados ──────────────────────────────────────────────────────
+const partilhadoForm = useForm({
+    descricao: '',
+    tipo: 'energia',
+    valor: '',
+    data_custo: new Date().toISOString().split('T')[0],
+    base_rateio: 'kg',
+    observacoes: '',
+});
+
+const tipoCustoLabel = (tipo) => ({
+    energia: 'Energia / eletricidade',
+    material: 'Material',
+    mao_obra: 'Mão de obra',
+    maquinaria: 'Maquinaria',
+    manutencao: 'Manutenção',
+    outro: 'Outro',
+}[tipo] ?? tipo);
+
+const baseRateioLabel = (base) => ({
+    kg: 'por quilo colhido',
+    area: 'por hectare',
+    igual: 'em partes iguais',
+}[base] ?? base);
+
+const totalPartilhados = computed(() => Number(props.resumoPartilhados.total ?? 0));
+const precoMedioVenda = computed(() => Number(props.resumoVendas.preco_medio ?? 0));
+const quilosVendidos = computed(() => Number(props.resumoVendas.quantidade ?? 0));
+
+function submeterPartilhado() {
+    partilhadoForm.post(`${route('app.despesas.partilhados.store')}?mes=${mesAtual.value}&ano=${anoAtual.value}`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            partilhadoForm.reset();
+            partilhadoForm.tipo = 'energia';
+            partilhadoForm.base_rateio = 'kg';
+            partilhadoForm.data_custo = new Date().toISOString().split('T')[0];
+        },
+    });
+}
+
+function eliminarPartilhado(custo) {
+    if (!window.confirm(`Eliminar o custo partilhado "${custo.descricao}"?`)) return;
+
+    router.delete(`${route('app.despesas.partilhados.destroy', custo.id)}?mes=${mesAtual.value}&ano=${anoAtual.value}`, {
         preserveScroll: true,
     });
 }
@@ -399,7 +473,10 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                 <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
                     <p class="text-xs font-semibold uppercase tracking-wider text-emerald-700">Vendas do mês</p>
                     <p class="mt-1 text-2xl font-black text-emerald-900">{{ fmt(totalVendas) }}</p>
-                    <p class="mt-1 text-xs text-emerald-700">{{ resumoVendas.count ?? 0 }} venda(s)</p>
+                    <p class="mt-1 text-xs text-emerald-700">
+                        {{ resumoVendas.count ?? 0 }} venda(s)
+                        <span v-if="quilosVendidos > 0"> · {{ quilosVendidos }} kg · {{ fmt(precoMedioVenda) }}/kg</span>
+                    </p>
                 </div>
                 <div class="rounded-2xl border border-red-100 bg-red-50 p-5">
                     <p class="text-xs font-semibold uppercase tracking-wider text-red-700">Despesas do mês</p>
@@ -467,10 +544,36 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                             </select>
                         </div>
                         <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Quantidade (kg)</label>
+                            <input v-model="vendaForm.quantidade" type="number" min="0" step="0.001" placeholder="Ex: 1250"
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
+                            <p v-if="vendaForm.errors.quantidade" class="mt-1 text-xs text-red-600">{{ vendaForm.errors.quantidade }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Preço €/kg</label>
+                            <input v-model="vendaForm.preco_unitario" type="number" min="0" step="0.0001" placeholder="Ex: 0,42"
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
+                            <p v-if="vendaForm.errors.preco_unitario" class="mt-1 text-xs text-red-600">{{ vendaForm.errors.preco_unitario }}</p>
+                        </div>
+                        <div>
                             <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Valor *</label>
                             <input v-model="vendaForm.valor" type="number" min="0.01" step="0.01" required
                                    class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
+                            <p v-if="valorCalculadoVenda !== null" class="mt-1 text-xs text-emerald-700">
+                                Calculado: {{ fmt(valorCalculadoVenda) }}
+                            </p>
                             <p v-if="vendaForm.errors.valor" class="mt-1 text-xs text-red-600">{{ vendaForm.errors.valor }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Lote</label>
+                            <select v-model="vendaForm.lote_id"
+                                    class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400">
+                                <option value="">Sem lote</option>
+                                <option v-for="lote in lotes" :key="lote.id" :value="lote.id">
+                                    {{ lote.numero_lote }} — {{ lote.quantidade }} {{ lote.unidade ?? 'kg' }}
+                                </option>
+                            </select>
+                            <p class="mt-1 text-xs text-slate-400">A venda de um lote entra na campanha da colheita.</p>
                         </div>
                         <div>
                             <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Data *</label>
@@ -519,6 +622,11 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                 </div>
                                 <div class="mt-1 flex flex-wrap gap-3 text-xs text-slate-500">
                                     <span>{{ new Date(venda.data).toLocaleDateString('pt-PT') }}</span>
+                                    <span v-if="venda.quantidade" class="font-semibold text-slate-600">
+                                        {{ venda.quantidade }} {{ venda.unidade ?? 'kg' }}
+                                    </span>
+                                    <span v-if="venda.preco_unitario">{{ fmt(venda.preco_unitario) }}/{{ venda.unidade ?? 'kg' }}</span>
+                                    <span v-if="venda.lote">Lote {{ venda.lote }}</span>
                                     <span v-if="venda.comprador_nome">{{ venda.comprador_nome }}</span>
                                     <span v-if="venda.documento">{{ venda.documento }}</span>
                                 </div>
@@ -530,6 +638,114 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                     Eliminar
                                 </button>
                             </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- custos partilhados -->
+            <div class="mb-6 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                <form v-if="can.create" @submit.prevent="submeterPartilhado" class="rounded-2xl border border-amber-200 bg-amber-50/40 p-5 shadow-sm">
+                    <div class="mb-4">
+                        <p class="text-xs font-semibold uppercase tracking-wider text-amber-700">Custos partilhados</p>
+                        <h3 class="mt-1 text-base font-bold text-slate-900">Luz das regas, frio, IMI, seguros</h3>
+                        <p class="mt-1 text-xs text-slate-500">
+                            Gastos que servem várias campanhas ao mesmo tempo. Entram repartidos por todas as campanhas do período.
+                        </p>
+                    </div>
+
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <div class="sm:col-span-2">
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Descrição *</label>
+                            <input v-model="partilhadoForm.descricao" type="text" required
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                                   placeholder="Ex: Eletricidade da rega — Julho" />
+                            <p v-if="partilhadoForm.errors.descricao" class="mt-1 text-xs text-red-600">{{ partilhadoForm.errors.descricao }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Tipo *</label>
+                            <select v-model="partilhadoForm.tipo" required
+                                    class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-amber-400">
+                                <option v-for="tipo in tiposCustoPartilhado" :key="tipo" :value="tipo">{{ tipoCustoLabel(tipo) }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Valor *</label>
+                            <input v-model="partilhadoForm.valor" type="number" min="0.01" step="0.01" required
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
+                            <p v-if="partilhadoForm.errors.valor" class="mt-1 text-xs text-red-600">{{ partilhadoForm.errors.valor }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Data *</label>
+                            <input v-model="partilhadoForm.data_custo" type="date" required
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
+                            <p v-if="partilhadoForm.errors.data_custo" class="mt-1 text-xs text-red-600">{{ partilhadoForm.errors.data_custo }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Repartir *</label>
+                            <select v-model="partilhadoForm.base_rateio" required
+                                    class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-amber-400">
+                                <option v-for="base in basesRateio" :key="base" :value="base">{{ baseRateioLabel(base) }}</option>
+                            </select>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Notas</label>
+                            <input v-model="partilhadoForm.observacoes" type="text"
+                                   class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                                   placeholder="Contador, período faturado, contrato" />
+                        </div>
+                    </div>
+
+                    <button type="submit" :disabled="partilhadoForm.processing"
+                            class="mt-4 w-full rounded-full bg-amber-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-500 disabled:opacity-60">
+                        {{ partilhadoForm.processing ? 'A guardar...' : 'Registar custo partilhado' }}
+                    </button>
+                </form>
+
+                <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Partilhados do período</p>
+                            <p class="mt-1 text-sm text-slate-500">{{ fmt(totalPartilhados) }} no mês selecionado</p>
+                        </div>
+                    </div>
+                    <div v-if="partilhados.length === 0" class="py-12 text-center">
+                        <p class="text-sm font-medium text-slate-600">Sem custos partilhados neste mês</p>
+                        <p class="mt-1 text-xs text-slate-400">Registe aqui a luz das regas e das câmaras frigoríficas.</p>
+                    </div>
+                    <ul v-else class="divide-y divide-slate-100">
+                        <li v-for="custo in partilhados" :key="custo.id" class="px-5 py-4">
+                            <div class="flex items-start justify-between gap-4">
+                                <div class="min-w-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <p class="truncate font-semibold text-slate-900">{{ custo.descricao }}</p>
+                                        <span class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                            {{ tipoCustoLabel(custo.tipo) }}
+                                        </span>
+                                    </div>
+                                    <div class="mt-1 flex flex-wrap gap-3 text-xs text-slate-500">
+                                        <span>{{ new Date(custo.data).toLocaleDateString('pt-PT') }}</span>
+                                        <span>repartido {{ baseRateioLabel(custo.base_rateio) }}</span>
+                                    </div>
+                                </div>
+                                <div class="flex flex-shrink-0 flex-col items-end gap-2">
+                                    <p class="text-base font-black text-amber-700">{{ fmt(custo.valor) }}</p>
+                                    <button v-if="can.delete" type="button" @click="eliminarPartilhado(custo)"
+                                            class="rounded-full px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50">
+                                        Eliminar
+                                    </button>
+                                </div>
+                            </div>
+                            <ul v-if="custo.campanhas.length" class="mt-3 space-y-1 rounded-xl bg-slate-50 px-3 py-2">
+                                <li v-for="quota in custo.campanhas" :key="quota.campanha_id"
+                                    class="flex items-center justify-between text-xs text-slate-600">
+                                    <span class="truncate">{{ quota.campanha }}</span>
+                                    <span class="font-semibold text-slate-800">{{ fmt(quota.valor) }}</span>
+                                </li>
+                            </ul>
+                            <p v-else class="mt-3 text-xs text-slate-400">
+                                Ainda não há campanha no período desta data — o custo fica por imputar.
+                            </p>
                         </li>
                     </ul>
                 </div>

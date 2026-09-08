@@ -25,6 +25,7 @@ class MigrarCampanhas extends Command
 {
     protected $signature = 'agri:migrar-campanhas
         {--ano= : Ano da apanha (por omissão o ano corrente)}
+        {--todos-os-anos : Corre para todos os anos que já têm campanhas}
         {--inicio= : Início da época, AAAA-MM-DD (por omissão 1 de Outubro do ano anterior)}
         {--fim= : Fim da época, AAAA-MM-DD (por omissão 30 de Setembro do ano da apanha)}
         {--confirmar : Aplica as alterações; sem esta opção apenas mostra o plano}';
@@ -33,7 +34,24 @@ class MigrarCampanhas extends Command
 
     public function handle(): int
     {
-        $ano = (int) ($this->option('ano') ?: now()->year);
+        // Ha campanhas antigas em anos anteriores (2025 e para tras): sem isto
+        // era preciso lembrar-se de correr o comando ano a ano.
+        if ($this->option('todos-os-anos')) {
+            $anos = Campanha::query()->distinct()->orderBy('ano')->pluck('ano');
+
+            foreach ($anos as $ano) {
+                $this->migrarAno((int) $ano);
+                $this->newLine();
+            }
+
+            return self::SUCCESS;
+        }
+
+        return $this->migrarAno((int) ($this->option('ano') ?: now()->year));
+    }
+
+    private function migrarAno(int $ano): int
+    {
         $aplicar = (bool) $this->option('confirmar');
 
         // A epoca atravessa dois anos civis: poda-se no ano anterior e apanha-se
@@ -41,8 +59,20 @@ class MigrarCampanhas extends Command
         $inicio = $this->option('inicio') ?: CarbonImmutable::create($ano - 1, 10, 1)->toDateString();
         $fim = $this->option('fim') ?: CarbonImmutable::create($ano, 9, 30)->toDateString();
 
-        $culturas = Cultura::query()->with('parcela')->get()
-            ->filter(fn (Cultura $c) => filled($c->tipo) && $c->parcela !== null);
+        $todas = Cultura::query()->with('parcela')->get();
+
+        $culturas = $todas->filter(fn (Cultura $c) => filled($c->tipo) && $c->parcela !== null);
+
+        // Uma cultura sem tipo nao entra em nenhuma campanha geral e ficaria
+        // calada com a sua campanha por parcela - vale mais dizer quais sao.
+        $semTipo = $todas->filter(fn (Cultura $c) => blank($c->tipo));
+
+        if ($semTipo->isNotEmpty()) {
+            $this->warn("Culturas sem espécie definida, que ficam de fora ({$semTipo->count()}): ".
+                $semTipo->pluck('nome')->implode(', '));
+            $this->line('  Preencha o campo tipo (ou corra agri:classificar-culturas) e volte a correr.');
+            $this->newLine();
+        }
 
         if ($culturas->isEmpty()) {
             $this->warn('Não há culturas com parcela associada. Nada a fazer.');

@@ -16,6 +16,8 @@ class Custo extends Model
         'descricao',
         'tipo',
         'valor',
+        'rateavel',
+        'base_rateio',
         'data_custo',
         'operacao_id',
         'campanha_id',
@@ -29,8 +31,18 @@ class Custo extends Model
 
     protected $casts = [
         'valor' => 'decimal:2',
+        'rateavel' => 'boolean',
         'data_custo' => 'date',
     ];
+
+    /** Bases de rateio aceites para custos partilhados. */
+    public const BASES_RATEIO = ['kg', 'area'];
+
+    /** Custos partilhados por varias campanhas (luz da rega, frio, IMI, seguros). */
+    public function scopePartilhados($query)
+    {
+        return $query->where('rateavel', true)->whereNull('campanha_id');
+    }
 
     // Relacionamentos
     public function operacao(): BelongsTo

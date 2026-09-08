@@ -75,6 +75,8 @@ class CustoController extends Controller
 
     private function payloadCusto(array $item): array
     {
+        $rateavel = (bool) ($item['rateavel'] ?? false);
+
         return [
             'descricao' => $item['descricao'],
             'tipo' => $item['tipo'],
@@ -82,7 +84,10 @@ class CustoController extends Controller
             'data_custo' => $item['data'],
             'referencia_externa' => $item['referencia_externa'] ?? null,
             'observacoes' => $item['observacoes'] ?? null,
-            'campanha_id' => $this->resolverIdOpcional('campanha', $item),
+            // Custo partilhado: fica sem campanha e e repartido pelo RateioCustosService.
+            'rateavel' => $rateavel,
+            'base_rateio' => $rateavel ? ($item['base_rateio'] ?? 'kg') : null,
+            'campanha_id' => $rateavel ? null : $this->resolverIdOpcional('campanha', $item),
             'operacao_id' => $this->resolverIdOpcional('operacao', $item),
             'cultura_id' => $this->resolverIdOpcional('cultura', $item),
             'parcela_id' => $this->resolverIdOpcional('parcela', $item),

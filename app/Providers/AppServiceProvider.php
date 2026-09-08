@@ -24,6 +24,7 @@ use App\Policies\MaquinaPolicy;
 use App\Policies\OperacaoPolicy;
 use App\Policies\ParcelaPolicy;
 use App\Policies\TerrenoPolicy;
+use App\Services\RateioCustosService;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Http\Request;
@@ -38,7 +39,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Singleton: o rateio le todos os custos partilhados e todas as
+        // campanhas uma vez por pedido e reutiliza o calculo.
+        $this->app->singleton(RateioCustosService::class);
     }
 
     /**

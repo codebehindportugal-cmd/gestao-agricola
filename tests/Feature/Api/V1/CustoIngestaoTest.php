@@ -40,6 +40,42 @@ class CustoIngestaoTest extends TestCase
         ]);
     }
 
+    /** A luz das regas nao pertence a uma campanha: entra rateavel e sem campanha. */
+    public function test_insere_um_custo_partilhado_rateavel(): void
+    {
+        $this->autenticarApi();
+
+        $this->postJson('/api/v1/custos', [
+            'descricao' => 'Eletricidade da rega - Julho',
+            'tipo' => 'energia',
+            'valor' => 412.80,
+            'data' => '2026-07-31',
+            'rateavel' => true,
+            'base_rateio' => 'kg',
+        ])->assertCreated()->assertJsonPath('sucesso', true);
+
+        $custo = Custo::query()->firstOrFail();
+
+        $this->assertTrue($custo->rateavel);
+        $this->assertSame('kg', $custo->base_rateio);
+        $this->assertNull($custo->campanha_id);
+    }
+
+    /** Base de rateio invalida e recusada, nao guardada em silencio. */
+    public function test_base_de_rateio_invalida_devolve_422(): void
+    {
+        $this->autenticarApi();
+
+        $this->postJson('/api/v1/custos', [
+            'descricao' => 'Eletricidade',
+            'tipo' => 'energia',
+            'valor' => 100,
+            'data' => '2026-07-31',
+            'rateavel' => true,
+            'base_rateio' => 'litros',
+        ])->assertStatus(422);
+    }
+
     public function test_insere_um_lote_de_custos(): void
     {
         $this->autenticarApi();

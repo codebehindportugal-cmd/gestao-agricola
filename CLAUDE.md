@@ -59,6 +59,11 @@ Equipa → Operacao
 ### Custo
 - `tipo` — 'material', 'mao_obra', 'maquinaria', 'energia', 'manutencao', 'outro'
 - `campanha_id`, `operacao_id`, `cultura_id`, `parcela_id`, `maquina_id`, `funcionario_id`
+- `rateavel` + `base_rateio` ('kg' | 'area') — custo partilhado por várias campanhas (luz das regas, câmaras frigoríficas, IMI, seguros). Fica sem `campanha_id`; o `RateioCustosService` reparte-o pelas campanhas cujo período contém a data do custo, por omissão na proporção dos quilos colhidos. Entra no `custo_total_calculado` e no custo/kg.
+
+### Receita
+- `quantidade`, `unidade` (default 'kg'), `preco_unitario` — vendas de fruta com quilos e preço; dão o preço médio de venda e a margem por quilo
+- Ligar a venda a um `lote` herda a colheita, parcela e campanha desse lote
 
 ## Convenções de Código
 
@@ -107,6 +112,12 @@ php artisan make:migration add_campo_to_tabela_table
 - Idempotencia: quando `referencia_externa` ja existe, o endpoint devolve o registo existente e nao cria duplicado.
 - Referencias podem ser enviadas por ID ou nome/codigo; se houver ambiguidade, a API devolve 422 com candidatos.
 - Tesouraria cruza `receitas` como entradas e `custos` como saidas, com filtros opcionais `campanha`, `de` e `ate`.
+
+## Campanhas
+
+- Uma campanha **geral** (`nome` preenchido, `cultura_id` nulo) cobre várias parcelas pela tabela `campanha_parcela`. As campanhas antigas eram uma por cultura — logo uma por parcela — e é isso que enche a lista de campanhas repetidas.
+- `php artisan agri:migrar-campanhas --todos-os-anos` mostra o plano; com `--confirmar` agrupa por espécie e ano ("Pereiras 2026") e repõe operações, custos, colheitas, vendas, despesas e compromissos na campanha geral.
+- Culturas sem `tipo` ficam de fora e o comando avisa quais são — preencher o tipo ou correr `agri:classificar-culturas` primeiro.
 
 ## Funcionalidades em Desenvolvimento
 

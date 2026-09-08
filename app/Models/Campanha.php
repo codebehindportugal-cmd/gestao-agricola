@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Services\RateioCustosService;
 
 class Campanha extends Model
 {
@@ -203,13 +204,61 @@ class Campanha extends Model
         )->values();
     }
 
+    /**
+     * Parte dos custos partilhados (luz das regas, frio, IMI, seguros) que
+     * pertence a esta campanha. Ver RateioCustosService.
+     */
+    public function getCustoRateadoAttribute(): float
+    {
+        return app(RateioCustosService::class)->totalPara($this);
+    }
+
+    /** Linhas do rateio, para o ecra da campanha e o PDF de custos. */
+    public function detalheRateio(): array
+    {
+        return app(RateioCustosService::class)->detalhePara($this);
+    }
+
     public function getCustoTotalCalculadoAttribute(): float
     {
         return round(
             $this->custo_operacoes
             + $this->custo_produtos
-            + $this->custo_diretos,
+            + $this->custo_diretos
+            + $this->custo_rateado,
             2
         );
+    }
+
+    /** Quilos colhidos na campanha; o denominador do custo/kg e do preco medio. */
+    public function getProducaoTotalKgAttribute(): float
+    {
+        return round((float) $this->colheitas->sum('quantidade_total') ?: (float) ($this->producao_real ?? 0), 2);
+    }
+
+    /** Quilos vendidos, somados das receitas com quantidade registada. */
+    public function getQuantidadeVendidaAttribute(): float
+    {
+        return round((float) $this->receitas()->sum('quantidade'), 2);
+    }
+
+    /** Preco medio de venda por quilo, so das vendas que registam quantidade. */
+    public function getPrecoMedioVendaAttribute(): float
+    {
+        $linhas = $this->receitas()->whereNotNull('quantidade')->where('quantidade', '>', 0);
+
+        $kg = (float) (clone $linhas)->sum('quantidade');
+
+        if ($kg <= 0) {
+            return 0;
+        }
+
+        return round((float) $linhas->sum('valor') / $kg, 4);
+    }
+
+    /** Receitas menos custos: o que a campanha deixou. */
+    public function getMargemAttribute(): float
+    {
+        return round($this->receita_total - $this->custo_total_calculado, 2);
     }
 }

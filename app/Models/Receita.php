@@ -13,6 +13,9 @@ class Receita extends Model
         'descricao',
         'tipo',
         'valor',
+        'quantidade',
+        'unidade',
+        'preco_unitario',
         'data',
         'campanha_id',
         'cultura_id',
@@ -28,7 +31,21 @@ class Receita extends Model
     protected $casts = [
         'data' => 'date',
         'valor' => 'decimal:2',
+        'quantidade' => 'decimal:3',
+        'preco_unitario' => 'decimal:4',
     ];
+
+    /** Preco por unidade: o registado, ou o que resulta do valor a dividir pela quantidade. */
+    public function getPrecoEfetivoAttribute(): ?float
+    {
+        if ($this->preco_unitario !== null) {
+            return (float) $this->preco_unitario;
+        }
+
+        $quantidade = (float) $this->quantidade;
+
+        return $quantidade > 0 ? round((float) $this->valor / $quantidade, 4) : null;
+    }
 
     public function campanha(): BelongsTo
     {

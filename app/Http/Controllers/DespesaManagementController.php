@@ -3,17 +3,22 @@
 namespace App\Http\Controllers;
 
 use App\Models\Campanha;
+use App\Models\Colheita;
+use App\Models\Custo;
 use App\Models\Despesa;
+use App\Models\Lote;
 use App\Models\FaturaItem;
 use App\Models\Produto;
 use App\Models\Receita;
 use App\Services\MovimentoStockService;
+use App\Services\RateioCustosService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -31,6 +36,16 @@ class DespesaManagementController extends Controller
     ];
 
     public const TAXAS_IVA = [0, 6, 13, 23];
+
+    /** Tipos de Custo aceites nos custos partilhados da exploracao. */
+    public const TIPOS_CUSTO_PARTILHADO = [
+        'energia',
+        'material',
+        'mao_obra',
+        'maquinaria',
+        'manutencao',
+        'outro',
+    ];
 
     public function index(Request $request): Response
     {
@@ -73,6 +88,11 @@ class DespesaManagementController extends Controller
             'resumoVendas'      => $this->buildResumoVendas($mes, $ano, $campanhaIds),
             'analytics'         => $this->buildAnalytics($mes, $ano, $campanhaIds),
             'produtos'          => Produto::query()->orderBy('nome')->get(['id', 'nome', 'tipo', 'unidade_medida', 'custo_unitario']),
+            'lotes'             => $this->lotesDisponiveis($campanhaIds),
+            'partilhados'       => $this->custosPartilhadosMes($mes, $ano),
+            'resumoPartilhados' => $this->buildResumoPartilhados($mes, $ano),
+            'tiposCustoPartilhado' => self::TIPOS_CUSTO_PARTILHADO,
+            'basesRateio'       => Custo::BASES_RATEIO,
             'can' => [
                 'create' => $request->user()->can('create', Despesa::class),
                 'update' => $request->user()->can('update', new Despesa()),
@@ -128,14 +148,53 @@ class DespesaManagementController extends Controller
         $data = $request->validate([
             'descricao' => ['required', 'string', 'max:255'],
             'tipo' => ['required', 'string', 'in:venda_colheita,subsidio,servico,outro'],
-            'valor' => ['required', 'numeric', 'gt:0'],
+            'valor' => ['nullable', 'numeric', 'gt:0'],
+            'quantidade' => ['nullable', 'numeric', 'gt:0'],
+            'unidade' => ['nullable', 'string', 'max:20'],
+            'preco_unitario' => ['nullable', 'numeric', 'gt:0'],
             'data' => ['required', 'date'],
             'comprador_nome' => ['nullable', 'string', 'max:255'],
             'documento' => ['nullable', 'string', 'max:255'],
+            'lote_id' => ['nullable', 'integer', 'exists:lotes,id'],
             'observacoes' => ['nullable', 'string'],
         ]);
 
+        // Quilos vezes preco chega para saber o valor: quem vende fruta sabe o
+        // preco a que a vendeu, nao o total da guia.
+        $quantidade = (float) ($data['quantidade'] ?? 0);
+        $preco = (float) ($data['preco_unitario'] ?? 0);
+
+        if (empty($data['valor']) && $quantidade > 0 && $preco > 0) {
+            $data['valor'] = round($quantidade * $preco, 2);
+        }
+
+        if (empty($data['valor'])) {
+            throw ValidationException::withMessages([
+                'valor' => 'Indique o valor da venda, ou a quantidade e o preco por unidade.',
+            ]);
+        }
+
+        if (empty($data['preco_unitario']) && $quantidade > 0) {
+            $data['preco_unitario'] = round((float) $data['valor'] / $quantidade, 4);
+        }
+
+        if ($quantidade > 0 && empty($data['unidade'])) {
+            $data['unidade'] = 'kg';
+        }
+
         $data['campanha_id'] = $this->activeCampaignIdForWrite($request);
+
+        // A venda de um lote pertence a campanha desse lote, nao a campanha activa.
+        if (! empty($data['lote_id'])) {
+            $lote = Lote::query()->with('colheita:id,campanha_id,parcela_id,cultura_id')->find($data['lote_id']);
+
+            if ($lote?->colheita) {
+                $data['colheita_id'] = $lote->colheita->id;
+                $data['campanha_id'] = $lote->colheita->campanha_id ?: $data['campanha_id'];
+                $data['parcela_id'] = $lote->colheita->parcela_id;
+                $data['cultura_id'] = $lote->colheita->cultura_id;
+            }
+        }
 
         Receita::query()->create($data);
 
@@ -526,11 +585,16 @@ class DespesaManagementController extends Controller
             ->when($campanhaIds, fn ($q) => $q->whereIn('campanha_id', $campanhaIds))
             ->whereYear('data', $ano)
             ->whereMonth('data', $mes)
-            ->get(['valor', 'tipo']);
+            ->get(['valor', 'tipo', 'quantidade']);
+
+        $kg = (float) $vendas->whereNotNull('quantidade')->sum('quantidade');
+        $valorComKg = (float) $vendas->whereNotNull('quantidade')->sum('valor');
 
         return [
             'total' => round((float) $vendas->sum('valor'), 2),
             'count' => $vendas->count(),
+            'quantidade' => round($kg, 2),
+            'preco_medio' => $kg > 0 ? round($valorComKg / $kg, 4) : 0,
             'por_tipo' => collect(['venda_colheita', 'subsidio', 'servico', 'outro'])
                 ->mapWithKeys(fn ($tipo) => [$tipo => round((float) $vendas->where('tipo', $tipo)->sum('valor'), 2)])
                 ->all(),
@@ -545,18 +609,133 @@ class DespesaManagementController extends Controller
             ->whereMonth('data', $mes)
             ->orderByDesc('data')
             ->orderByDesc('id')
-            ->get(['id', 'descricao', 'tipo', 'valor', 'data', 'comprador_nome', 'documento', 'observacoes'])
+            ->with('lote:id,numero_lote')
+            ->get()
             ->map(fn (Receita $receita) => [
                 'id' => $receita->id,
                 'descricao' => $receita->descricao,
                 'tipo' => $receita->tipo,
                 'valor' => (float) $receita->valor,
+                'quantidade' => $receita->quantidade !== null ? (float) $receita->quantidade : null,
+                'unidade' => $receita->unidade,
+                'preco_unitario' => $receita->preco_efetivo,
+                'lote' => $receita->lote?->numero_lote,
                 'data' => $receita->data?->format('Y-m-d'),
                 'comprador_nome' => $receita->comprador_nome,
                 'documento' => $receita->documento,
                 'observacoes' => $receita->observacoes,
             ])
             ->all();
+    }
+
+    /** Lotes que ainda podem ser vendidos, para ligar a venda a colheita. */
+    private function lotesDisponiveis(array $campanhaIds = []): array
+    {
+        return Lote::query()
+            ->with('colheita:id,campanha_id')
+            ->when($campanhaIds, fn ($q) => $q->whereHas(
+                'colheita',
+                fn ($sub) => $sub->whereIn('campanha_id', $campanhaIds)
+            ))
+            ->orderByDesc('data_colheita')
+            ->orderByDesc('id')
+            ->limit(200)
+            ->get(['id', 'numero_lote', 'quantidade', 'unidade_medida', 'colheita_id', 'data_colheita', 'status'])
+            ->map(fn (Lote $lote) => [
+                'id' => $lote->id,
+                'numero_lote' => $lote->numero_lote,
+                'quantidade' => (float) $lote->quantidade,
+                'unidade' => $lote->unidade_medida,
+                'status' => $lote->status,
+            ])
+            ->all();
+    }
+
+    // -- Custos partilhados (luz das regas, frio, IMI, seguros) ---------------
+
+    /**
+     * Regista um gasto da exploracao que serve varias campanhas ao mesmo tempo.
+     *
+     * Fica sem campanha_id e marcado como rateavel: e o RateioCustosService
+     * que decide, no momento de mostrar as contas, quanto dele pertence a cada
+     * campanha - por omissao na proporcao dos quilos colhidos.
+     */
+    public function storePartilhado(Request $request): RedirectResponse
+    {
+        $this->authorize('create', Despesa::class);
+
+        $data = $request->validate([
+            'descricao' => ['required', 'string', 'max:255'],
+            'tipo' => ['required', 'string', Rule::in(self::TIPOS_CUSTO_PARTILHADO)],
+            'valor' => ['required', 'numeric', 'gt:0'],
+            'data_custo' => ['required', 'date'],
+            'base_rateio' => ['required', 'string', Rule::in(Custo::BASES_RATEIO)],
+            'observacoes' => ['nullable', 'string'],
+        ]);
+
+        Custo::query()->create($data + [
+            'rateavel' => true,
+            'campanha_id' => null,
+        ]);
+
+        app(RateioCustosService::class)->esquecer();
+
+        return redirect()
+            ->route('app.despesas.index', $request->only(['mes', 'ano']))
+            ->with('success', 'Custo partilhado registado. Vai ser repartido pelas campanhas do periodo.');
+    }
+
+    public function destroyPartilhado(Request $request, Custo $custo): RedirectResponse
+    {
+        $this->authorize('delete', new Despesa());
+
+        abort_unless($custo->rateavel, 404);
+
+        $custo->delete();
+
+        app(RateioCustosService::class)->esquecer();
+
+        return redirect()
+            ->route('app.despesas.index', $request->only(['mes', 'ano']))
+            ->with('success', 'Custo partilhado eliminado.');
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function custosPartilhadosMes(int $mes, int $ano): array
+    {
+        $rateio = app(RateioCustosService::class);
+
+        return Custo::query()
+            ->partilhados()
+            ->whereYear('data_custo', $ano)
+            ->whereMonth('data_custo', $mes)
+            ->orderByDesc('data_custo')
+            ->get()
+            ->map(fn (Custo $custo) => [
+                'id' => $custo->id,
+                'descricao' => $custo->descricao,
+                'tipo' => $custo->tipo,
+                'valor' => (float) $custo->valor,
+                'base_rateio' => $custo->base_rateio ?: 'kg',
+                'data' => $custo->data_custo?->format('Y-m-d'),
+                'observacoes' => $custo->observacoes,
+                'campanhas' => $rateio->distribuicaoDe($custo),
+            ])
+            ->all();
+    }
+
+    private function buildResumoPartilhados(int $mes, int $ano): array
+    {
+        $custos = Custo::query()
+            ->partilhados()
+            ->whereYear('data_custo', $ano)
+            ->whereMonth('data_custo', $mes)
+            ->get(['valor', 'tipo']);
+
+        return [
+            'total' => round((float) $custos->sum('valor'), 2),
+            'count' => $custos->count(),
+        ];
     }
 
     private function activeCampaignIdForWrite(Request $request): ?int

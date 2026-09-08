@@ -42,6 +42,27 @@ class ReceitaIngestaoTest extends TestCase
         ]);
     }
 
+    /** Venda de fruta: quilos e preco, para dar preco medio e margem por quilo. */
+    public function test_venda_com_quantidade_guarda_preco_por_quilo(): void
+    {
+        $this->autenticarApi();
+
+        $this->postJson('/api/v1/receitas', [
+            'descricao' => 'Venda de pera rocha',
+            'tipo' => 'venda_colheita',
+            'valor' => 4500,
+            'quantidade' => 10000,
+            'data' => '2026-09-05',
+        ])->assertCreated()->assertJsonPath('sucesso', true);
+
+        $receita = Receita::query()->firstOrFail();
+
+        $this->assertSame('10000.000', (string) $receita->quantidade);
+        $this->assertSame('kg', $receita->unidade);
+        // Preco por quilo deduzido do total quando nao vem indicado.
+        $this->assertSame(0.45, (float) $receita->preco_unitario);
+    }
+
     public function test_insere_um_lote_de_receitas(): void
     {
         $this->autenticarApi();

@@ -115,6 +115,38 @@ curl -X POST http://localhost/api/v1/custos \
   -d "{\"descricao\":\"Gasoleo agricola\",\"tipo\":\"energia\",\"valor\":148.50,\"data\":\"2026-07-15\",\"referencia_externa\":\"fatura-2026-0842\"}"
 ```
 
+### Custos partilhados (luz das regas, camaras frigorificas, IMI, seguros)
+
+Gastos que servem varias campanhas ao mesmo tempo nao se prendem a nenhuma: enviam-se **sem** `campanha` e com `rateavel: true`.
+
+- `rateavel` (bool, default `false`)
+- `base_rateio`: `kg` (default) reparte na proporcao dos quilos colhidos; `area` reparte na proporcao dos hectares das parcelas cobertas.
+
+O custo fica com `campanha_id` nulo e e imputado no momento de mostrar as contas, a cada campanha cujo periodo (`data_inicio`..`data_fim`) contem a data do custo. Se a base escolhida ainda nao tem valores, cai na outra; se nenhuma tiver, divide em partes iguais. Aparece no ecra de despesas ("Custos partilhados") e na campanha em "Custos partilhados imputados", e entra no custo/kg.
+
+```json
+{
+  "descricao": "Eletricidade da rega - Julho",
+  "tipo": "energia",
+  "valor": 412.80,
+  "data": "2026-07-31",
+  "rateavel": true,
+  "base_rateio": "kg",
+  "referencia_externa": "edp-2026-07"
+}
+```
+
+```json
+{
+  "descricao": "Eletricidade das camaras frigorificas - Agosto",
+  "tipo": "energia",
+  "valor": 268.40,
+  "data": "2026-08-31",
+  "rateavel": true,
+  "base_rateio": "kg"
+}
+```
+
 ## POST /api/v1/aplicacoes
 
 Ability exigida: `aplicacoes:write`.
@@ -441,6 +473,10 @@ Ability exigida: `receitas:write`.
 
 Aceita uma receita unica ou lote. Tipos aceites: `venda_colheita`, `subsidio`, `servico`, `outro`.
 
+Vendas de fruta: alem de `valor`, aceitam `quantidade` (quilos), `unidade` (default `kg`) e `preco_unitario` (EUR por unidade). Se so vier `quantidade`, o preco por quilo e deduzido do valor. E o que permite comparar o preco medio de venda com o custo/kg da campanha e ter a margem por quilo.
+
+Ligar a venda a um `lote` liga-a tambem a colheita, a parcela e a campanha desse lote.
+
 Payload:
 
 ```json
@@ -450,6 +486,9 @@ Payload:
       "descricao": "Venda de milho - lote colheita",
       "tipo": "venda_colheita",
       "valor": 8450.00,
+      "quantidade": 20000,
+      "unidade": "kg",
+      "preco_unitario": 0.4225,
       "data": "2026-10-20",
       "campanha": "Milho 2026",
       "lote": "LOTE-2026-A",
