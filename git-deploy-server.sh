@@ -147,12 +147,29 @@ php artisan route:cache
 php artisan view:cache
 
 # 9. Permissoes.
-# Em Plesk o PHP corre como o utilizador da subscricao (andre.mendes), NAO como
-# www-data ou root. Ficheiros a root partem o deploy seguinte do painel Plesk,
-# por isso herda-se o dono/grupo do proprio directorio da app.
-APP_OWNER="$(stat -c '%U:%G' "$REMOTE_DIR")"
-echo "==> Dono da app: $APP_OWNER"
-chown -R "$APP_OWNER" . 2>/dev/null || true
+#
+# Em Plesk o PHP corre como o utilizador da subscricao (andre.mendes) e o
+# servidor web pertence ao grupo psaserv. Os dois grupos NAO sao intermutaveis:
+#
+#   httpdocs/public  ->  <user>:psaserv   (a raiz do site; o nginx tem de entrar)
+#   ficheiros dentro ->  <user>:psacln
+#
+# Em 03/09/2026 este passo fazia "chown -R <user>:psacln ." a app toda. Isso
+# tirou o psaserv da raiz do site, o nginx deixou de conseguir la entrar e o
+# site inteiro passou a 403 — ate o favicon. Por isso: quem manda nisto e o
+# proprio Plesk, nao este script.
+if command -v plesk >/dev/null 2>&1; then
+  DOMINIO="$(basename "$(dirname "$REMOTE_DIR")")"
+  echo "==> plesk repair fs $DOMINIO"
+  plesk repair fs "$DOMINIO" -y || echo "AVISO: o plesk repair fs falhou; ver permissoes a mao." >&2
+else
+  # Sem Plesk: so o que o PHP precisa de escrever, sem tocar na raiz do site.
+  APP_OWNER="$(stat -c '%U:%G' "$REMOTE_DIR")"
+  echo "==> Dono da app: $APP_OWNER (sem plesk; chown limitado)"
+  chown -R "$APP_OWNER" storage bootstrap/cache 2>/dev/null || true
+fi
+
+# Isto e sempre seguro: mexe em modos, nao em dono nem grupo.
 chmod -R ug+rwX storage bootstrap/cache 2>/dev/null || true
 
 # 10. O agendador. Sem esta linha no cron, o aviso ntfy das 07:00 nunca dispara.
