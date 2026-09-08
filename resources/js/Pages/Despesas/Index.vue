@@ -173,16 +173,18 @@ function onFicheiroChange(e) {
     if (!file) return;
     form.ficheiro = file;
     ficheiroNome.value = file.name;
+    leitura.value = null;
+    erroLeitura.value = '';
+
     if (file.type.startsWith('image/')) {
         const reader = new FileReader();
         reader.onload = (ev) => { ficheiroPreview.value = ev.target.result; };
         reader.readAsDataURL(file);
-        // Tentar detectar QR AT automaticamente
-        tentarLerQR(file);
     } else {
         ficheiroPreview.value = null;
     }
-    qrDetectado.value = null;
+
+    analisarFatura(file);
 }
 
 function submeter() {
@@ -354,33 +356,86 @@ function eliminarPartilhado(custo) {
     });
 }
 
-// ─── QR AT scan ──────────────────────────────────────────────────────────────
-const qrDetectado = ref(null);   // { nif_fornecedor, data, numero_fatura, total, total_iva }
+// ─── leitura da fatura ───────────────────────────────────────────────────────
+//
+// O QR da AT traz, por lei, apenas o cabeçalho: NIF, data, número, IVA e total.
+// As linhas dos produtos nunca lá estão — daí a fatura entrar sempre sem
+// artigos. Por isso lêem-se as duas coisas: o QR no browser, que é imediato e
+// exacto, e o OCR no servidor, que é quem consegue apanhar as linhas.
+const leitura = ref(null);       // { fornecedor, numero_fatura, data, total, linhas: [...] }
 const qrScanning = ref(false);
+const erroLeitura = ref('');
 
-async function tentarLerQR(file) {
-    if (!file || !file.type.startsWith('image/')) return;
+async function analisarFatura(file) {
+    if (!file) return;
+
     qrScanning.value = true;
-    try {
-        const resultado = await scanAndParseAT(file);
-        if (resultado.is_at_qr) {
-            qrDetectado.value = resultado;
+
+    let qr = null;
+    if (file.type.startsWith('image/')) {
+        try {
+            const resultado = await scanAndParseAT(file);
+            if (resultado.is_at_qr) qr = resultado;
+        } catch {
+            // Sem QR legível — o OCR do servidor ainda pode salvar a leitura.
         }
-    } catch {
-        // QR não encontrado — ignorar silenciosamente
-    } finally {
-        qrScanning.value = false;
     }
+
+    let servidor = null;
+    try {
+        const dados = new FormData();
+        dados.append('ficheiro', file);
+        const { data } = await window.axios.post(route('app.despesas.extrair-fatura'), dados);
+        servidor = data;
+    } catch (e) {
+        erroLeitura.value = e?.response?.data?.message
+            ?? 'Não foi possível ler a fatura no servidor.';
+    }
+
+    if (qr || servidor) {
+        // O QR ganha nos campos que traz: é o documento a dizê-lo, não um palpite.
+        leitura.value = {
+            fornecedor: servidor?.fornecedor ?? null,
+            nif: qr?.nif_fornecedor ?? servidor?.nif ?? null,
+            numero_fatura: qr?.numero_fatura ?? servidor?.numero_fatura ?? null,
+            data: qr?.data ?? servidor?.data ?? null,
+            total: qr?.total ?? servidor?.total ?? null,
+            linhas: servidor?.linhas ?? [],
+            avisos: servidor?.avisos ?? [],
+            rever: servidor?.rever ?? true,
+            tem_qr: Boolean(qr),
+        };
+    }
+
+    qrScanning.value = false;
 }
 
-function preencherFromQR() {
-    const qr = qrDetectado.value;
-    if (!qr) return;
-    if (qr.data && !form.data_despesa) form.data_despesa = qr.data;
-    if (qr.numero_fatura && !form.numero_fatura) form.numero_fatura = qr.numero_fatura;
-    if (qr.nif_fornecedor && !form.fornecedor) form.fornecedor = `NIF: ${qr.nif_fornecedor}`;
-    if (qr.total && !form.valor) form.valor = qr.total.toFixed(2);
-    qrDetectado.value = null;
+const somaLinhasLidas = computed(() =>
+    (leitura.value?.linhas ?? []).reduce((s, l) => s + (Number(l.total_linha) || 0), 0));
+
+function preencherDaLeitura() {
+    const l = leitura.value;
+    if (!l) return;
+
+    if (l.data && !form.data_despesa) form.data_despesa = l.data;
+    if (l.numero_fatura && !form.numero_fatura) form.numero_fatura = l.numero_fatura;
+    if (l.fornecedor && !form.fornecedor) form.fornecedor = l.fornecedor;
+    else if (l.nif && !form.fornecedor) form.fornecedor = `NIF: ${l.nif}`;
+    if (l.fornecedor && !form.titulo) form.titulo = l.fornecedor;
+    if (l.total && !form.valor) form.valor = Number(l.total).toFixed(2);
+
+    if (l.linhas.length > 0) {
+        form.items = l.linhas.map((linha) => ({
+            descricao: linha.descricao,
+            quantidade: linha.quantidade,
+            preco_unitario: linha.preco_unitario,
+            iva_percentagem: linha.iva_percentagem,
+            produto_id: linha.produto_id,
+            notas: '',
+        }));
+    }
+
+    leitura.value = null;
 }
 
 // ─── lightbox ────────────────────────────────────────────────────────────────
@@ -950,27 +1005,63 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                 </div>
                             </div>
 
-                            <!-- QR AT detectado -->
+                            <!-- leitura da fatura -->
                             <div v-if="qrScanning" class="flex items-center gap-2 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-700">
                                 <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                                A procurar QR AT na imagem…
+                                A ler a fatura — QR e linhas dos produtos…
                             </div>
-                            <div v-if="qrDetectado && !qrScanning"
+
+                            <div v-if="erroLeitura && !qrScanning"
+                                 class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                                {{ erroLeitura }} Pode preencher à mão.
+                            </div>
+
+                            <div v-if="leitura && !qrScanning"
                                  class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
-                                <p class="font-semibold text-blue-800">QR AT detectado na fatura</p>
-                                <p class="mt-0.5 text-xs text-blue-600">
-                                    {{ [qrDetectado.numero_fatura, qrDetectado.data, qrDetectado.total ? fmt(qrDetectado.total) : null].filter(Boolean).join(' · ') }}
+                                <p class="font-semibold text-blue-800">
+                                    Fatura lida{{ leitura.tem_qr ? ' (QR AT)' : '' }}
                                 </p>
+                                <p class="mt-0.5 text-xs text-blue-600">
+                                    {{ [leitura.fornecedor, leitura.numero_fatura, leitura.data, leitura.total ? fmt(leitura.total) : null].filter(Boolean).join(' · ') }}
+                                </p>
+
+                                <div v-if="leitura.linhas.length" class="mt-2 max-h-40 overflow-y-auto rounded-lg bg-white/70 p-2">
+                                    <p class="mb-1 text-xs font-semibold text-blue-800">
+                                        {{ leitura.linhas.length }} linha(s) — soma {{ fmt(somaLinhasLidas) }}
+                                    </p>
+                                    <ul class="space-y-0.5">
+                                        <li v-for="(linha, idx) in leitura.linhas" :key="idx"
+                                            class="flex items-center justify-between gap-3 text-xs text-slate-600">
+                                            <span class="truncate">{{ linha.descricao }}</span>
+                                            <span class="shrink-0 tabular-nums">
+                                                {{ fmtN(linha.quantidade) }} × {{ fmt(linha.preco_unitario) }}
+                                            </span>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <p v-else class="mt-2 text-xs text-blue-600">
+                                    Não foram reconhecidas linhas de produtos — o cabeçalho é preenchido na mesma.
+                                </p>
+
+                                <ul v-if="leitura.avisos.length" class="mt-2 space-y-0.5">
+                                    <li v-for="(aviso, idx) in leitura.avisos" :key="idx" class="text-xs text-amber-700">
+                                        {{ aviso }}
+                                    </li>
+                                </ul>
+
                                 <div class="mt-2 flex gap-2">
-                                    <button type="button" @click="preencherFromQR"
+                                    <button type="button" @click="preencherDaLeitura"
                                             class="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-500">
-                                        Preencher campos
+                                        Preencher fatura
                                     </button>
-                                    <button type="button" @click="qrDetectado = null"
+                                    <button type="button" @click="leitura = null"
                                             class="rounded-full border border-blue-200 px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100">
                                         Ignorar
                                     </button>
                                 </div>
+                                <p v-if="leitura.rever" class="mt-2 text-xs text-slate-500">
+                                    Confira os valores antes de guardar — a leitura é automática.
+                                </p>
                             </div>
 
                             <!-- título -->

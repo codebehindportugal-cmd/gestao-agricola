@@ -119,6 +119,14 @@ php artisan make:migration add_campo_to_tabela_table
 - `php artisan agri:migrar-campanhas --todos-os-anos` mostra o plano; com `--confirmar` agrupa por espécie e ano ("Pereiras 2026") e repõe operações, custos, colheitas, vendas, despesas e compromissos na campanha geral.
 - Culturas sem `tipo` ficam de fora e o comando avisa quais são — preencher o tipo ou correr `agri:classificar-culturas` primeiro.
 
+## Leitura de faturas (foto ou PDF)
+
+- `POST /despesas/extrair-fatura` (`FaturaExtracaoController`) devolve cabeçalho e linhas de uma foto/PDF; não grava nada, é o utilizador que confirma no formulário.
+- Motor: `App\Services\PaperInvoice\PaperInvoiceExtractor`, portado do gestao.ateneya.com. Usa `tesseract` (OCR), `zbarimg` (QR), `pdftotext`/`pdftoppm` (PDFs). Caminhos configuráveis em `config/paper_invoice.php` (`TESSERACT_BINARY`, `ZBARIMG_BINARY`, `PDFTOTEXT_BINARY`, `PDFTOPPM_BINARY`).
+- O QR da AT traz **apenas** o cabeçalho (NIF, data, número, IVA, total) — as linhas dos produtos vêm sempre do OCR. No browser o QR continua a ser lido por `useQRScanner` (jsQR) e ganha ao OCR nos campos que traz.
+- Em Plesk, se `proc_open` estiver em `disable_functions` nenhum destes programas corre e a resposta explica-o nos avisos.
+- O extractor sugere o `produto_id` do catálogo quando o nome ou código interno aparece na descrição lida.
+
 ## Funcionalidades em Desenvolvimento
 
 ### 1. Custos por Campanha
