@@ -401,6 +401,7 @@ async function analisarFatura(file) {
             data: qr?.data ?? servidor?.data ?? null,
             total: qr?.total ?? servidor?.total ?? null,
             linhas: servidor?.linhas ?? [],
+            fonte: servidor?.fonte ?? 'ocr',
             avisos: servidor?.avisos ?? [],
             rever: servidor?.rever ?? true,
             tem_qr: Boolean(qr),
@@ -417,12 +418,15 @@ function preencherDaLeitura() {
     const l = leitura.value;
     if (!l) return;
 
-    if (l.data && !form.data_despesa) form.data_despesa = l.data;
-    if (l.numero_fatura && !form.numero_fatura) form.numero_fatura = l.numero_fatura;
-    if (l.fornecedor && !form.fornecedor) form.fornecedor = l.fornecedor;
+    // Carregar no botão é dizer "usa o que leste": os campos são substituídos.
+    // Antes só se preenchia o que estivesse vazio, e como a data já vem com a de
+    // hoje por omissão, a data da fatura nunca entrava.
+    if (l.data) form.data_despesa = l.data;
+    if (l.numero_fatura) form.numero_fatura = l.numero_fatura;
+    if (l.fornecedor) form.fornecedor = l.fornecedor;
     else if (l.nif && !form.fornecedor) form.fornecedor = `NIF: ${l.nif}`;
     if (l.fornecedor && !form.titulo) form.titulo = l.fornecedor;
-    if (l.total && !form.valor) form.valor = Number(l.total).toFixed(2);
+    if (l.total) form.valor = Number(l.total).toFixed(2);
 
     if (l.linhas.length > 0) {
         form.items = l.linhas.map((linha) => ({
@@ -1019,7 +1023,7 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                             <div v-if="leitura && !qrScanning"
                                  class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
                                 <p class="font-semibold text-blue-800">
-                                    Fatura lida{{ leitura.tem_qr ? ' (QR AT)' : '' }}
+                                    Fatura lida{{ leitura.tem_qr ? ' (QR AT)' : '' }}{{ leitura.fonte === 'visao' ? ' · linhas com leitura assistida' : '' }}
                                 </p>
                                 <p class="mt-0.5 text-xs text-blue-600">
                                     {{ [leitura.fornecedor, leitura.numero_fatura, leitura.data, leitura.total ? fmt(leitura.total) : null].filter(Boolean).join(' · ') }}

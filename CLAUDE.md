@@ -126,6 +126,7 @@ php artisan make:migration add_campo_to_tabela_table
 - O QR da AT traz **apenas** o cabeçalho (NIF, data, número, IVA, total) — as linhas dos produtos vêm sempre do OCR. No browser o QR continua a ser lido por `useQRScanner` (jsQR) e ganha ao OCR nos campos que traz.
 - Em Plesk, se `proc_open` estiver em `disable_functions` nenhum destes programas corre e a resposta explica-o nos avisos.
 - O extractor sugere o `produto_id` do catálogo quando o nome ou código interno aparece na descrição lida.
+- **Leitura assistida**: `LeituraFatura` corre o OCR e, só quando não encontra linhas ou as linhas não somam o total, manda a imagem (ou o PDF inteiro) ao modelo de visão do Claude — `LeitorFaturaClaude`, `ANTHROPIC_API_KEY` + `CLAUDE_INVOICE_MODEL` em `config/paper_invoice.php`. Fotos de papel amarrotado são ilegíveis para o tesseract; é para essas que existe. Sem chave, fica-se pelo OCR e di-lo nos avisos. O QR, quando lido, continua a mandar no número, data e total; o nome do fornecedor vem do modelo.
 
 ## Funcionalidades em Desenvolvimento
 

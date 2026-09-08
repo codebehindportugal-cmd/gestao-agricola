@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Despesa;
 use App\Models\Produto;
-use App\Services\PaperInvoice\PaperInvoiceExtractor;
+use App\Services\PaperInvoice\LeituraFatura;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -23,7 +23,7 @@ use Illuminate\Support\Str;
  */
 class FaturaExtracaoController extends Controller
 {
-    public function __invoke(Request $request, PaperInvoiceExtractor $extractor): JsonResponse
+    public function __invoke(Request $request, LeituraFatura $leitura): JsonResponse
     {
         $this->authorize('create', Despesa::class);
 
@@ -34,7 +34,7 @@ class FaturaExtracaoController extends Controller
         $path = $request->file('ficheiro')->store('faturas-leitura/tmp');
 
         try {
-            $dados = $extractor->extract(Storage::path($path));
+            $dados = $leitura->ler(Storage::path($path));
         } finally {
             Storage::delete($path);
         }
@@ -68,6 +68,7 @@ class FaturaExtracaoController extends Controller
             'total' => (float) ($dados['invoice']['total'] ?? 0) ?: null,
             'total_iva' => (float) ($dados['invoice']['vatTotal'] ?? 0) ?: null,
             'linhas' => $linhas,
+            'fonte' => $dados['fonte'] ?? 'ocr',
             'confianca' => $dados['confidence'] ?? 0,
             'rever' => $dados['needsManualReview'] ?? true,
             'avisos' => $dados['warnings'] ?? [],

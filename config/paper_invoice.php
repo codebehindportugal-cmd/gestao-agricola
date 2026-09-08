@@ -18,6 +18,23 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Leitura assistida (modelo de visão)
+    |--------------------------------------------------------------------------
+    |
+    | Só entra quando o OCR não encontra linhas, ou quando as linhas que
+    | encontrou não somam o total da fatura. Sem chave configurada o sistema
+    | fica-se pelo OCR e diz-o nos avisos.
+    |
+    */
+
+    'claude' => [
+        'api_key' => env('ANTHROPIC_API_KEY'),
+        'model' => env('CLAUDE_INVOICE_MODEL', 'claude-sonnet-5'),
+        'timeout' => (int) env('CLAUDE_INVOICE_TIMEOUT', 90),
+    ],
+
     'binaries' => [
         'pdftotext' => env('PDFTOTEXT_BINARY'),
         'pdftoppm'  => env('PDFTOPPM_BINARY'),

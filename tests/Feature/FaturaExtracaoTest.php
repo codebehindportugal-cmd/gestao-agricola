@@ -27,6 +27,7 @@ class FaturaExtracaoTest extends TestCase
             ->assertJsonPath('linhas.0.descricao', 'Adubo foliar 20L')
             ->assertJsonPath('linhas.0.quantidade', 2)
             ->assertJsonPath('linhas.0.iva_percentagem', 6)
+            ->assertJsonPath('fonte', 'ocr')
             ->assertJsonCount(2, 'linhas');
     }
 
@@ -69,7 +70,7 @@ class FaturaExtracaoTest extends TestCase
                     'invoice' => [
                         'number' => 'FT 1000/1755',
                         'date' => '08/09/2026',
-                        'total' => 577.0,
+                        'total' => 460.04,
                         'vatTotal' => 31.85,
                     ],
                     'products' => [
