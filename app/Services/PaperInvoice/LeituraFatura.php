@@ -55,10 +55,11 @@ class LeituraFatura
             return true;
         }
 
-        $total = (float) ($dados['invoice']['total'] ?? 0);
-        $somaLinhas = array_sum(array_column($dados['products'], 'lineTotal'));
-
-        return $total > 0 && abs($total - $somaLinhas) > 0.05;
+        return ! PaperInvoiceExtractor::linhasBatemComOTotal(
+            $dados['products'],
+            (float) ($dados['invoice']['total'] ?? 0),
+            (float) ($dados['invoice']['vatTotal'] ?? 0)
+        );
     }
 
     /**

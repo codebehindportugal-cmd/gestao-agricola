@@ -177,11 +177,18 @@ class PaperInvoiceExtractor
             $warnings[] = 'Nao foram encontradas linhas de produtos.';
         }
 
-        if ($total > 0 && $lineTotal > 0 && abs($total - $lineTotal) > 0.05) {
+        $totalDocumento = (float) ($qrFields['total'] ?: $total);
+        $batemCertas = self::linhasBatemComOTotal(
+            $products,
+            $totalDocumento,
+            (float) ($qrFields['vat_total'] ?: $vatTotal)
+        );
+
+        if (! $batemCertas) {
             $warnings[] = 'A soma das linhas nao coincide com o total da fatura.';
         }
 
-        $confidence = $this->confidence($rawText, $products, $total, $warnings);
+        $confidence = $this->confidence($rawText, $products, $totalDocumento, $warnings, $batemCertas);
 
         return [
             'source' => 'paper_invoice_photo',
@@ -456,6 +463,33 @@ class PaperInvoiceExtractor
             ]),
             default => [],
         };
+    }
+
+    /**
+     * As linhas somam o que a fatura diz?
+     *
+     * O total do documento e' com IVA e as linhas sao sem ele - compara-los
+     * directamente dava sempre diferenca e enchia o ecra de avisos numa
+     * leitura que estava certa. Quando se sabe o IVA do documento, compara-se
+     * com a base; quando nao, acrescenta-se o IVA a cada linha.
+     */
+    public static function linhasBatemComOTotal(array $products, float $total, float $vatTotal): bool
+    {
+        if ($products === [] || $total <= 0) {
+            return $products !== [];
+        }
+
+        $soma = $vatTotal > 0
+            ? array_sum(array_column($products, 'lineTotal'))
+            : array_sum(array_map(
+                fn (array $linha) => $linha['lineTotal'] * (1 + ($linha['vatRate'] ?? 0) / 100),
+                $products
+            ));
+
+        $referencia = $vatTotal > 0 ? $total - $vatTotal : $total;
+
+        // Um cêntimo por linha de arredondamento e' normal.
+        return abs($referencia - $soma) <= max(0.05, count($products) * 0.01);
     }
 
     /**
@@ -840,12 +874,15 @@ class PaperInvoiceExtractor
         return $total > 0 && $vat > ($total * 0.35) ? 0.0 : $vat;
     }
 
-    private function confidence(string $rawText, array $products, float $total, array $warnings): float
+    private function confidence(string $rawText, array $products, float $total, array $warnings, bool $batemCertas = false): float
     {
         $score = 0.2;
         $score += $rawText !== '' ? 0.25 : 0;
         $score += $products !== [] ? 0.25 : 0;
         $score += $total > 0 ? 0.2 : 0;
+        // As linhas somarem o que a fatura diz vale mais do que qualquer
+        // outro sinal: e' a prova de que a leitura esta certa.
+        $score += $batemCertas && $products !== [] ? 0.1 : 0;
         $score -= min(0.3, count($warnings) * 0.08);
 
         return round(max(0, min(1, $score)), 2);

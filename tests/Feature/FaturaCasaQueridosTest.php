@@ -47,7 +47,10 @@ class FaturaCasaQueridosTest extends TestCase
         $this->assertSame(0.0, $linha['discountRate']);
         // As contas da linha fecham com o que esta impresso.
         $this->assertSame(0.95, $linha['confidence']);
+        // 329,80 de linhas + 19,79 de IVA = 349,59: as contas da fatura fecham,
+        // por isso nao ha nada a avisar nem a rever a mao.
         $this->assertSame([], $dados['warnings']);
+        $this->assertFalse($dados['needsManualReview']);
     }
 
     /** O numero do lote nao pode entrar como preco nem como quantidade. */
