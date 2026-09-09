@@ -328,7 +328,7 @@ Campos:
 - `categoria`: `combustivel`, `sementes`, `fertilizantes`, `fitofarmaceuticos`, `equipamento`, `mao_obra`, `outro` (default `outro`)
 - `campanha` (por id ou nome)
 - `valor`: total da fatura. Se omitido, e calculado das linhas com IVA; se indicado e divergir mais de 2 centimos, prevalece o indicado e a resposta traz aviso
-- `linhas[]`: `descricao` (obrigatorio), `quantidade` (obrigatorio, > 0), `preco_unitario` (obrigatorio), `iva_percentagem` (0, 6, 13 ou 23), `produto` (id / nº DGAV / nome), `tipo_produto`, `numero_autorizacao_dgav`, `unidade_medida`, `notas`
+- `linhas[]`: `descricao` (obrigatorio), `quantidade` (obrigatorio, > 0), `preco_unitario` (obrigatorio, preco de tabela antes do desconto), `desconto_percentagem` (0 a 100, por omissao 0), `iva_percentagem` (0, 6, 13 ou 23), `produto` (id / nº DGAV / nome), `tipo_produto`, `numero_autorizacao_dgav`, `unidade_medida`, `notas`
 - Interruptores, todos `true` por omissao: `criar_produtos`, `actualizar_custo_unitario`, `dar_entrada_em_stock`, `criar_custo`
 
 Regras:
@@ -337,6 +337,7 @@ Regras:
 - Se a referencia for ambigua (varios produtos possiveis), devolve 422 com os candidatos em vez de criar um duplicado.
 - Linha sem produto identificado fica na fatura mas sem ligacao ao catalogo nem stock, com aviso.
 - Idempotencia por `numero_fatura` (+ `fornecedor` quando indicado): repetir devolve a despesa existente sem duplicar.
+- O desconto entra antes do IVA, como na fatura: `quantidade x preco_unitario x (1 - desconto/100) x (1 + iva/100)`. O custo unitario que vai para o catalogo e para o movimento de stock e o preco **depois** do desconto - e o que se pagou.
 - Mapeamento categoria -> tipo de custo: `combustivel`->`energia`, `sementes`/`fertilizantes`/`fitofarmaceuticos`->`material`, `equipamento`->`maquinaria`, `mao_obra`->`mao_obra`, `outro`->`outro`.
 
 Payload:
@@ -353,6 +354,7 @@ Payload:
       "descricao": "Montana 5L",
       "quantidade": 4,
       "preco_unitario": 45,
+      "desconto_percentagem": 10,
       "iva_percentagem": 6
     }
   ]

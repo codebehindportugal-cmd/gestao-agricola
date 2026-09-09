@@ -26,7 +26,9 @@ class LeituraFatura
         }
 
         if (! $this->visao->disponivel()) {
-            $dados['warnings'][] = 'O OCR nao conseguiu ler as linhas. Configure ANTHROPIC_API_KEY para a leitura assistida.';
+            $dados['warnings'][] = 'Nao foi possivel ler as linhas desta imagem.'
+                .' Um PDF do fornecedor le-se sempre bem; numa foto, ajuda ter a folha direita,'
+                .' bem iluminada e a tabela toda no enquadramento.';
 
             return $dados + ['fonte' => 'ocr'];
         }
@@ -34,7 +36,11 @@ class LeituraFatura
         $lido = $this->visao->ler($caminho);
 
         if ($lido === null) {
-            $dados['warnings'][] = 'A leitura assistida falhou; ficam apenas os dados do OCR.';
+            // Dizer porque falhou: sem isto ficava-se a olhar para uma fatura
+            // sem linhas sem saber se era a chave, o modelo ou a rede.
+            $dados['warnings'][] = 'A leitura assistida falhou'
+                .($this->visao->ultimoErro() ? ' ('.$this->visao->ultimoErro().')' : '')
+                .'; ficam apenas os dados do OCR.';
 
             return $dados + ['fonte' => 'ocr'];
         }

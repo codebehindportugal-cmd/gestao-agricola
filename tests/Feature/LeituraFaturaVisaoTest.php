@@ -22,6 +22,7 @@ class LeituraFaturaVisaoTest extends TestCase
         parent::setUp();
 
         config([
+            'paper_invoice.claude.activa' => true,
             'paper_invoice.claude.api_key' => 'chave-de-teste',
             'paper_invoice.claude.model' => 'claude-sonnet-5',
         ]);
@@ -83,10 +84,7 @@ class LeituraFaturaVisaoTest extends TestCase
         $dados = app(LeituraFatura::class)->ler($this->ficheiro());
 
         $this->assertSame('ocr', $dados['fonte']);
-        $this->assertContains(
-            'O OCR nao conseguiu ler as linhas. Configure ANTHROPIC_API_KEY para a leitura assistida.',
-            $dados['warnings']
-        );
+        $this->assertStringContainsString('Nao foi possivel ler as linhas', implode(' ', $dados['warnings']));
         Http::assertNothingSent();
     }
 
@@ -100,7 +98,12 @@ class LeituraFaturaVisaoTest extends TestCase
 
         $this->assertSame('ocr', $dados['fonte']);
         $this->assertSame('FT 1/1', $dados['invoice']['number']);
-        $this->assertContains('A leitura assistida falhou; ficam apenas os dados do OCR.', $dados['warnings']);
+        // O aviso tem de dizer porque falhou, senao fica-se sem saber se foi a
+        // chave, o modelo ou a rede.
+        $this->assertStringContainsString(
+            'A leitura assistida falhou (500',
+            implode(' ', $dados['warnings'])
+        );
     }
 
     private function endpoint(): string

@@ -86,7 +86,7 @@ const form = useForm({
 
 // ─── itens ───────────────────────────────────────────────────────────────────
 function novoItem() {
-    return { descricao: '', quantidade: 1, preco_unitario: '', iva_percentagem: 23, produto_id: null, notas: '' };
+    return { descricao: '', quantidade: 1, preco_unitario: '', desconto_percentagem: 0, iva_percentagem: 23, produto_id: null, notas: '' };
 }
 
 function adicionarItem() {
@@ -98,12 +98,26 @@ function removerItem(idx) {
 }
 
 function itemTotal(item) {
-    const base = (parseFloat(item.quantidade) || 0) * (parseFloat(item.preco_unitario) || 0);
+    const base = itemBase(item);
     return base + base * (parseFloat(item.iva_percentagem) || 0) / 100;
 }
 
+// Base já líquida: o desconto entra antes do IVA, como na fatura.
 function itemBase(item) {
+    return itemBruto(item) * (1 - (parseFloat(item.desconto_percentagem) || 0) / 100);
+}
+
+function itemBruto(item) {
     return (parseFloat(item.quantidade) || 0) * (parseFloat(item.preco_unitario) || 0);
+}
+
+function itemDesconto(item) {
+    return itemBruto(item) - itemBase(item);
+}
+
+// O que o produto custou mesmo por unidade — é este preço que vai para o stock.
+function itemPrecoLiquido(item) {
+    return (parseFloat(item.preco_unitario) || 0) * (1 - (parseFloat(item.desconto_percentagem) || 0) / 100);
 }
 
 const subtotalForm = computed(() => form.items.reduce((s, i) => s + itemBase(i), 0));
@@ -111,6 +125,7 @@ const ivaForm = computed(() => form.items.reduce((s, i) => {
     const base = itemBase(i);
     return s + base * (parseFloat(i.iva_percentagem) || 0) / 100;
 }, 0));
+const descontoForm = computed(() => form.items.reduce((s, i) => s + itemDesconto(i), 0));
 const totalComIvaForm = computed(() => subtotalForm.value + ivaForm.value);
 const temItems = computed(() => form.items.length > 0);
 
@@ -152,6 +167,7 @@ function abrirEditar(despesa) {
         descricao: i.descricao,
         quantidade: i.quantidade,
         preco_unitario: i.preco_unitario,
+        desconto_percentagem: i.desconto_percentagem ?? 0,
         iva_percentagem: i.iva_percentagem,
         produto_id: i.produto_id,
         notas: i.notas ?? '',
@@ -433,6 +449,7 @@ function preencherDaLeitura() {
             descricao: linha.descricao,
             quantidade: linha.quantidade,
             preco_unitario: linha.preco_unitario,
+            desconto_percentagem: linha.desconto_percentagem ?? 0,
             iva_percentagem: linha.iva_percentagem,
             produto_id: linha.produto_id,
             notas: '',
@@ -1038,7 +1055,7 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                             class="flex items-center justify-between gap-3 text-xs text-slate-600">
                                             <span class="truncate">{{ linha.descricao }}</span>
                                             <span class="shrink-0 tabular-nums">
-                                                {{ fmtN(linha.quantidade) }} × {{ fmt(linha.preco_unitario) }}
+                                                {{ fmtN(linha.quantidade) }} × {{ fmt(linha.preco_unitario) }}<template v-if="linha.desconto_percentagem > 0"> −{{ fmtN(linha.desconto_percentagem) }}%</template>
                                             </span>
                                         </li>
                                     </ul>
@@ -1163,8 +1180,8 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                         </select>
                                     </div>
 
-                                    <!-- qtd + preço + IVA -->
-                                    <div class="grid grid-cols-3 gap-2">
+                                    <!-- qtd + preço + desconto + IVA -->
+                                    <div class="grid grid-cols-4 gap-2">
                                         <div>
                                             <label class="mb-1 block text-[10px] font-semibold uppercase text-slate-400">Qtd</label>
                                             <input v-model="item.quantidade" type="number" step="0.001" min="0.001" required
@@ -1174,6 +1191,12 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                             <label class="mb-1 block text-[10px] font-semibold uppercase text-slate-400">Preço unit. €</label>
                                             <input v-model="item.preco_unitario" type="number" step="0.01" min="0" required
                                                    class="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-right outline-none focus:border-emerald-400" />
+                                        </div>
+                                        <div>
+                                            <label class="mb-1 block text-[10px] font-semibold uppercase text-slate-400">Desc. %</label>
+                                            <input v-model="item.desconto_percentagem" type="number" step="0.01" min="0" max="100"
+                                                   class="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-right outline-none focus:border-emerald-400"
+                                                   placeholder="0" />
                                         </div>
                                         <div>
                                             <label class="mb-1 block text-[10px] font-semibold uppercase text-slate-400">IVA %</label>
@@ -1190,6 +1213,10 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                             <span class="text-slate-400">
                                                 base {{ fmt(itemBase(item)) }} + IVA {{ fmt(itemBase(item) * (parseFloat(item.iva_percentagem) || 0) / 100) }}
                                             </span>
+                                            <span v-if="parseFloat(item.desconto_percentagem) > 0"
+                                                  class="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700">
+                                                −{{ fmt(itemDesconto(item)) }} · {{ fmt(itemPrecoLiquido(item)) }}/un
+                                            </span>
                                             <span v-if="item.produto_id"
                                                   class="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">
                                                 📦 +{{ (parseFloat(item.quantidade) || 0).toFixed(2) }} ao stock
@@ -1202,6 +1229,10 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
 
                             <!-- totais calculados -->
                             <div v-if="temItems" class="mt-4 rounded-xl bg-emerald-50 p-4 text-sm">
+                                <div v-if="descontoForm > 0" class="flex justify-between text-slate-600">
+                                    <span>Descontos</span>
+                                    <span>−{{ fmt(descontoForm) }}</span>
+                                </div>
                                 <div class="flex justify-between text-slate-600">
                                     <span>Subtotal s/ IVA</span>
                                     <span>{{ fmt(subtotalForm) }}</span>

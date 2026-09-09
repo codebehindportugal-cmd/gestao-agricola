@@ -25,9 +25,18 @@ class LeitorFaturaClaude
     /** O maior lado a que a imagem e reduzida antes de subir: acima disto so paga tokens. */
     private const LADO_MAXIMO = 1600;
 
+    /** Porque e que a ultima leitura nao deu. Sem isto a falha e' muda. */
+    private ?string $ultimoErro = null;
+
+    public function ultimoErro(): ?string
+    {
+        return $this->ultimoErro;
+    }
+
     public function disponivel(): bool
     {
-        return filled(config('paper_invoice.claude.api_key'));
+        return (bool) config('paper_invoice.claude.activa')
+            && filled(config('paper_invoice.claude.api_key'));
     }
 
     /**
@@ -35,13 +44,19 @@ class LeitorFaturaClaude
      */
     public function ler(string $caminho): ?array
     {
+        $this->ultimoErro = null;
+
         if (! $this->disponivel() || ! is_file($caminho)) {
+            $this->ultimoErro = 'sem chave configurada ou ficheiro inacessivel';
+
             return null;
         }
 
         $bloco = $this->blocoDoFicheiro($caminho);
 
         if ($bloco === null) {
+            $this->ultimoErro = 'formato de ficheiro nao suportado';
+
             return null;
         }
 
@@ -65,13 +80,19 @@ class LeitorFaturaClaude
                     ]],
                 ]);
         } catch (\Throwable $e) {
+            $this->ultimoErro = $e->getMessage();
             Log::warning('Leitura da fatura pelo Claude falhou: '.$e->getMessage());
 
             return null;
         }
 
         if ($resposta->failed()) {
-            Log::warning('Leitura da fatura pelo Claude devolveu '.$resposta->status().': '.$resposta->body());
+            // O corpo da Anthropic diz o essencial: chave invalida, modelo
+            // inexistente, imagem grande demais. Guardar so isso.
+            $this->ultimoErro = $resposta->status().' '.mb_substr(
+                (string) ($resposta->json('error.message') ?? $resposta->body()), 0, 200
+            );
+            Log::warning('Leitura da fatura pelo Claude devolveu '.$this->ultimoErro);
 
             return null;
         }
@@ -83,7 +104,13 @@ class LeitorFaturaClaude
 
         $dados = $this->descodificar($texto);
 
-        return $dados === null ? null : $this->paraFormatoDoExtractor($dados);
+        if ($dados === null) {
+            $this->ultimoErro = 'a resposta do modelo nao trazia JSON';
+
+            return null;
+        }
+
+        return $this->paraFormatoDoExtractor($dados);
     }
 
     private function instrucoes(): string
@@ -103,7 +130,8 @@ class LeitorFaturaClaude
             {
               "descricao": string,          // designação do artigo, sem o código nem o lote
               "quantidade": number,
-              "preco_unitario": number,     // preço unitário sem IVA
+              "preco_unitario": number,     // preço unitário de tabela, sem IVA e ANTES do desconto
+              "desconto_percentagem": number, // desconto da linha; se houver duas colunas em cascata (D1% e D2%), devolve o efectivo: 100*(1-(1-d1/100)*(1-d2/100))
               "iva_percentagem": number,    // 0, 6, 13 ou 23
               "total_linha": number         // valor da linha como está impresso
             }
@@ -111,6 +139,7 @@ class LeitorFaturaClaude
         }
 
         Regras:
+        - Sem desconto na linha, "desconto_percentagem" é 0.
         - Não inventes. O que não conseguires ler fica null, e uma linha que não consigas ler por inteiro não entra.
         - Usa ponto como separador decimal.
         - Lê apenas as linhas de artigos. Totais, descontos, IVA, portes e observações não são linhas.
@@ -222,6 +251,7 @@ class LeitorFaturaClaude
                 'description' => (string) $linha['descricao'],
                 'quantity' => (float) ($linha['quantidade'] ?? 1),
                 'unitPrice' => (float) ($linha['preco_unitario'] ?? 0),
+                'discountRate' => (float) ($linha['desconto_percentagem'] ?? 0),
                 'vatRate' => (float) ($linha['iva_percentagem'] ?? 0),
                 'lineTotal' => (float) ($linha['total_linha'] ?? 0),
                 'confidence' => 0.9,

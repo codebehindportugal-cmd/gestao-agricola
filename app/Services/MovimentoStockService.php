@@ -61,7 +61,8 @@ class MovimentoStockService
                 'tipo' => 'entrada',
                 'quantidade' => (float) $item->quantidade,
                 'unidade_medida' => $produto->unidade_medida ?? 'un',
-                'custo_unitario' => (float) $item->preco_unitario,
+                // O custo e o preco depois do desconto: e o que se pagou.
+                'custo_unitario' => (float) $item->preco_liquido,
                 'referencia' => $referencia,
                 'despesa_id' => $despesa->id,
                 'fatura_item_id' => $item->id,

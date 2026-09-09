@@ -119,6 +119,13 @@ php artisan make:migration add_campo_to_tabela_table
 - `php artisan agri:migrar-campanhas --todos-os-anos` mostra o plano; com `--confirmar` agrupa por espécie e ano ("Pereiras 2026") e repõe operações, custos, colheitas, vendas, despesas e compromissos na campanha geral.
 - Culturas sem `tipo` ficam de fora e o comando avisa quais são — preencher o tipo ou correr `agri:classificar-culturas` primeiro.
 
+## Descontos nas linhas de fatura
+
+- `fatura_items.desconto_percentagem` (uma percentagem efectiva por linha). Faturas com duas colunas em cascata (D1% e D2%) entram como um só: `100*(1-(1-d1)(1-d2))`.
+- O desconto entra **antes** do IVA. `FaturaItem` expõe `total_bruto`, `desconto_valor`, `preco_liquido`, `total_sem_iva`, `total_iva_valor`, `total_com_iva`.
+- `preco_liquido` é o que vai para o `MovimentoStock.custo_unitario` e para o `custo_unitario` do Produto — o custo é o que se pagou, não o preço de tabela.
+- Aceite no ecrã de despesas, em `POST /api/v1/faturas` (`linhas.*.desconto_percentagem`) e na leitura da fatura.
+
 ## Leitura de faturas (foto ou PDF)
 
 - `POST /despesas/extrair-fatura` (`FaturaExtracaoController`) devolve cabeçalho e linhas de uma foto/PDF; não grava nada, é o utilizador que confirma no formulário.
@@ -126,7 +133,10 @@ php artisan make:migration add_campo_to_tabela_table
 - O QR da AT traz **apenas** o cabeçalho (NIF, data, número, IVA, total) — as linhas dos produtos vêm sempre do OCR. No browser o QR continua a ser lido por `useQRScanner` (jsQR) e ganha ao OCR nos campos que traz.
 - Em Plesk, se `proc_open` estiver em `disable_functions` nenhum destes programas corre e a resposta explica-o nos avisos.
 - O extractor sugere o `produto_id` do catálogo quando o nome ou código interno aparece na descrição lida.
-- **Leitura assistida**: `LeituraFatura` corre o OCR e, só quando não encontra linhas ou as linhas não somam o total, manda a imagem (ou o PDF inteiro) ao modelo de visão do Claude — `LeitorFaturaClaude`, `ANTHROPIC_API_KEY` + `CLAUDE_INVOICE_MODEL` em `config/paper_invoice.php`. Fotos de papel amarrotado são ilegíveis para o tesseract; é para essas que existe. Sem chave, fica-se pelo OCR e di-lo nos avisos. O QR, quando lido, continua a mandar no número, data e total; o nome do fornecedor vem do modelo.
+- **Linhas lidas pelas colunas** (`TabelaFatura` + `PalavrasPosicionadas`): as posições das colunas mandam, não a ordem das palavras. Serve as duas origens — `pdftotext -layout` (PDF) e `tesseract ... tsv` (foto) — e trata colunas vazias (D1%, D2%) sem deixar os números escorregarem uma casa. Cada linha é validada pela aritmética (`qtd × preço × (1-desc) ≈ total`) e a confiança sai daí. A leitura antiga por expressões regulares fica como recurso.
+- **Antes do OCR** a foto passa por ImageMagick (`-auto-orient -colorspace Gray -resize -normalize -deskew -despeckle -sharpen`). Sem ImageMagick avisa e segue.
+- **PDF é sempre melhor do que foto**: com camada de texto a leitura é exacta e gratuita.
+- **Leitura assistida por IA** (desligada por omissão, `PAPER_INVOICE_CLAUDE=false`): `LeituraFatura` corre o OCR e, só quando não encontra linhas ou as linhas não somam o total, manda a imagem (ou o PDF inteiro) ao modelo de visão do Claude — `LeitorFaturaClaude`, `ANTHROPIC_API_KEY` + `CLAUDE_INVOICE_MODEL` em `config/paper_invoice.php`. Fotos de papel amarrotado são ilegíveis para o tesseract; é para essas que existe. Sem chave, fica-se pelo OCR e di-lo nos avisos. O QR, quando lido, continua a mandar no número, data e total; o nome do fornecedor vem do modelo.
 
 ## Funcionalidades em Desenvolvimento
 

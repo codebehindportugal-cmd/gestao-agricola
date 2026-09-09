@@ -41,6 +41,7 @@ class StoreFaturaApiRequest extends FormRequest
             'linhas.*.descricao' => ['required', 'string', 'max:255'],
             'linhas.*.quantidade' => ['required', 'numeric', 'gt:0'],
             'linhas.*.preco_unitario' => ['required', 'numeric', 'min:0'],
+            'linhas.*.desconto_percentagem' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'linhas.*.iva_percentagem' => ['nullable', 'numeric', Rule::in(self::TAXAS_IVA)],
             'linhas.*.tipo_produto' => ['nullable', 'string', 'max:255'],
             'linhas.*.numero_autorizacao_dgav' => ['nullable', 'string', 'max:255'],

@@ -57,7 +57,7 @@ class DespesaManagementController extends Controller
         $campanhaIds = $this->activeCampaignIds($request);
 
         $despesas = Despesa::query()
-            ->with(['items:id,despesa_id,descricao,quantidade,preco_unitario,iva_percentagem,produto_id,notas'])
+            ->with(['items:id,despesa_id,descricao,quantidade,preco_unitario,desconto_percentagem,iva_percentagem,produto_id,notas'])
             ->when($campanhaIds, fn ($q) => $q->whereIn('campanha_id', $campanhaIds))
             ->when($filters['search'] ?? null, fn ($q, $s) => $q->where(function ($sub) use ($s) {
                 $sub->where('titulo', 'like', "%{$s}%")
@@ -304,6 +304,7 @@ class DespesaManagementController extends Controller
                     'descricao'       => $i->descricao,
                     'quantidade'      => (float) $i->quantidade,
                     'preco_unitario'  => (float) $i->preco_unitario,
+                    'desconto_percentagem' => (float) $i->desconto_percentagem,
                     'iva_percentagem' => (float) $i->iva_percentagem,
                     'total_sem_iva'   => $i->total_sem_iva,
                     'total_iva_valor' => $i->total_iva_valor,
@@ -361,7 +362,7 @@ class DespesaManagementController extends Controller
                 ], ';');
 
                 if ($d->items->isNotEmpty()) {
-                    fputcsv($handle, ['', '  ↳ Descrição', '', 'Qtd', 'Preço Unit.', 'IVA %', 'Total s/ IVA', 'IVA', 'Total c/ IVA', ''], ';');
+                    fputcsv($handle, ['', '  ↳ Descrição', '', 'Qtd', 'Preço Unit.', 'Desc. %', 'IVA %', 'Total s/ IVA', 'IVA', 'Total c/ IVA', ''], ';');
                     foreach ($d->items as $i) {
                         fputcsv($handle, [
                             '',
@@ -369,6 +370,7 @@ class DespesaManagementController extends Controller
                             '',
                             number_format((float) $i->quantidade, 3, ',', '.'),
                             number_format((float) $i->preco_unitario, 4, ',', '.'),
+                            number_format((float) $i->desconto_percentagem, 2, ',', '.'),
                             number_format((float) $i->iva_percentagem, 0),
                             number_format($i->total_sem_iva, 2, ',', '.'),
                             number_format($i->total_iva_valor, 2, ',', '.'),
@@ -436,6 +438,7 @@ class DespesaManagementController extends Controller
             'items.*.descricao'       => ['required', 'string', 'max:255'],
             'items.*.quantidade'      => ['required', 'numeric', 'min:0.001'],
             'items.*.preco_unitario'  => ['required', 'numeric', 'min:0'],
+            'items.*.desconto_percentagem' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'items.*.iva_percentagem' => ['required', 'numeric', 'in:0,6,13,23'],
             'items.*.produto_id'      => ['nullable', 'integer', 'exists:produtos,id'],
             'items.*.notas'           => ['nullable', 'string', 'max:500'],
@@ -460,6 +463,8 @@ class DespesaManagementController extends Controller
                 'descricao'       => $i->descricao,
                 'quantidade'      => (float) $i->quantidade,
                 'preco_unitario'  => (float) $i->preco_unitario,
+                'desconto_percentagem' => (float) $i->desconto_percentagem,
+                'preco_liquido'   => $i->preco_liquido,
                 'iva_percentagem' => (float) $i->iva_percentagem,
                 'produto_id'      => $i->produto_id,
                 'notas'           => $i->notas ?? '',
@@ -477,7 +482,9 @@ class DespesaManagementController extends Controller
     private function calcularTotalItems(array $items): float
     {
         return array_reduce($items, function (float $carry, array $item) {
-            $base = (float) ($item['quantidade'] ?? 0) * (float) ($item['preco_unitario'] ?? 0);
+            $bruto = (float) ($item['quantidade'] ?? 0) * (float) ($item['preco_unitario'] ?? 0);
+            // O desconto entra antes do IVA, como na fatura.
+            $base = $bruto * (1 - (float) ($item['desconto_percentagem'] ?? 0) / 100);
             $iva  = $base * (float) ($item['iva_percentagem'] ?? 0) / 100;
 
             return $carry + round($base + $iva, 2);

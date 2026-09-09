@@ -7,33 +7,167 @@ use Symfony\Component\Process\Process;
 
 class PaperInvoiceExtractor
 {
+    public function __construct(private readonly TabelaFatura $tabela = new TabelaFatura)
+    {
+    }
+
     public function extract(string $documentPath): array
     {
         $warnings = [];
         $extension = strtolower(pathinfo($documentPath, PATHINFO_EXTENSION));
+        $tsv = null;
 
         if ($extension === 'pdf') {
             [$rawText, $qrData] = $this->extractPdf($documentPath, $warnings);
         } else {
             $qrData = $this->readQrCode($documentPath, $warnings);
-            $rawText = $this->runOcr($documentPath, $warnings);
+            [$rawText, $tsv] = $this->melhorLeitura($documentPath, $warnings);
         }
 
-        return $this->parseText($rawText, $qrData, $warnings);
+        return $this->parseText($rawText, $qrData, $warnings, $tsv);
     }
 
-    public function parseText(string $rawText, ?string $qrData = null, array $warnings = []): array
+    /**
+     * Le a fotografia varias vezes e fica com a leitura que passa nas contas.
+     *
+     * Nao ha um tratamento de imagem que sirva todas as fotos: uma sombra
+     * pede binarizacao, uma folha desmaiada pede contraste, uma tabela com
+     * linhas finas le-se melhor noutro modo de segmentacao. Como cada linha
+     * pode ser verificada pela aritmetica (quantidade x preco = total), ha
+     * como escolher objectivamente: tenta-se cada combinacao e fica a que
+     * produz mais linhas certas. Para quando a primeira ja acerta tudo.
+     *
+     * @return array{0: string, 1: ?string}
+     */
+    private function melhorLeitura(string $caminho, array &$warnings): array
+    {
+        $melhor = ['texto' => '', 'tsv' => null, 'pontos' => -1.0];
+        $avisosPreparacao = [];
+        $preparadas = [];
+
+        foreach (config('paper_invoice.tentativas', [['tratamento' => 'normal', 'psm' => '6']]) as $tentativa) {
+            $tratamento = $tentativa['tratamento'] ?? 'normal';
+            $imagem = $preparadas[$tratamento] ??= $this->prepararImagem($caminho, $avisosPreparacao, $tratamento);
+
+            $tsv = $this->runOcr($imagem, $avisosPreparacao, 'tsv', $tentativa['psm'] ?? '6');
+            $linhas = $tsv === '' ? [] : $this->tabela->linhas(PalavrasPosicionadas::deTsv($tsv));
+            $pontos = $this->pontuar($linhas);
+
+            if ($pontos > $melhor['pontos']) {
+                // O texto sai do proprio TSV: correr o tesseract outra vez so
+                // para o obter duplicava o tempo de espera.
+                $melhor = [
+                    'texto' => PalavrasPosicionadas::textoDeTsv($tsv),
+                    'tsv' => $tsv,
+                    'pontos' => $pontos,
+                ];
+            }
+
+            // Todas as linhas com as contas certas: nao ha melhor do que isto.
+            if ($linhas !== [] && $pontos >= count($linhas)) {
+                break;
+            }
+        }
+
+        foreach ($preparadas as $imagem) {
+            if ($imagem !== $caminho && is_file($imagem)) {
+                @unlink($imagem);
+            }
+        }
+
+        // Os avisos das tentativas repetem-se; interessa a lista sem repeticoes.
+        foreach (array_unique($avisosPreparacao) as $aviso) {
+            $warnings[] = $aviso;
+        }
+
+        return [$melhor['texto'], $melhor['tsv']];
+    }
+
+    /** Uma linha vale o que valem as suas contas. */
+    private function pontuar(array $linhas): float
+    {
+        return array_sum(array_map(
+            fn (array $linha) => $linha['confidence'] >= 0.95 ? 1.0 : $linha['confidence'] / 2,
+            $linhas
+        ));
+    }
+
+    /**
+     * Endireita e limpa a fotografia antes do OCR.
+     *
+     * Uma foto de telemovel vem com sombras, inclinacao e fundo colorido. O
+     * tesseract nao lida com isso: perde as colunas de numeros e devolve as
+     * linhas em papa. Se o ImageMagick nao estiver instalado, segue-se com a
+     * imagem tal como veio - pior leitura, mas nunca falha.
+     */
+    private function prepararImagem(string $caminho, array &$warnings, string $tratamento = 'normal'): string
+    {
+        $convert = $this->commandPath('convert') ?? $this->commandPath('magick');
+
+        if (! $convert) {
+            $warnings[] = 'ImageMagick indisponivel: a foto vai para OCR sem tratamento e le-se pior.';
+
+            return $caminho;
+        }
+
+        $destino = sys_get_temp_dir().DIRECTORY_SEPARATOR.uniqid('fatura_', true).'.png';
+
+        try {
+            $comando = [
+                $convert, $caminho,
+                '-auto-orient',
+                '-colorspace', 'Gray',
+                // 300 dpi equivalentes: abaixo disto os algarismos pequenos
+                // nao tem pixeis que cheguem para serem lidos.
+                '-resize', '2400x3200>',
+                '-resize', '1600x2100<',
+                '-deskew', '40%',
+            ];
+
+            $comando = array_merge($comando, $tratamento === 'binaria'
+                // Limiar local: resolve sombras e papel amarelado, onde o
+                // contraste global deixa metade da folha ilegivel.
+                ? ['-lat', '25x25-8%', '-despeckle']
+                : ['-normalize', '-despeckle', '-sharpen', '0x1']);
+
+            $comando[] = $destino;
+
+            $processo = new Process($comando);
+            $processo->setTimeout(60)->mustRun();
+        } catch (ProcessFailedException|\Throwable $e) {
+            $warnings[] = 'Nao foi possivel tratar a imagem antes do OCR: '.$e->getMessage();
+
+            return $caminho;
+        }
+
+        return is_file($destino) ? $destino : $caminho;
+    }
+
+    public function parseText(string $rawText, ?string $qrData = null, array $warnings = [], ?string $tsv = null): array
     {
         $lines = collect(preg_split('/\R/u', $rawText) ?: [])
             ->map(fn (string $line) => trim(preg_replace('/\s+/u', ' ', $line) ?? ''))
             ->filter()
             ->values();
 
-        $products = $this->extractProducts($lines->all());
+        // Primeiro pelas colunas, que e' como a fatura esta feita; so depois
+        // pelas expressoes sobre o texto corrido, que e' um palpite.
+        $products = $this->linhasPorColunas($rawText, $tsv);
+
+        if ($products === []) {
+            $products = $this->extractProducts($lines->all());
+        }
         $total = $this->extractTotal($rawText);
         $vatTotal = $this->extractVatTotal($rawText);
-        $lineTotal = array_sum(array_column($products, 'lineTotal'));
         $qrFields = $this->parseQrFields($qrData);
+        // O QR e' a fonte exacta do total e do IVA; e' com ele, quando existe,
+        // que se deduz a taxa das linhas.
+        $products = $this->taxaDoRodape(
+            $products,
+            (float) ($qrFields['total'] ?: $total),
+            (float) ($qrFields['vat_total'] ?: $vatTotal)
+        );
+        $lineTotal = array_sum(array_column($products, 'lineTotal'));
 
         if ($rawText === '') {
             $warnings[] = 'OCR nao devolveu texto legivel.';
@@ -171,7 +305,7 @@ class PaperInvoiceExtractor
         }
     }
 
-    private function runOcr(string $imagePath, array &$warnings): string
+    private function runOcr(string $imagePath, array &$warnings, string $formato = 'txt', string $psm = '6'): string
     {
         $tesseract = $this->commandPath('tesseract');
 
@@ -184,7 +318,11 @@ class PaperInvoiceExtractor
 
         foreach (array_unique([env('TESSERACT_LANGUAGE', 'por+eng'), 'por+eng', 'eng']) as $language) {
             try {
-                $command = [$tesseract, $imagePath, 'stdout', '-l', $language, '--psm', '6'];
+                $command = [$tesseract, $imagePath, 'stdout', '-l', $language, '--psm', $psm];
+
+                if ($formato !== 'txt') {
+                    $command[] = $formato;
+                }
                 if ($tessdataDir) {
                     array_splice($command, 3, 0, ['--tessdata-dir', $tessdataDir]);
                 }
@@ -199,7 +337,13 @@ class PaperInvoiceExtractor
         }
 
         try {
-            $process = new Process([$tesseract, $imagePath, 'stdout', '--psm', '6']);
+            $comando = [$tesseract, $imagePath, 'stdout', '--psm', $psm];
+
+            if ($formato !== 'txt') {
+                $comando[] = $formato;
+            }
+
+            $process = new Process($comando);
             $process->setTimeout(90)->mustRun();
 
             return trim($process->getOutput());
@@ -315,6 +459,58 @@ class PaperInvoiceExtractor
     }
 
     /**
+     * A coluna do IVA e' estreita e perde-se com facilidade numa foto. Se
+     * nenhuma linha trouxe taxa, o rodape da fatura sabe-a: o IVA a dividir
+     * pela base da uma das taxas legais. So se aplica quando bate certo numa
+     * delas - nao se inventa uma taxa a meio.
+     */
+    private function taxaDoRodape(array $products, float $total, float $vatTotal): array
+    {
+        if ($products === [] || $vatTotal <= 0 || $total <= $vatTotal) {
+            return $products;
+        }
+
+        foreach ($products as $linha) {
+            if (($linha['vatRate'] ?? 0) > 0) {
+                return $products;
+            }
+        }
+
+        $taxa = round($vatTotal / ($total - $vatTotal) * 100, 2);
+        $legal = collect([0, 6, 13, 23])->first(fn (int $valor) => abs($taxa - $valor) < 0.3);
+
+        if ($legal === null) {
+            return $products;
+        }
+
+        return array_map(fn (array $linha) => ['vatRate' => (float) $legal] + $linha, $products);
+    }
+
+    /**
+     * Linhas lidas pelas posicoes das colunas: do TSV do tesseract quando ha
+     * fotografia, e do texto alinhado do pdftotext quando ha PDF.
+     */
+    private function linhasPorColunas(string $rawText, ?string $tsv): array
+    {
+        foreach ([
+            $tsv === null ? [] : PalavrasPosicionadas::deTsv($tsv),
+            PalavrasPosicionadas::deTextoAlinhado($rawText),
+        ] as $palavras) {
+            if ($palavras === []) {
+                continue;
+            }
+
+            $linhas = $this->tabela->linhas($palavras);
+
+            if ($linhas !== []) {
+                return $linhas;
+            }
+        }
+
+        return [];
+    }
+
+    /**
      * O simbolo do euro aparece nas linhas em duas formas: o "€" como deve ser
      * e a versao duplamente codificada que o OCR devolve em ficheiros gravados
      * em latin1. Ambas sao opcionais - ha faturas que nao o imprimem de todo.
@@ -346,6 +542,7 @@ class PaperInvoiceExtractor
                     'description' => $this->cleanProductDescription(($matches['ref'] ?? '').' '.$matches['description']),
                     'quantity' => $this->moneyToFloat($matches['quantity']),
                     'unitPrice' => $this->moneyToFloat($matches['unit']),
+                    'discountRate' => 0.0,
                     'vatRate' => $this->moneyToFloat($matches['vat']),
                     'lineTotal' => $this->moneyToFloat($matches['total']),
                     'confidence' => 0.75,

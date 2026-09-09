@@ -97,7 +97,8 @@ class FaturaController extends Controller
                         $actualizacoes = [];
 
                         if ($actualizarCusto) {
-                            $precoUnitario = (float) $linha['preco_unitario'];
+                            // O custo do catalogo e o preco pago, ja com o desconto.
+                            $precoUnitario = $this->precoLiquido($linha);
 
                             if ((float) $produto->custo_unitario !== $precoUnitario) {
                                 $actualizacoes['custo_unitario'] = $precoUnitario;
@@ -121,13 +122,16 @@ class FaturaController extends Controller
 
                     $quantidade = (float) $linha['quantidade'];
                     $preco = (float) $linha['preco_unitario'];
+                    $desconto = (float) ($linha['desconto_percentagem'] ?? 0);
                     $iva = (float) ($linha['iva_percentagem'] ?? 0);
-                    $totalCalculado += $quantidade * $preco * (1 + $iva / 100);
+                    // O desconto entra antes do IVA, como na fatura.
+                    $totalCalculado += $quantidade * $preco * (1 - $desconto / 100) * (1 + $iva / 100);
 
                     $linhas[] = [
                         'descricao' => $linha['descricao'],
                         'quantidade' => $quantidade,
                         'preco_unitario' => $preco,
+                        'desconto_percentagem' => $desconto,
                         'iva_percentagem' => $iva,
                         'produto_id' => $produto?->id,
                         'notas' => $linha['notas'] ?? null,
@@ -253,7 +257,7 @@ class FaturaController extends Controller
             'numero_autorizacao_dgav' => $dgav,
             'codigo_interno' => $linha['codigo'] ?? null,
             'unidade_medida' => $linha['unidade_medida'] ?? 'un',
-            'custo_unitario' => (float) $linha['preco_unitario'],
+            'custo_unitario' => $this->precoLiquido($linha),
             'estabelecimento_venda_nome' => $linha['estabelecimento_venda_nome'] ?? null,
             'estabelecimento_venda_autorizacao' => $linha['estabelecimento_venda_autorizacao'] ?? null,
         ]);
@@ -289,6 +293,8 @@ class FaturaController extends Controller
                     'descricao' => $item->descricao,
                     'quantidade' => $item->quantidade,
                     'preco_unitario' => $item->preco_unitario,
+                    'desconto_percentagem' => $item->desconto_percentagem,
+                    'preco_liquido' => $item->preco_liquido,
                     'iva_percentagem' => $item->iva_percentagem,
                     'produto' => $item->produto ? [
                         'id' => $item->produto->id,
@@ -305,6 +311,15 @@ class FaturaController extends Controller
                 'data' => $custo->data_custo?->toDateString(),
             ],
         ];
+    }
+
+    /** Preco de tabela menos o desconto da linha. */
+    private function precoLiquido(array $linha): float
+    {
+        return round(
+            (float) $linha['preco_unitario'] * (1 - (float) ($linha['desconto_percentagem'] ?? 0) / 100),
+            4
+        );
     }
 
     private function valorReferencia(mixed $referencia): int|string|null

@@ -52,6 +52,7 @@ class FaturaExtracaoController extends Controller
                 'descricao' => $linha['description'] ?? '',
                 'quantidade' => round((float) ($linha['quantity'] ?? 1), 3),
                 'preco_unitario' => round((float) ($linha['unitPrice'] ?? 0), 4),
+                'desconto_percentagem' => round(min(100, max(0, (float) ($linha['discountRate'] ?? 0))), 2),
                 'iva_percentagem' => $this->taxaIvaAceite((float) ($linha['vatRate'] ?? 0)),
                 'total_linha' => round((float) ($linha['lineTotal'] ?? 0), 2),
                 'confianca' => round((float) ($linha['confidence'] ?? 0), 2),
