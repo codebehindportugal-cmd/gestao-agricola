@@ -9,6 +9,7 @@ use App\Models\Custo;
 use App\Models\Despesa;
 use App\Models\Produto;
 use App\Services\MovimentoStockService;
+use App\Services\PaperInvoice\TamanhoEmbalagem;
 use App\Services\ResolvedorReferencias;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -97,8 +98,13 @@ class FaturaController extends Controller
                         $actualizacoes = [];
 
                         if ($actualizarCusto) {
-                            // O custo do catalogo e o preco pago, ja com o desconto.
-                            $precoUnitario = $this->precoLiquido($linha);
+                            // O custo do catalogo e' por unidade de stock: o
+                            // preco pago (ja com desconto) a dividir pelo que
+                            // leva a embalagem.
+                            $precoUnitario = round(
+                                $this->precoLiquido($linha) / $produto->conteudo_por_embalagem,
+                                4
+                            );
 
                             if ((float) $produto->custo_unitario !== $precoUnitario) {
                                 $actualizacoes['custo_unitario'] = $precoUnitario;
@@ -251,13 +257,23 @@ class FaturaController extends Controller
             ? ($linha['descricao'] ?? (string) $referencia)
             : (string) $referencia;
 
+        // "BANJO fluziname - 5 LT" nasce com 5 L por embalagem: e' o que faz o
+        // stock subir 10 e nao 2 quando se compram duas.
+        $embalagem = TamanhoEmbalagem::daDescricao($linha['descricao']);
+        $embalagem = $embalagem === null
+            ? null
+            : TamanhoEmbalagem::paraUnidadeBase($embalagem['conteudo'], $embalagem['unidade']);
+
         $produto = Produto::query()->create([
             'nome' => $nome,
             'tipo' => $tipo,
             'numero_autorizacao_dgav' => $dgav,
             'codigo_interno' => $linha['codigo'] ?? null,
-            'unidade_medida' => $linha['unidade_medida'] ?? 'un',
-            'custo_unitario' => $this->precoLiquido($linha),
+            'unidade_medida' => $linha['unidade_medida'] ?? $embalagem['unidade'] ?? 'un',
+            'conteudo' => $embalagem['conteudo'] ?? null,
+            'custo_unitario' => $embalagem === null
+                ? $this->precoLiquido($linha)
+                : round($this->precoLiquido($linha) / $embalagem['conteudo'], 4),
             'estabelecimento_venda_nome' => $linha['estabelecimento_venda_nome'] ?? null,
             'estabelecimento_venda_autorizacao' => $linha['estabelecimento_venda_autorizacao'] ?? null,
         ]);

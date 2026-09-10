@@ -11,6 +11,7 @@ use App\Models\FaturaItem;
 use App\Models\Produto;
 use App\Models\Receita;
 use App\Services\MovimentoStockService;
+use App\Services\PaperInvoice\ProdutosDaFatura;
 use App\Services\RateioCustosService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -87,7 +88,7 @@ class DespesaManagementController extends Controller
             'resumoMesAnterior' => $this->buildResumoMes($mesAnt, $anoAnt, $campanhaIds),
             'resumoVendas'      => $this->buildResumoVendas($mes, $ano, $campanhaIds),
             'analytics'         => $this->buildAnalytics($mes, $ano, $campanhaIds),
-            'produtos'          => Produto::query()->orderBy('nome')->get(['id', 'nome', 'tipo', 'unidade_medida', 'custo_unitario']),
+            'produtos'          => Produto::query()->orderBy('nome')->get(['id', 'nome', 'tipo', 'unidade_medida', 'conteudo', 'custo_unitario']),
             'lotes'             => $this->lotesDisponiveis($campanhaIds),
             'partilhados'       => $this->custosPartilhadosMes($mes, $ano),
             'resumoPartilhados' => $this->buildResumoPartilhados($mes, $ano),
@@ -129,12 +130,10 @@ class DespesaManagementController extends Controller
         });
 
         $despesa->load(['items.produto']);
+        $catalogo = app(ProdutosDaFatura::class)->garantir($despesa);
         $movimentos = $this->processarMovimentosStock($despesa);
 
-        $msg = 'Despesa registada com sucesso.';
-        if (count($movimentos) > 0) {
-            $msg .= ' ' . count($movimentos) . ' produto(s) adicionado(s) ao stock automaticamente.';
-        }
+        $msg = 'Despesa registada com sucesso.'.$this->resumoDoStock($catalogo, $movimentos);
 
         return redirect()
             ->route('app.despesas.index', $request->only(['mes', 'ano']))
@@ -246,12 +245,10 @@ class DespesaManagementController extends Controller
         });
 
         $despesa->load(['items.produto']);
+        $catalogo = app(ProdutosDaFatura::class)->garantir($despesa);
         $movimentos = $this->processarMovimentosStock($despesa);
 
-        $msg = 'Despesa atualizada com sucesso.';
-        if (count($movimentos) > 0) {
-            $msg .= ' Stock actualizado para ' . count($movimentos) . ' produto(s).';
-        }
+        $msg = 'Despesa atualizada com sucesso.'.$this->resumoDoStock($catalogo, $movimentos);
 
         return redirect()
             ->route('app.despesas.index', $request->only(['mes', 'ano']))
@@ -409,6 +406,35 @@ class DespesaManagementController extends Controller
     private function processarMovimentosStock(Despesa $despesa): array
     {
         return app(MovimentoStockService::class)->processarEntradas($despesa);
+    }
+
+    /**
+     * Diz em texto o que entrou em stock, com as quantidades ja convertidas
+     * (dois bidoes de 5 L sao 10 L), e o que ficou de fora e porque.
+     *
+     * @param  array{ligados: int, criados: array, avisos: array}  $catalogo
+     */
+    private function resumoDoStock(array $catalogo, array $movimentos): string
+    {
+        $partes = [];
+
+        if ($catalogo['criados'] !== []) {
+            $partes[] = 'Produtos criados: '.implode(', ', $catalogo['criados']).'.';
+        }
+
+        if ($movimentos !== []) {
+            $entradas = collect($movimentos)
+                ->map(fn (array $m) => "{$m['produto']} +".rtrim(rtrim(number_format($m['quantidade'], 2, ',', ''), '0'), ',')." {$m['unidade']}")
+                ->implode('; ');
+
+            $partes[] = "Stock: {$entradas}.";
+        }
+
+        foreach ($catalogo['avisos'] as $aviso) {
+            $partes[] = $aviso;
+        }
+
+        return $partes === [] ? '' : ' '.implode(' ', $partes);
     }
 
     private function reverterMovimentosAnteriores(Despesa $despesa): void

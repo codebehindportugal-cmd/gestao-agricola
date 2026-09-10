@@ -129,6 +129,18 @@ const descontoForm = computed(() => form.items.reduce((s, i) => s + itemDesconto
 const totalComIvaForm = computed(() => subtotalForm.value + ivaForm.value);
 const temItems = computed(() => form.items.length > 0);
 
+// A fatura conta embalagens e o stock conta produto: 2 bidões de 5 L são 10 L.
+function entradaStock(item) {
+    const produto = props.produtos.find(p => p.id === parseInt(item.produto_id));
+    const conteudo = Number(produto?.conteudo) > 0 ? Number(produto.conteudo) : 1;
+    const total = (parseFloat(item.quantidade) || 0) * conteudo;
+    const unidade = produto?.unidade_medida ?? 'un';
+
+    return conteudo === 1
+        ? `${total.toFixed(2)} ${unidade}`
+        : `${total.toFixed(2)} ${unidade} (${item.quantidade} × ${conteudo})`;
+}
+
 // Quando produto é seleccionado, preenche o preço unitário
 function onProdutoChange(item) {
     if (!item.produto_id) return;
@@ -227,14 +239,18 @@ function submeter() {
         const payload = { ...data, data: data.data_despesa };
         delete payload.data_despesa;
 
+        // O PHP não interpreta corpos multipart em PATCH nem PUT: os campos
+        // chegavam todos vazios e a validação queixava-se de "titulo required"
+        // com o título preenchido no ecrã. Vai POST com _method, que o Laravel
+        // reencaminha para o update e o PHP já sabe ler.
+        if (editingDespesa.value) {
+            payload._method = 'patch';
+        }
+
         return payload;
     });
 
-    if (editingDespesa.value) {
-        form.patch(url, opts);
-    } else {
-        form.post(url, opts);
-    }
+    form.post(url, opts);
 }
 
 // ─── eliminar ────────────────────────────────────────────────────────────────
@@ -417,6 +433,7 @@ async function analisarFatura(file) {
             data: qr?.data ?? servidor?.data ?? null,
             total: qr?.total ?? servidor?.total ?? null,
             linhas: servidor?.linhas ?? [],
+            categoria: servidor?.categoria ?? null,
             fonte: servidor?.fonte ?? 'ocr',
             avisos: servidor?.avisos ?? [],
             rever: servidor?.rever ?? true,
@@ -443,6 +460,8 @@ function preencherDaLeitura() {
     else if (l.nif && !form.fornecedor) form.fornecedor = `NIF: ${l.nif}`;
     if (l.fornecedor && !form.titulo) form.titulo = l.fornecedor;
     if (l.total) form.valor = Number(l.total).toFixed(2);
+    // A categoria vinha sempre em "outro" e obrigava a corrigir a mão.
+    if (l.categoria && props.categorias.includes(l.categoria)) form.categoria = l.categoria;
 
     if (l.linhas.length > 0) {
         form.items = l.linhas.map((linha) => ({
@@ -1044,6 +1063,7 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                 </p>
                                 <p class="mt-0.5 text-xs text-blue-600">
                                     {{ [leitura.fornecedor, leitura.numero_fatura, leitura.data, leitura.total ? fmt(leitura.total) : null].filter(Boolean).join(' · ') }}
+                                    <template v-if="leitura.categoria"> · {{ categoriaLabel(leitura.categoria) }}</template>
                                 </p>
 
                                 <div v-if="leitura.linhas.length" class="mt-2 max-h-40 overflow-y-auto rounded-lg bg-white/70 p-2">
@@ -1219,7 +1239,7 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                             </span>
                                             <span v-if="item.produto_id"
                                                   class="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">
-                                                📦 +{{ (parseFloat(item.quantidade) || 0).toFixed(2) }} ao stock
+                                                📦 +{{ entradaStock(item) }} ao stock
                                             </span>
                                         </div>
                                         <span class="font-bold text-slate-800">{{ fmt(itemTotal(item)) }}</span>

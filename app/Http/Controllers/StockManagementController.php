@@ -54,6 +54,7 @@ class StockManagementController extends Controller
                     'estabelecimento_venda_nome' => $produto->estabelecimento_venda_nome,
                     'estabelecimento_venda_autorizacao' => $produto->estabelecimento_venda_autorizacao,
                     'unidade_medida' => $produto->unidade_medida,
+                    'conteudo' => $produto->conteudo !== null ? (float) $produto->conteudo : null,
                     'custo_unitario' => $produto->custo_unitario,
                     'stock_minimo' => $stockMinimo,
                     'stock_atual' => $stockAtual,
@@ -102,6 +103,9 @@ class StockManagementController extends Controller
             'nome' => ['required', 'string', 'max:255'],
             'tipo' => ['required', 'string', 'max:255'],
             'unidade_medida' => ['required', 'string', 'max:50'],
+            // Quanto leva cada embalagem: "5" num produto medido em litros quer
+            // dizer que cada bidao tem 5 L, e comprar 2 poe 10 L em stock.
+            'conteudo' => ['nullable', 'numeric', 'gt:0'],
             'custo_unitario' => ['nullable', 'numeric', 'min:0'],
             'stock_minimo' => ['nullable', 'numeric', 'min:0'],
             'quantidade_inicial' => ['nullable', 'numeric', 'min:0'],
@@ -122,6 +126,7 @@ class StockManagementController extends Controller
                 'nome' => $data['nome'],
                 'tipo' => $this->normalizeTipo($data['tipo']),
                 'unidade_medida' => $data['unidade_medida'],
+                'conteudo' => $data['conteudo'] ?? null,
                 'custo_unitario' => $data['custo_unitario'] === '' ? null : ($data['custo_unitario'] ?? null),
                 'stock_minimo' => $data['stock_minimo'] === '' ? 0 : (int) round((float) ($data['stock_minimo'] ?? 0)),
                 'codigo_interno' => $data['codigo_interno'] ?? null,
@@ -138,6 +143,7 @@ class StockManagementController extends Controller
                     'armazem_id' => null,
                     'quantidade' => (float) $data['quantidade_inicial'],
                     'unidade_medida' => $data['unidade_medida'],
+                'conteudo' => $data['conteudo'] ?? null,
                     'data_atualizado' => now()->toDateString(),
                     'observacoes' => 'Stock inicial.',
                 ]);
@@ -174,6 +180,9 @@ class StockManagementController extends Controller
             'stock_minimo' => ['nullable', 'numeric', 'min:0'],
             'custo_unitario' => ['nullable', 'numeric', 'min:0'],
             'unidade_medida' => ['required', 'string', 'max:50'],
+            // Quanto leva cada embalagem: "5" num produto medido em litros quer
+            // dizer que cada bidao tem 5 L, e comprar 2 poe 10 L em stock.
+            'conteudo' => ['nullable', 'numeric', 'gt:0'],
             'observacoes' => ['nullable', 'string'],
         ]);
 
@@ -190,6 +199,7 @@ class StockManagementController extends Controller
 
             $stock->fill([
                 'unidade_medida' => $data['unidade_medida'],
+                'conteudo' => $data['conteudo'] ?? null,
                 'quantidade' => $quantidadeNova,
                 'data_atualizado' => now()->toDateString(),
                 'observacoes' => $data['observacoes'] ?? null,
@@ -198,6 +208,7 @@ class StockManagementController extends Controller
 
             $produto->update([
                 'unidade_medida' => $data['unidade_medida'],
+                'conteudo' => $data['conteudo'] ?? null,
                 'stock_minimo' => $data['stock_minimo'] === '' ? 0 : (int) round((float) ($data['stock_minimo'] ?? 0)),
                 'custo_unitario' => $data['custo_unitario'] === '' ? null : ($data['custo_unitario'] ?? null),
             ]);

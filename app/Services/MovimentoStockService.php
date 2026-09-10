@@ -51,18 +51,24 @@ class MovimentoStockService
                 ]
             );
 
+            // A fatura conta embalagens; o stock conta produto. "2 x BANJO 5 LT"
+            // sao 10 litros, e o custo por litro e' um quinto do preco da
+            // embalagem.
+            $embalagem = $produto->conteudo_por_embalagem;
+            $entrada = round((float) $item->quantidade * $embalagem, 3);
+            $custoPorUnidade = round((float) $item->preco_liquido / $embalagem, 4);
+
             $stock->update([
-                'quantidade' => max(0, (float) $stock->quantidade + (float) $item->quantidade),
+                'quantidade' => max(0, (float) $stock->quantidade + $entrada),
                 'data_atualizado' => now()->toDateString(),
             ]);
 
             MovimentoStock::create([
                 'produto_id' => $item->produto_id,
                 'tipo' => 'entrada',
-                'quantidade' => (float) $item->quantidade,
+                'quantidade' => $entrada,
                 'unidade_medida' => $produto->unidade_medida ?? 'un',
-                // O custo e o preco depois do desconto: e o que se pagou.
-                'custo_unitario' => (float) $item->preco_liquido,
+                'custo_unitario' => $custoPorUnidade,
                 'referencia' => $referencia,
                 'despesa_id' => $despesa->id,
                 'fatura_item_id' => $item->id,
@@ -71,8 +77,10 @@ class MovimentoStockService
 
             $movimentos[] = [
                 'produto' => $produto->nome,
-                'quantidade' => (float) $item->quantidade,
+                'quantidade' => $entrada,
                 'unidade' => $produto->unidade_medida ?? 'un',
+                'embalagens' => (float) $item->quantidade,
+                'conteudo' => $embalagem,
             ];
         }
 

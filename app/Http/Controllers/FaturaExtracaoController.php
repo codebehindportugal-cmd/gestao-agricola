@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Despesa;
 use App\Models\Produto;
 use App\Services\PaperInvoice\LeituraFatura;
+use App\Services\PaperInvoice\CategoriaDaFatura;
+use App\Services\PaperInvoice\TamanhoEmbalagem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -56,12 +58,17 @@ class FaturaExtracaoController extends Controller
                 'iva_percentagem' => $this->taxaIvaAceite((float) ($linha['vatRate'] ?? 0)),
                 'total_linha' => round((float) ($linha['lineTotal'] ?? 0), 2),
                 'confianca' => round((float) ($linha['confidence'] ?? 0), 2),
+                'embalagem' => $this->embalagem($linha['description'] ?? ''),
                 'produto_id' => $this->produtoSugerido($linha['description'] ?? '', $produtos),
             ])
             ->values()
             ->all();
 
         return [
+            'categoria' => CategoriaDaFatura::adivinhar(
+                $dados['supplier']['name'] ?? null,
+                array_column($dados['products'] ?? [], 'description')
+            ),
             'fornecedor' => $dados['supplier']['name'] ?? null,
             'nif' => $dados['supplier']['taxNumber'] ?: null,
             'numero_fatura' => $dados['invoice']['number'] ?: null,
@@ -74,6 +81,16 @@ class FaturaExtracaoController extends Controller
             'rever' => $dados['needsManualReview'] ?? true,
             'avisos' => $dados['warnings'] ?? [],
         ];
+    }
+
+    /** Tamanho da embalagem lido da designacao, para o ecra poder dizer o que entra em stock. */
+    private function embalagem(string $descricao): ?array
+    {
+        $lido = TamanhoEmbalagem::daDescricao($descricao);
+
+        return $lido === null
+            ? null
+            : TamanhoEmbalagem::paraUnidadeBase($lido['conteudo'], $lido['unidade']);
     }
 
     /** O extractor devolve dd/mm/aaaa; o campo de data do formulario quer aaaa-mm-dd. */

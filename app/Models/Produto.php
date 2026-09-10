@@ -41,6 +41,17 @@ class Produto extends Model
         };
     }
 
+    /**
+     * Quanto leva cada embalagem. Sem tamanho registado vale 1, e a compra
+     * conta unidades - que e' o que acontecia antes desta coluna existir.
+     */
+    public function getConteudoPorEmbalagemAttribute(): float
+    {
+        $conteudo = (float) ($this->attributes['conteudo'] ?? 0);
+
+        return $conteudo > 0 ? $conteudo : 1.0;
+    }
+
     public function ehFitofarmaco(): bool
     {
         return self::normalizarTipo($this->tipo) === self::TIPO_FITOFARMACO;
@@ -57,6 +68,7 @@ class Produto extends Model
         'fornecedor_id',
         'custo_unitario',
         'unidade_medida',
+        'conteudo',
         'stock_minimo',
         'descricao',
         'data_validade',

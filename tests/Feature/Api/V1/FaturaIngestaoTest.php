@@ -87,12 +87,17 @@ class FaturaIngestaoTest extends TestCase
         $response->assertCreated()
             ->assertJsonFragment(['produto criado: Adubo Foliar X (tipo fertilizante).']);
 
+        // "Adubo Foliar X 20kg" a 30 EUR o saco: o catalogo guarda o custo por
+        // quilo, que e' o que o campo consome, e nao o preco do saco.
         $this->assertDatabaseHas('produtos', [
             'nome' => 'Adubo Foliar X',
             'tipo' => 'fertilizante',
             'unidade_medida' => 'kg',
-            'custo_unitario' => 30,
+            'conteudo' => 20,
+            'custo_unitario' => 1.5,
         ]);
+        // Dois sacos de 20 kg sao 40 kg de stock.
+        $this->assertDatabaseHas('stocks', ['quantidade' => 40, 'unidade_medida' => 'kg']);
     }
 
     public function test_produto_fitofarmaceutico_novo_sem_dgav_devolve_422(): void
@@ -283,7 +288,8 @@ class FaturaIngestaoTest extends TestCase
             'estabelecimento_venda_nome' => 'Casa Queridos',
             'estabelecimento_venda_autorizacao' => '889-V-R',
         ]);
-        $this->assertDatabaseHas('stocks', ['quantidade' => 5, 'unidade_medida' => 'L']);
+        // Cinco bidoes de 5 LT sao 25 litros em stock, nao 5 unidades.
+        $this->assertDatabaseHas('stocks', ['quantidade' => 25, 'unidade_medida' => 'L']);
     }
 
     public function test_produto_criado_fica_com_o_tipo_canonico_da_aplicacao(): void

@@ -139,6 +139,48 @@ class DescontoLinhaFaturaTest extends TestCase
         $this->assertSame('197.48', (string) Despesa::query()->value('valor'));
     }
 
+    /**
+     * O ecra envia POST com _method=patch por causa do ficheiro anexado: o PHP
+     * nao interpreta corpos multipart em PATCH, e os campos chegavam vazios
+     * ("The titulo field is required" com o titulo preenchido).
+     */
+    public function test_actualizar_fatura_por_post_com_method_patch(): void
+    {
+        $this->autenticar();
+
+        $this->post(route('app.despesas.store'), [
+            'titulo' => 'Agribipes',
+            'numero_fatura' => 'FR 2026A101/3403',
+            'fornecedor' => 'Agribipes',
+            'data' => '2026-09-09',
+            'categoria' => 'pecas',
+            'valor' => 100,
+        ])->assertRedirect();
+
+        $despesa = Despesa::query()->firstOrFail();
+
+        $this->post(route('app.despesas.update', $despesa), [
+            '_method' => 'patch',
+            'titulo' => 'Agribipes',
+            'numero_fatura' => 'FR 2026A101/3403',
+            'fornecedor' => 'Agribipes',
+            'data' => '2026-09-09',
+            'categoria' => 'pecas',
+            'items' => [[
+                'descricao' => 'TUBO BORRACHA RETORNO OLEO 2TE - 1/2"',
+                'quantidade' => 2,
+                'preco_unitario' => 15,
+                'iva_percentagem' => 23,
+            ]],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $despesa->refresh();
+
+        $this->assertSame('Agribipes', $despesa->titulo);
+        $this->assertCount(1, $despesa->items);
+        $this->assertSame('36.90', (string) $despesa->valor);
+    }
+
     private function autenticar(): User
     {
         $user = User::factory()->create();
