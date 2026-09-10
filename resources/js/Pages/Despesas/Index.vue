@@ -891,6 +891,13 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                     <span v-if="d.fornecedor">{{ d.fornecedor }}</span>
                                     <span v-if="d.numero_fatura"># {{ d.numero_fatura }}</span>
                                     <span>{{ new Date(d.data).toLocaleDateString('pt-PT') }}</span>
+                                    <!-- Sem campanha e um gasto de toda a exploracao, repartido
+                                         pelo rateio; dizer-lo evita que pareca um esquecimento. -->
+                                    <span v-if="d.campanha">{{ d.campanha }}</span>
+                                    <span v-else class="text-amber-600"
+                                          title="Gasto geral da exploração: é repartido pelas campanhas do período, pelos quilos colhidos.">
+                                        Geral (repartido)
+                                    </span>
                                 </div>
 
                                 <!-- linhas resumo -->

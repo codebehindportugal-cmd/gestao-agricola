@@ -58,8 +58,12 @@ class DespesaManagementController extends Controller
         $campanhaIds = $this->activeCampaignIds($request);
 
         $despesas = Despesa::query()
-            ->with(['items:id,despesa_id,descricao,quantidade,preco_unitario,desconto_percentagem,iva_percentagem,produto_id,notas'])
-            ->when($campanhaIds, fn ($q) => $q->whereIn('campanha_id', $campanhaIds))
+            ->with([
+                'items:id,despesa_id,descricao,quantidade,preco_unitario,desconto_percentagem,iva_percentagem,produto_id,notas',
+                'campanha:id,nome,cultura_id,ano',
+                'campanha.cultura:id,nome',
+            ])
+            ->tap(fn ($q) => $this->filtrarPorCampanha($q, $campanhaIds))
             ->when($filters['search'] ?? null, fn ($q, $s) => $q->where(function ($sub) use ($s) {
                 $sub->where('titulo', 'like', "%{$s}%")
                     ->orWhere('fornecedor', 'like', "%{$s}%")
@@ -283,7 +287,7 @@ class DespesaManagementController extends Controller
 
         $despesas = Despesa::query()
             ->with('items')
-            ->when($campanhaIds, fn ($q) => $q->whereIn('campanha_id', $campanhaIds))
+            ->tap(fn ($q) => $this->filtrarPorCampanha($q, $campanhaIds))
             ->whereYear('data', $ano)
             ->whereMonth('data', $mes)
             ->orderBy('data')
@@ -324,7 +328,7 @@ class DespesaManagementController extends Controller
 
         $despesas = Despesa::query()
             ->with('items')
-            ->when($campanhaIds, fn ($q) => $q->whereIn('campanha_id', $campanhaIds))
+            ->tap(fn ($q) => $this->filtrarPorCampanha($q, $campanhaIds))
             ->whereYear('data', $ano)
             ->whereMonth('data', $mes)
             ->orderBy('data')
@@ -502,6 +506,10 @@ class DespesaManagementController extends Controller
             'subtotal_calculado' => $d->subtotal_calculado,
             'iva_calculado'      => $d->iva_calculado,
             'total_fatura'       => $d->total_fatura,
+            // Sem campanha e um gasto geral da exploracao, repartido pelo
+            // rateio. Vai para o ecra para se ver porque e que a despesa nao
+            // esta em nenhuma campanha, em vez de parecer um engano.
+            'campanha'           => $d->campanha?->nome_completo,
         ];
     }
 
@@ -522,7 +530,7 @@ class DespesaManagementController extends Controller
     private function buildResumoMes(int $mes, int $ano, array $campanhaIds = []): array
     {
         $despesas = Despesa::query()
-            ->when($campanhaIds, fn ($q) => $q->whereIn('campanha_id', $campanhaIds))
+            ->tap(fn ($q) => $this->filtrarPorCampanha($q, $campanhaIds))
             ->whereYear('data', $ano)
             ->whereMonth('data', $mes)
             ->get(['valor', 'categoria']);
@@ -558,7 +566,7 @@ class DespesaManagementController extends Controller
         }
 
         $despesaIds = Despesa::query()
-            ->when($campanhaIds, fn ($q) => $q->whereIn('campanha_id', $campanhaIds))
+            ->tap(fn ($q) => $this->filtrarPorCampanha($q, $campanhaIds))
             ->whereYear('data', $ano)
             ->whereMonth('data', $mes)
             ->pluck('id');
@@ -615,7 +623,7 @@ class DespesaManagementController extends Controller
     private function buildResumoVendas(int $mes, int $ano, array $campanhaIds = []): array
     {
         $vendas = Receita::query()
-            ->when($campanhaIds, fn ($q) => $q->whereIn('campanha_id', $campanhaIds))
+            ->tap(fn ($q) => $this->filtrarPorCampanha($q, $campanhaIds))
             ->whereYear('data', $ano)
             ->whereMonth('data', $mes)
             ->get(['valor', 'tipo', 'quantidade']);
@@ -637,7 +645,7 @@ class DespesaManagementController extends Controller
     private function vendasMes(int $mes, int $ano, array $campanhaIds = []): array
     {
         return Receita::query()
-            ->when($campanhaIds, fn ($q) => $q->whereIn('campanha_id', $campanhaIds))
+            ->tap(fn ($q) => $this->filtrarPorCampanha($q, $campanhaIds))
             ->whereYear('data', $ano)
             ->whereMonth('data', $mes)
             ->orderByDesc('data')
@@ -769,6 +777,27 @@ class DespesaManagementController extends Controller
             'total' => round((float) $custos->sum('valor'), 2),
             'count' => $custos->count(),
         ];
+    }
+
+    /**
+     * Limita despesas e vendas as campanhas do ano activo, sem esconder o que
+     * nao pertence a campanha nenhuma.
+     *
+     * Uma despesa sem campanha_id e um gasto geral da exploracao — e o que a
+     * API cria quando a fatura serve varias campanhas, como um fungicida que
+     * vai as pereiras e as macieiras. Se o filtro fosse so um whereIn, esse
+     * gasto desaparecia do ecra sem ninguem dar por ela, e era dinheiro saido
+     * que nunca mais aparecia em conta nenhuma.
+     */
+    private function filtrarPorCampanha($query, array $campanhaIds)
+    {
+        if ($campanhaIds === []) {
+            return $query;
+        }
+
+        return $query->where(
+            fn ($sub) => $sub->whereIn('campanha_id', $campanhaIds)->orWhereNull('campanha_id')
+        );
     }
 
     private function activeCampaignIdForWrite(Request $request): ?int

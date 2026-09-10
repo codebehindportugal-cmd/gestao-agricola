@@ -21,7 +21,6 @@ class Despesa extends Model
         'data',
         'campanha_id',
         'categoria',
-        'marca',
         'ficheiro_path',
         'notas',
     ];

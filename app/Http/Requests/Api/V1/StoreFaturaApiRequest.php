@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api\V1;
 
 use App\Http\Controllers\DespesaManagementController;
+use App\Models\Custo;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -34,6 +35,11 @@ class StoreFaturaApiRequest extends FormRequest
             'actualizar_custo_unitario' => ['nullable', 'boolean'],
             'dar_entrada_em_stock' => ['nullable', 'boolean'],
             'criar_custo' => ['nullable', 'boolean'],
+            // Custo partilhado por varias campanhas. Por omissao, uma fatura
+            // sem campanha nem maquina nasce rateavel; isto serve para forcar
+            // o contrario, ou para escolher a base do rateio.
+            'rateavel' => ['nullable', 'boolean'],
+            'base_rateio' => ['nullable', 'string', Rule::in(Custo::BASES_RATEIO)],
 
             'linhas' => ['required', 'array', 'min:1'],
             'linhas.*.produto' => ['nullable'],

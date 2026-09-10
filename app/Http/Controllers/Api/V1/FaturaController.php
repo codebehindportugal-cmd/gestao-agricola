@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Api\RespondeJson;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\StoreFaturaApiRequest;
+use App\Models\Campanha;
 use App\Models\Custo;
 use App\Models\Despesa;
 use App\Models\Produto;
@@ -12,6 +13,7 @@ use App\Services\MovimentoStockService;
 use App\Services\PaperInvoice\TamanhoEmbalagem;
 use App\Services\ResolvedorReferencias;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -60,7 +62,7 @@ class FaturaController extends Controller
             if ($existente) {
                 $avisos[] = "fatura ja registada ({$data['numero_fatura']})";
 
-                return $this->criado($this->formatar($existente->load('items.produto'), null), $avisos);
+                return $this->criado($this->formatar($existente->load(['items.produto', 'campanha']), null), $avisos);
             }
         }
 
@@ -73,6 +75,8 @@ class FaturaController extends Controller
 
                 if (! empty($data['campanha'])) {
                     $campanha = $this->resolvedor->resolverCampanha($this->valorReferencia($data['campanha']));
+                } else {
+                    $campanha = $this->campanhaPelaData($data['data'], $avisos);
                 }
 
                 // Faturas de pecas ligam-se a maquina, para o custo entrar no
@@ -172,7 +176,7 @@ class FaturaController extends Controller
                     $despesa->items()->create($linha);
                 }
 
-                $despesa->load('items.produto');
+                $despesa->load(['items.produto', 'campanha']);
 
                 $movimentos = [];
 
@@ -187,6 +191,11 @@ class FaturaController extends Controller
                 $custo = null;
 
                 if (($data['criar_custo'] ?? true) && $valor > 0) {
+                    // Sem campanha e sem maquina, o custo nao tem onde encostar:
+                    // nasce rateavel para o RateioCustosService o repartir pelas
+                    // campanhas do periodo, em vez de ficar fora de todas as contas.
+                    $rateavel = $data['rateavel'] ?? ($campanha === null && $maquina === null);
+
                     $custo = Custo::query()->create([
                         'descricao' => $this->stock->referencia($despesa),
                         'tipo' => self::CATEGORIA_PARA_TIPO_CUSTO[$categoria] ?? 'outro',
@@ -194,6 +203,10 @@ class FaturaController extends Controller
                         'data_custo' => $data['data'],
                         'campanha_id' => $campanha?->id,
                         'maquina_id' => $maquina?->id,
+                        'rateavel' => $rateavel && $campanha === null,
+                        'base_rateio' => $rateavel && $campanha === null
+                            ? ($data['base_rateio'] ?? 'kg')
+                            : null,
                         'referencia_externa' => 'fatura-'.$despesa->id,
                     ]);
                 }
@@ -208,6 +221,48 @@ class FaturaController extends Controller
             $this->formatar($despesa, $custo, $movimentos),
             array_merge($avisos, $avisosCriacao)
         );
+    }
+
+    /**
+     * Campanha da fatura quando o pedido nao a indica.
+     *
+     * Nao ha "a campanha activa": nesta exploracao correm varias ao mesmo
+     * tempo (pereiras, macieiras, culturas anuais), todas com o mesmo periodo.
+     * Por isso so se escolhe quando a data da fatura cai dentro de uma unica
+     * campanha. Havendo mais do que uma, a fatura fica sem campanha e o custo
+     * nasce rateavel, para ser repartido pelos quilos colhidos em vez de ser
+     * atirado ao calhas para uma delas.
+     */
+    private function campanhaPelaData(string $data, array &$avisos): ?Campanha
+    {
+        $dia = Carbon::parse($data)->startOfDay();
+
+        $candidatas = Campanha::query()
+            ->whereDate('data_inicio', '<=', $dia)
+            ->where(fn ($q) => $q->whereNull('data_fim')->orWhereDate('data_fim', '>=', $dia))
+            ->orderBy('id')
+            ->get(['id', 'nome', 'ano', 'cultura_id']);
+
+        if ($candidatas->count() === 1) {
+            return $candidatas->first();
+        }
+
+        if ($candidatas->isEmpty()) {
+            $avisos[] = 'nenhuma campanha cobre a data da fatura; o custo fica rateavel pelas campanhas do periodo.';
+
+            return null;
+        }
+
+        $nomes = $candidatas->map(fn (Campanha $c) => $c->nome_completo)->implode(', ');
+
+        $avisos[] = sprintf(
+            'a data da fatura cai em %d campanhas (%s); a despesa fica sem campanha e o custo rateavel. '
+            .'Indique "campanha" no pedido, ou atribua-a no ecra, se pertencer so a uma.',
+            $candidatas->count(),
+            $nomes
+        );
+
+        return null;
     }
 
     private function resolverProduto(array $linha, bool $criarProdutos, int $indice, array &$avisos): ?Produto
@@ -304,6 +359,10 @@ class FaturaController extends Controller
                 'categoria' => $despesa->categoria,
                 'valor' => $despesa->valor,
                 'data' => $despesa->data?->toDateString(),
+                'campanha' => $despesa->campanha === null ? null : [
+                    'id' => $despesa->campanha->id,
+                    'nome' => $despesa->campanha->nome_completo,
+                ],
                 'linhas' => $despesa->items->map(fn ($item) => [
                     'id' => $item->id,
                     'descricao' => $item->descricao,
@@ -325,6 +384,8 @@ class FaturaController extends Controller
                 'tipo' => $custo->tipo,
                 'valor' => $custo->valor,
                 'data' => $custo->data_custo?->toDateString(),
+                'rateavel' => (bool) $custo->rateavel,
+                'base_rateio' => $custo->base_rateio,
             ],
         ];
     }
