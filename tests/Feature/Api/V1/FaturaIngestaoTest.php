@@ -53,15 +53,22 @@ class FaturaIngestaoTest extends TestCase
 
         $this->assertDatabaseHas('despesas', ['numero_fatura' => 'FT 2026/123', 'valor' => 190.80]);
         $this->assertDatabaseHas('fatura_items', ['descricao' => 'Montana 5L', 'quantidade' => 4]);
-        $this->assertDatabaseHas('stocks', ['produto_id' => $montana->id, 'quantidade' => 4]);
+
+        // "Montana 5L" sao bidoes de 5 litros: 4 bidoes dao 20 L de stock a 9
+        // EUR/L. O produto estava sem conteudo (o valor de antes da coluna
+        // existir), por isso a fatura corrige-o.
+        $this->assertDatabaseHas('stocks', ['produto_id' => $montana->id, 'quantidade' => 20]);
         $this->assertDatabaseHas('movimento_stocks', [
             'produto_id' => $montana->id,
             'tipo' => 'entrada',
-            'quantidade' => 4,
-            'custo_unitario' => 45,
+            'quantidade' => 20,
+            'custo_unitario' => 9,
         ]);
-        // custo_unitario do produto actualizado pelo preco da fatura
-        $this->assertDatabaseHas('produtos', ['id' => $montana->id, 'custo_unitario' => 45]);
+        $this->assertDatabaseHas('produtos', [
+            'id' => $montana->id,
+            'conteudo' => 5,
+            'custo_unitario' => 9,
+        ]);
     }
 
     public function test_cria_produto_novo_quando_nao_existe(): void

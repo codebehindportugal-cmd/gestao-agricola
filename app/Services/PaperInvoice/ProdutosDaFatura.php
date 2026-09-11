@@ -37,6 +37,8 @@ class ProdutosDaFatura
         $resultado = ['ligados' => 0, 'criados' => [], 'avisos' => []];
 
         if ($tipo === null) {
+            $this->garantirEmbalagens($despesa, $resultado);
+
             return $resultado;
         }
 
@@ -70,8 +72,72 @@ class ProdutosDaFatura
         }
 
         $despesa->load('items.produto');
+        $this->garantirEmbalagens($despesa, $resultado);
 
         return $resultado;
+    }
+
+    /**
+     * Grava em cada linha quanto leva a embalagem, lido da designacao.
+     *
+     * E o que faz "2 x ERUNE 5 LT" dar 10 litros mesmo quando o produto ja
+     * existia no catalogo com conteudo 1 — o caso que entrou mal. O tamanho
+     * fica na linha, por isso o movimento e reproduzivel; e se o produto estava
+     * sem tamanho, aproveita-se para o corrigir.
+     *
+     * @param  array{ligados: int, criados: array<int, string>, avisos: array<int, string>}  $resultado
+     */
+    private function garantirEmbalagens(Despesa $despesa, array &$resultado): void
+    {
+        foreach ($despesa->items as $item) {
+            $lido = TamanhoEmbalagem::daDescricao($item->descricao);
+
+            if ($lido === null) {
+                continue;
+            }
+
+            $base = TamanhoEmbalagem::paraUnidadeBase($lido['conteudo'], $lido['unidade']);
+
+            if ((float) ($item->conteudo_embalagem ?? 0) <= 0) {
+                $item->update([
+                    'conteudo_embalagem' => $base['conteudo'],
+                    'unidade_embalagem' => $base['unidade'],
+                ]);
+            }
+
+            $produto = $item->produto;
+
+            if ($produto === null) {
+                continue;
+            }
+
+            $doProduto = (float) ($produto->conteudo ?: 0);
+
+            if (abs($doProduto - $base['conteudo']) < 0.0001) {
+                continue;
+            }
+
+            // Conteudo a 1 ou vazio e o valor por omissao de antes desta coluna
+            // existir: corrige-se. Com outro tamanho a serio nao se mexe — pode
+            // ser a embalagem grande que ele costuma comprar — e avisa-se.
+            if ($doProduto <= 1) {
+                $produto->update(array_filter([
+                    'conteudo' => $base['conteudo'],
+                    'unidade_medida' => blank($produto->unidade_medida) ? $base['unidade'] : null,
+                ], fn ($valor) => $valor !== null));
+
+                continue;
+            }
+
+            $resultado['avisos'][] = sprintf(
+                'O conteúdo de "%s" no catálogo (%s %s) difere da fatura (%s %s); a entrada usou o da fatura.',
+                $produto->nome,
+                rtrim(rtrim(number_format($doProduto, 4, ',', ''), '0'), ','),
+                $produto->unidade_medida ?? '',
+                rtrim(rtrim(number_format($base['conteudo'], 4, ',', ''), '0'), ','),
+                $base['unidade']
+            );
+        }
     }
 
     /** Produto que ja exista com este nome, para nao duplicar o catalogo. */

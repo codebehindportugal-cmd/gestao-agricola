@@ -59,7 +59,7 @@ class DespesaManagementController extends Controller
 
         $despesas = Despesa::query()
             ->with([
-                'items:id,despesa_id,descricao,quantidade,preco_unitario,desconto_percentagem,iva_percentagem,produto_id,notas',
+                'items:id,despesa_id,descricao,quantidade,conteudo_embalagem,unidade_embalagem,preco_unitario,desconto_percentagem,iva_percentagem,produto_id,notas',
                 'campanha:id,nome,cultura_id,ano',
                 'campanha.cultura:id,nome',
             ])
@@ -467,6 +467,10 @@ class DespesaManagementController extends Controller
             'items'     => ['nullable', 'array'],
             'items.*.descricao'       => ['required', 'string', 'max:255'],
             'items.*.quantidade'      => ['required', 'numeric', 'min:0.001'],
+            // Quanto leva a embalagem desta linha: 2 bidoes de 5 L sao 10 L de
+            // stock. Em branco, e lido da designacao.
+            'items.*.conteudo_embalagem' => ['nullable', 'numeric', 'gt:0'],
+            'items.*.unidade_embalagem'  => ['nullable', 'string', 'max:20'],
             'items.*.preco_unitario'  => ['required', 'numeric', 'min:0'],
             'items.*.desconto_percentagem' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'items.*.iva_percentagem' => ['required', 'numeric', 'in:0,6,13,23'],

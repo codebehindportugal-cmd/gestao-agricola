@@ -46,6 +46,10 @@ class StoreFaturaApiRequest extends FormRequest
             'linhas.*.codigo' => ['nullable', 'string', 'max:255'],
             'linhas.*.descricao' => ['required', 'string', 'max:255'],
             'linhas.*.quantidade' => ['required', 'numeric', 'gt:0'],
+            // Quanto leva cada embalagem desta linha (2 bidoes de 5 L sao 10 L
+            // de stock). Ganha ao tamanho lido da designacao e ao do catalogo.
+            'linhas.*.conteudo_embalagem' => ['nullable', 'numeric', 'gt:0'],
+            'linhas.*.unidade_embalagem' => ['nullable', 'string', 'max:20'],
             'linhas.*.preco_unitario' => ['required', 'numeric', 'min:0'],
             'linhas.*.desconto_percentagem' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'linhas.*.iva_percentagem' => ['nullable', 'numeric', Rule::in(self::TAXAS_IVA)],
