@@ -94,6 +94,13 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->group(functio
     Route::post('faturas', [FaturaController::class, 'store'])
         ->middleware(['ability:faturas:write,custos:write', 'api.write.role']);
 
+    // A foto da fatura, em multipart. Separada do store porque o corpo deste
+    // e' o ficheiro e o do store e' JSON com as linhas; juntar os dois obrigava
+    // quem envia a codificar a imagem em texto, e uma foto de telemovel nao
+    // cabe la. O documento e' preciso para o caderno de campo.
+    Route::post('faturas/{despesa}/ficheiro', [FaturaController::class, 'ficheiro'])
+        ->middleware(['ability:faturas:write,custos:write', 'api.write.role']);
+
     Route::post('compromissos', [CompromissoController::class, 'store'])
         ->middleware(['ability:compromissos:write,custos:write', 'api.write.role']);
 

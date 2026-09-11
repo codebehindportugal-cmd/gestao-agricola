@@ -13,8 +13,10 @@ use App\Services\MovimentoStockService;
 use App\Services\PaperInvoice\TamanhoEmbalagem;
 use App\Services\ResolvedorReferencias;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -280,6 +282,47 @@ class FaturaController extends Controller
         );
 
         return null;
+    }
+
+    /**
+     * Guarda a foto ou o PDF da fatura numa despesa que ja existe.
+     *
+     * O documento da compra faz parte do caderno de campo, e quem registra a
+     * fatura pelo chat nao tinha por onde o enviar: a despesa ficava sem
+     * nenhuma prova do que foi comprado. Fica no mesmo sitio e com o mesmo
+     * nome de campo que o ecra usa (`ficheiro_path`, disco public), para as
+     * duas vias mostrarem a mesma imagem.
+     */
+    public function ficheiro(Request $request, Despesa $despesa): JsonResponse
+    {
+        try {
+            $request->validate([
+                'ficheiro' => ['required', 'file', 'mimes:jpeg,jpg,png,webp,pdf', 'max:20480'],
+            ]);
+        } catch (ValidationException $excepcao) {
+            // Na mesma forma que o resto da API: sucesso/dados/avisos/erros.
+            return $this->erro422($excepcao->errors());
+        }
+
+        $avisos = [];
+
+        // Substituir apaga o anterior: as faturas sao fotografadas uma vez e
+        // uma foto orfa no disco nunca mais seria vista por ninguem.
+        if ($despesa->ficheiro_path && Storage::disk('public')->exists($despesa->ficheiro_path)) {
+            Storage::disk('public')->delete($despesa->ficheiro_path);
+            $avisos[] = 'a foto anterior foi substituida.';
+        }
+
+        $despesa->update([
+            'ficheiro_path' => $request->file('ficheiro')->store('despesas', 'public'),
+        ]);
+
+        return $this->ok([
+            'despesa_id' => $despesa->id,
+            'numero_fatura' => $despesa->numero_fatura,
+            'ficheiro_path' => $despesa->ficheiro_path,
+            'ficheiro_url' => Storage::disk('public')->url($despesa->ficheiro_path),
+        ], $avisos);
     }
 
     /**
@@ -585,6 +628,9 @@ class FaturaController extends Controller
                 'categoria' => $despesa->categoria,
                 'valor' => $despesa->valor,
                 'data' => $despesa->data?->toDateString(),
+                'ficheiro_url' => $despesa->ficheiro_path
+                    ? Storage::disk('public')->url($despesa->ficheiro_path)
+                    : null,
                 'campanha' => $despesa->campanha === null ? null : [
                     'id' => $despesa->campanha->id,
                     'nome' => $despesa->campanha->nome_completo,

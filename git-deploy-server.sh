@@ -141,6 +141,15 @@ fi
 
 # 8. Migracoes e caches.
 php artisan migrate --force
+
+# O link public/storage -> storage/app/public. Sem ele as fotos das faturas
+# sao gravadas mas nenhuma aparece no site: os /storage/despesas/... dao 404.
+# E untracked (nao vem no git) e em Plesk a raiz do site e' um link para
+# public/, por isso tem de ser garantido aqui, em cada deploy.
+if [ ! -e public/storage ]; then
+  echo "==> storage:link (public/storage nao existia)"
+  php artisan storage:link || echo "AVISO: o storage:link falhou; as fotos das faturas nao vao aparecer." >&2
+fi
 php artisan optimize:clear
 php artisan config:cache
 php artisan route:cache
