@@ -9,24 +9,38 @@ const props = defineProps({
     modoVideo: { type: String, default: 'webrtc' },
     intervaloFeed: { type: Number, default: 5 },
     minutosSemContacto: { type: Number, default: 12 },
+    horaRecarga: { type: String, default: '' },
+    minutosCamaras: { type: Number, default: 30 },
     kiosk: { type: Boolean, default: false },
     feed: { type: Object, required: true },
 });
 
-// No ecrã de parede não queremos barra de navegação nem margens.
+// No ecrã de parede não queremos barra de navegação nem margens, e nada pode
+// ficar abaixo da dobra: num ecrã sem rato ninguém faz scroll.
 const Kiosk = (_, { slots }) =>
-    h('div', { class: 'min-h-screen bg-neutral-950' }, slots.default?.());
+    h('div', { class: 'h-screen overflow-hidden bg-neutral-950' }, slots.default?.());
 const Moldura = computed(() => (props.kiosk ? Kiosk : AppLayout));
 
 const feed = ref(props.feed);
 const offline = ref(false);
 const relogio = ref(new Date());
+
+// Chave dos iframes das câmaras: mudá-la remonta-os e reata os streams.
+const chaveCamaras = ref(0);
+
+// Versão dos assets no momento em que a página abriu.
+const versaoInicial = props.feed.versao ?? null;
+
 let temporizadorFeed = null;
 let temporizadorRelogio = null;
+let temporizadorCamaras = null;
+let temporizadorRecarga = null;
 
 async function actualizar() {
     // Poupar pedidos quando ninguém está a olhar.
     if (document.hidden) return;
+
+    const estavaOffline = offline.value;
 
     try {
         const resposta = await fetch(route('app.casa.feed'), {
@@ -42,11 +56,58 @@ async function actualizar() {
         }
         if (!resposta.ok) throw new Error(resposta.status);
 
-        feed.value = await resposta.json();
+        const novo = await resposta.json();
+
+        // Deploy novo enquanto o separador estava aberto: o JS em memória é de
+        // outra versão do site. Recarregar é a única saída honesta.
+        if (versaoInicial && novo.versao && novo.versao !== versaoInicial) {
+            window.location.reload();
+            return;
+        }
+
+        feed.value = novo;
         offline.value = false;
+
+        // Voltou a haver rede. As câmaras não se queixam quando a ligação cai:
+        // ficam com a última imagem congelada. Reatar aqui é o que evita um
+        // ecrã de parede a mostrar o quintal de há uma hora.
+        if (estavaOffline) reatarCamaras();
     } catch {
         offline.value = true;
     }
+}
+
+function reatarCamaras() {
+    chaveCamaras.value += 1;
+}
+
+/** Milissegundos até à próxima ocorrência de HH:MM. */
+function msAte(horaMinuto) {
+    const [h, m] = String(horaMinuto).split(':').map(Number);
+    if (!Number.isInteger(h) || !Number.isInteger(m)) return null;
+
+    const alvo = new Date();
+    alvo.setHours(h, m, 0, 0);
+    if (alvo <= new Date()) alvo.setDate(alvo.getDate() + 1);
+
+    return alvo.getTime() - Date.now();
+}
+
+/**
+ * Recarga diária. Não é para actualizar dados — isso o feed já faz a cada
+ * poucos segundos — é para o browser não ir acumulando memória ao longo de
+ * semanas com o separador aberto e quatro streams a correr.
+ *
+ * Encadeada com setTimeout em vez de setInterval porque um único setInterval de
+ * 24 h desalinha-se com a mudança da hora e com o computador suspenso.
+ */
+function agendarRecarga() {
+    if (!props.horaRecarga) return;
+
+    const espera = msAte(props.horaRecarga);
+    if (espera === null) return;
+
+    temporizadorRecarga = setTimeout(() => window.location.reload(), espera);
 }
 
 const semContacto = computed(() => {
@@ -93,18 +154,28 @@ function haQuanto(iso) {
     return `há ${Math.floor(segundos / 86400)} d`;
 }
 
+// O baseUrl já vem do servidor com o caminho do go2rtc incluído: a raiz quando
+// se liga direto ao 1984, '/go2rtc' quando passa pelo Caddy.
 const streamUrl = (cam) =>
-    `${props.baseUrl}/go2rtc/stream.html?src=${encodeURIComponent(cam)}&mode=${props.modoVideo}`;
+    `${props.baseUrl}/stream.html?src=${encodeURIComponent(cam)}&mode=${props.modoVideo}`;
 
 onMounted(() => {
     temporizadorFeed = setInterval(actualizar, props.intervaloFeed * 1000);
     temporizadorRelogio = setInterval(() => (relogio.value = new Date()), 1000);
     document.addEventListener('visibilitychange', actualizar);
+
+    if (props.minutosCamaras > 0) {
+        temporizadorCamaras = setInterval(reatarCamaras, props.minutosCamaras * 60 * 1000);
+    }
+
+    agendarRecarga();
 });
 
 onUnmounted(() => {
     clearInterval(temporizadorFeed);
     clearInterval(temporizadorRelogio);
+    clearInterval(temporizadorCamaras);
+    clearTimeout(temporizadorRecarga);
     document.removeEventListener('visibilitychange', actualizar);
 });
 </script>
@@ -119,9 +190,15 @@ onUnmounted(() => {
             </h2>
         </template>
 
-        <div class="bg-neutral-950 p-4 text-neutral-100" :class="kiosk ? '' : 'rounded-xl'">
+        <div
+            class="bg-neutral-950 p-4 text-neutral-100"
+            :class="kiosk ? 'flex h-full flex-col' : 'rounded-xl'"
+        >
             <!-- cabeçalho -->
-            <div class="mb-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+            <div
+                class="mb-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2"
+                :class="kiosk ? 'shrink-0' : ''"
+            >
                 <div class="flex items-baseline gap-3">
                     <span class="text-3xl font-semibold tabular-nums">
                         {{ fHora.format(relogio) }}
@@ -140,16 +217,27 @@ onUnmounted(() => {
                 </div>
             </div>
 
-            <div class="grid gap-4" :class="calendario ? 'xl:grid-cols-[3fr,1fr]' : ''">
-                <div>
+            <div
+                class="grid gap-4"
+                :class="[
+                    calendario ? 'xl:grid-cols-[3fr,1fr]' : '',
+                    kiosk ? 'min-h-0 flex-1' : '',
+                ]"
+            >
+                <div :class="kiosk ? 'flex min-h-0 flex-col' : ''">
                     <!-- câmaras -->
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div
+                        class="grid grid-cols-1 gap-3 sm:grid-cols-2"
+                        :class="kiosk ? 'min-h-0 flex-1 auto-rows-fr' : ''"
+                    >
                         <div
                             v-for="cam in cameras"
                             :key="cam"
-                            class="relative aspect-video overflow-hidden rounded-lg bg-black"
+                            class="relative overflow-hidden rounded-lg bg-black"
+                            :class="kiosk ? 'min-h-0' : 'aspect-video'"
                         >
                             <iframe
+                                :key="`${cam}-${chaveCamaras}`"
                                 :src="streamUrl(cam)"
                                 class="h-full w-full border-0"
                                 allow="autoplay"
@@ -169,7 +257,7 @@ onUnmounted(() => {
                     </div>
 
                     <!-- sensores accionados agora -->
-                    <div class="mt-5">
+                    <div class="mt-5" :class="kiosk ? 'shrink-0' : ''">
                         <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
                             Estado
                         </h3>
@@ -188,11 +276,14 @@ onUnmounted(() => {
                     </div>
 
                     <!-- histórico -->
-                    <div class="mt-5">
+                    <div class="mt-5" :class="kiosk ? 'shrink-0' : ''">
                         <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
                             Movimento
                         </h3>
-                        <ul class="divide-y divide-neutral-800 text-sm">
+                        <ul
+                            class="divide-y divide-neutral-800 text-sm"
+                            :class="kiosk ? 'max-h-44 overflow-y-auto' : ''"
+                        >
                             <li
                                 v-for="e in feed.eventos"
                                 :key="e.id"
@@ -217,7 +308,11 @@ onUnmounted(() => {
                 </div>
 
                 <!-- calendário -->
-                <aside v-if="calendario" class="space-y-5">
+                <aside
+                    v-if="calendario"
+                    class="space-y-5"
+                    :class="kiosk ? 'min-h-0 overflow-y-auto pr-1' : ''"
+                >
                     <section v-if="calendario.atrasados.length">
                         <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-red-400">
                             Atrasados

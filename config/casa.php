@@ -57,6 +57,37 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Ecrã sempre ligado
+    |--------------------------------------------------------------------------
+    |
+    | O painel do escritório fica aberto semanas a fio no mesmo separador. Os
+    | dados actualizam-se sozinhos a cada 'intervalo_feed', mas há três coisas
+    | que nenhum feed resolve e que estas opções tratam.
+    |
+    */
+
+    /*
+    | Recarga completa da página, uma vez por dia, a esta hora (HH:MM).
+    | Serve o que o feed não cobre: memória acumulada pelo browser ao fim de
+    | semanas, e o separador que ficaria preso a uma versão antiga do JS depois
+    | de um deploy caso a detecção de versão falhe.
+    | Vazio desliga.
+    */
+    'hora_recarga' => env('CASA_HORA_RECARGA', '04:30'),
+
+    /*
+    | De quantos em quantos minutos reatar os streams das câmaras.
+    |
+    | Uma ligação WebRTC que cai — go2rtc reiniciado, switch a arrancar, câmara
+    | sem energia — deixa a imagem congelada sem qualquer erro visível. Num
+    | ecrã de parede ninguém dá por isso. Reatar de tempos a tempos custa um
+    | piscar de olhos e garante que a imagem no ecrã é de agora.
+    | 0 desliga.
+    */
+    'minutos_camaras' => (int) env('CASA_MINUTOS_CAMARAS', 30),
+
+    /*
+    |--------------------------------------------------------------------------
     | Retenção
     |--------------------------------------------------------------------------
     */

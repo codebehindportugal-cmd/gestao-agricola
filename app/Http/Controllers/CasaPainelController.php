@@ -28,6 +28,8 @@ class CasaPainelController extends Controller
             'modoVideo' => config('casa.modo_video'),
             'intervaloFeed' => config('casa.intervalo_feed'),
             'minutosSemContacto' => config('casa.minutos_sem_contacto'),
+            'horaRecarga' => config('casa.hora_recarga'),
+            'minutosCamaras' => config('casa.minutos_camaras'),
             'kiosk' => $request->boolean('kiosk'),
             'feed' => $this->dados($request),
         ]);
@@ -59,6 +61,13 @@ class CasaPainelController extends Controller
             'calendario' => $this->calendario($request, $agora),
 
             'agora' => $agora->toIso8601String(),
+
+            // Versão dos assets (hash do manifest do Vite, o mesmo que o
+            // Inertia usa). O separador do escritório fica aberto durante
+            // semanas; sem isto continuaria a correr o JS antigo depois de um
+            // deploy, e a mostrar uma página que já não existe assim. A página
+            // compara com a que tinha ao abrir e recarrega quando muda.
+            'versao' => Inertia::getVersion(),
         ];
     }
 
