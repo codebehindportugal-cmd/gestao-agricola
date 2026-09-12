@@ -16,7 +16,21 @@ return [
     |
     */
 
-    'base_url' => env('CASA_BASE_URL', 'https://casa.codebehind.pt'),
+    'base_url' => env('CASA_BASE_URL', 'http://192.168.1.60:1984'),
+
+    /*
+    | Caminho onde o go2rtc responde dentro do 'base_url'.
+    |
+    | Ligando direto ao go2rtc (http://192.168.1.60:1984) ele serve na raiz, e
+    | isto fica vazio. Atrás do Caddy o bloco 'handle_path /go2rtc/*' corta o
+    | prefixo antes de reencaminhar, por isso o URL público leva '/go2rtc'.
+    |
+    | Enquanto o casa.codebehind.pt não existir, é o IP direto que funciona —
+    | mas só com o painel aberto em http. A partir de https://agro.codebehind.pt
+    | o browser recusa carregar um iframe http (mixed content), e aí não há
+    | volta a dar: é preciso o certificado do Passo 1.
+    */
+    'caminho_go2rtc' => rtrim((string) env('CASA_CAMINHO_GO2RTC', ''), '/'),
 
     /*
     | Nomes dos streams no go2rtc, na ordem em que aparecem no mosaico.
