@@ -22,8 +22,29 @@ class StoreTrabalhoApiRequest extends FormRequest
             'campanha' => ['nullable'],
             'parcela' => ['nullable'],
             'cultura' => ['nullable'],
+            'colheita' => ['nullable'],
+
+            // Recurso principal, mantido por compatibilidade: equivale a uma
+            // linha de maquinas[].
             'maquina' => ['nullable'],
             'alfaia' => ['nullable'],
+
+            // Todas as maquinas, alfaias e viaturas da operacao. Uma apanha
+            // pode levar dois tratores, dois empilhadores e um carro.
+            'maquinas' => ['nullable', 'array', 'max:50'],
+            'maquinas.*.maquina' => ['nullable'],
+            'maquinas.*.alfaia' => ['nullable'],
+            'maquinas.*.nome' => ['nullable', 'string', 'max:255'],
+            'maquinas.*.papel' => ['nullable', 'string', 'max:255'],
+            'maquinas.*.unidades' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'maquinas.*.horas' => ['nullable', 'numeric', 'min:0'],
+            'maquinas.*.horas_por_dia' => ['nullable', 'numeric', 'min:0', 'max:24'],
+            'maquinas.*.dias' => ['nullable', 'integer', 'min:1', 'max:366'],
+            'maquinas.*.km' => ['nullable', 'numeric', 'min:0'],
+            'maquinas.*.custo_hora' => ['nullable', 'numeric', 'min:0'],
+            'maquinas.*.custo_km' => ['nullable', 'numeric', 'min:0'],
+            'maquinas.*.custo_total' => ['nullable', 'numeric', 'min:0'],
+            'maquinas.*.observacoes' => ['nullable', 'string'],
 
             'data_inicio' => ['required', 'date'],
             'data_fim' => ['nullable', 'date', 'after_or_equal:data_inicio'],

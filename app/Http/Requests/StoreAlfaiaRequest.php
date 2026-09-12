@@ -21,6 +21,7 @@ class StoreAlfaiaRequest extends FormRequest
             'comprimento' => 'nullable|numeric|min:0.01',
             'largura' => 'nullable|numeric|min:0.01',
             'consumo_agua_ha' => 'nullable|numeric|min:0',
+            'custo_hora' => 'nullable|numeric|min:0',
             'estado' => 'in:operacional,danificada,retirada',
             'observacoes' => 'nullable|string',
         ];

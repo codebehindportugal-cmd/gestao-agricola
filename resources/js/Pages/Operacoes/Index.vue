@@ -76,6 +76,7 @@ const baseFormData = {
     estado: 'planejada',
     observacoes: '',
     produtos: [],
+    recursos: [],
 };
 
 const createForm = useForm({ ...baseFormData });
@@ -217,7 +218,19 @@ const openEditModal = (operacao) => {
     editForm.distancia_km = operacao.distancia_km?.toString() ?? '';
     editForm.combustivel_gasto_l = operacao.combustivel_gasto_l?.toString() ?? '';
     editForm.custo_estimado = operacao.custo_estimado?.toString() ?? '';
-    editForm.custo_real = operacao.custo_real?.toString() ?? '';
+    // A caixa mostra so a parte escrita a mao; as maquinas somam-se na gravacao.
+    editForm.custo_real = (operacao.custo_real_extra ?? operacao.custo_real)?.toString() ?? '';
+    editForm.recursos = (operacao.recursos ?? []).map((recurso) => ({
+        maquina_id: recurso.maquina_id ?? '',
+        alfaia_id: recurso.alfaia_id ?? '',
+        nome: recurso.nome ?? '',
+        papel: recurso.papel ?? '',
+        unidades: recurso.unidades ?? 1,
+        horas: recurso.horas ?? '',
+        km: recurso.km ?? '',
+        custo_hora: recurso.custo_hora ?? '',
+        custo_km: recurso.custo_km ?? '',
+    }));
     editForm.colheita_quantidade_total = operacao.colheita_quantidade_total?.toString() ?? '';
     editForm.colheita_quantidade_perdas = operacao.colheita_quantidade_perdas?.toString() ?? '';
     editForm.colheita_qualidade = operacao.colheita_qualidade ?? 'comercial';
@@ -314,6 +327,19 @@ const normalizePayload = (form) => form.transform((data) => {
         colheita_qualidade: data.colheita_qualidade || 'comercial',
         data_hora_inicio: data.data_hora_inicio ? data.data_hora_inicio.replace('T', ' ') : '',
         data_hora_fim: data.data_hora_fim ? data.data_hora_fim.replace('T', ' ') : null,
+        recursos: (data.recursos ?? [])
+            .filter((recurso) => recurso.maquina_id || recurso.alfaia_id || recurso.nome)
+            .map((recurso) => ({
+                maquina_id: recurso.maquina_id || null,
+                alfaia_id: recurso.alfaia_id || null,
+                nome: recurso.nome || null,
+                papel: recurso.papel || null,
+                unidades: recurso.unidades || 1,
+                horas: recurso.horas || null,
+                km: recurso.km || null,
+                custo_hora: recurso.custo_hora || null,
+                custo_km: recurso.custo_km || null,
+            })),
         produtos: (data.produtos ?? []).filter((produto) => produto.produto_id).map((produto) => ({
             ...produto,
             quantidade: produto.quantidade || null,

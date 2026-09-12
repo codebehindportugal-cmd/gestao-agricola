@@ -20,6 +20,21 @@ class StoreFaturaApiRequest extends FormRequest
 
     public function rules(): array
     {
+        return self::regrasFatura();
+    }
+
+    /**
+     * As regras de uma fatura, sem prefixo.
+     *
+     * Sao publicas e static porque o lote valida cada fatura por si (ver
+     * FaturaController::lote): uma fatura mal lida nao pode levar atras as
+     * outras do mesmo envio, e um validador com 'faturas.*.' faria cair todas
+     * juntas.
+     *
+     * @return array<string, mixed>
+     */
+    public static function regrasFatura(): array
+    {
         return [
             'titulo' => ['nullable', 'string', 'max:255'],
             'numero_fatura' => ['nullable', 'string', 'max:255'],
@@ -63,6 +78,12 @@ class StoreFaturaApiRequest extends FormRequest
     }
 
     public function messages(): array
+    {
+        return self::mensagensFatura();
+    }
+
+    /** @return array<string, string> */
+    public static function mensagensFatura(): array
     {
         $taxas = implode(', ', self::TAXAS_IVA);
         $categorias = implode(', ', DespesaManagementController::CATEGORIAS);

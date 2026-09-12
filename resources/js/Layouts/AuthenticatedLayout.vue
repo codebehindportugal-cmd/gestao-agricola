@@ -89,18 +89,18 @@ function setActiveCampaign(event) {
             <nav class="relative z-[1200] border-b border-emerald-100 bg-white/90 backdrop-blur">
                 <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div class="flex h-16 justify-between">
-                        <div class="flex items-center gap-8">
+                        <div class="flex items-center gap-4">
                             <div class="flex shrink-0 items-center">
                                 <Link :href="route('dashboard')" class="flex items-center gap-3" @click="closeDesktopMenus">
                                     <ApplicationLogo class="block h-10 w-10" />
                                     <div class="hidden sm:block">
                                         <p class="text-sm font-black uppercase tracking-[0.24em] text-slate-900">Agro</p>
-                                        <p class="text-xs font-medium uppercase tracking-[0.28em] text-emerald-700">Gestão Agrícola</p>
+                                        <p class="hidden text-xs font-medium uppercase tracking-[0.28em] text-emerald-700 2xl:block">Gestão Agrícola</p>
                                     </div>
                                 </Link>
                             </div>
 
-                            <div class="hidden items-center gap-3 sm:flex">
+                            <div class="hidden items-center gap-2 xl:flex">
                                 <NavLink
                                     v-for="link in primaryLinks"
                                     :key="link.routeName"
@@ -131,7 +131,8 @@ function setActiveCampaign(event) {
                                         class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium text-slate-600 transition hover:text-slate-900"
                                         @click="toggleAdminDropdown"
                                     >
-                                        Administração
+                                        <span class="2xl:hidden">Admin</span>
+                                        <span class="hidden 2xl:inline">Administração</span>
                                         <svg class="ml-2 h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                                             <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
                                         </svg>
@@ -155,11 +156,11 @@ function setActiveCampaign(event) {
                             </div>
                         </div>
 
-                        <div class="hidden sm:ms-6 sm:flex sm:items-center sm:gap-3">
+                        <div class="hidden xl:ms-6 xl:flex xl:items-center xl:gap-3">
                             <div v-if="campaignOptions.length" class="flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5">
-                                <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Campanha</span>
+                                <span class="hidden text-[10px] font-bold uppercase tracking-wider text-emerald-700 2xl:inline">Campanha</span>
                                 <select
-                                    class="max-w-[190px] border-0 bg-transparent p-0 text-sm font-semibold text-slate-800 focus:ring-0"
+                                    class="max-w-[150px] border-0 bg-transparent p-0 text-sm font-semibold text-slate-800 focus:ring-0"
                                     :value="activeCampaign?.id ?? ''"
                                     @change="setActiveCampaign"
                                 >
@@ -195,7 +196,7 @@ function setActiveCampaign(event) {
                             </div>
                         </div>
 
-                        <div class="-me-2 flex items-center sm:hidden">
+                        <div class="-me-2 flex items-center xl:hidden">
                             <button
                                 class="inline-flex items-center justify-center rounded-md p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-500 focus:bg-gray-100 focus:text-gray-500 focus:outline-none"
                                 @click="showingNavigationDropdown = !showingNavigationDropdown"
@@ -221,7 +222,7 @@ function setActiveCampaign(event) {
                     </div>
                 </div>
 
-                <div v-show="resourcesPanelOpen" class="hidden border-t border-slate-200 bg-white sm:block">
+                <div v-show="resourcesPanelOpen" class="hidden border-t border-slate-200 bg-white xl:block">
                     <div class="mx-auto flex max-w-7xl flex-wrap gap-3 px-4 py-3 sm:px-6 lg:px-8">
                         <Link
                             v-for="link in resourceLinks"
@@ -236,7 +237,7 @@ function setActiveCampaign(event) {
                     </div>
                 </div>
 
-                <div :class="{ block: showingNavigationDropdown, hidden: !showingNavigationDropdown }" class="sm:hidden">
+                <div :class="{ block: showingNavigationDropdown, hidden: !showingNavigationDropdown }" class="xl:hidden">
                     <div class="space-y-1 pb-3 pt-2">
                         <ResponsiveNavLink
                             v-for="link in primaryLinks"

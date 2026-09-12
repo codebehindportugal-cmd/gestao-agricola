@@ -878,7 +878,7 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                             <!-- info -->
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-baseline gap-2">
-                                    <p class="font-semibold text-slate-900">{{ d.titulo }}</p>
+                                    <p class="min-w-0 max-w-full truncate font-semibold text-slate-900">{{ d.titulo }}</p>
                                     <span class="rounded-full px-2 py-0.5 text-xs font-medium" :class="categoriaBadge(d.categoria)">
                                         {{ categoriaLabel(d.categoria) }}
                                     </span>
@@ -924,8 +924,10 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                         </div>
 
                         <!-- detalhe linhas (expandível por hover/click – opcional) -->
+                        <!-- overflow-x-auto e nao hidden: uma designacao comprida
+                             ("KATANA-WG-500GR") era cortada sem forma de a ler. -->
                         <div v-if="d.tem_items"
-                             class="mt-3 overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
+                             class="mt-3 overflow-x-auto rounded-xl border border-slate-100 bg-slate-50">
                             <table class="w-full text-xs">
                                 <thead>
                                     <tr class="border-b border-slate-200 text-left">
@@ -1207,8 +1209,11 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                         </select>
                                     </div>
 
-                                    <!-- qtd + preço + desconto + IVA -->
-                                    <div class="grid grid-cols-4 gap-2">
+                                    <!-- qtd + preço + desconto + IVA.
+                                         A quatro colunas no telemovel sobram 68px por
+                                         campo e nem "1234.567" nem o select do IVA cabem:
+                                         duas colunas abaixo do sm. -->
+                                    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
                                         <div>
                                             <label class="mb-1 block text-[10px] font-semibold uppercase text-slate-400">Qtd</label>
                                             <input v-model="item.quantidade" type="number" step="0.001" min="0.001" required

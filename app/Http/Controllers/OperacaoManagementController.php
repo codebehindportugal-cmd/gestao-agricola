@@ -16,6 +16,7 @@ use App\Models\Operacao;
 use App\Models\Parcela;
 use App\Models\Produto;
 use App\Models\User;
+use App\Services\CustoRecursosService;
 use App\Support\OperacaoDuration;
 use App\Support\StockConsumption;
 use Illuminate\Http\JsonResponse;
@@ -30,6 +31,10 @@ use Inertia\Response;
 
 class OperacaoManagementController extends Controller
 {
+    public function __construct(private readonly CustoRecursosService $custoRecursos)
+    {
+    }
+
     public function index(Request $request): Response
     {
         $this->authorize('viewAny', Operacao::class);
@@ -45,6 +50,8 @@ class OperacaoManagementController extends Controller
                 'colheita:id,operacao_id,quantidade_total,quantidade_perdas,qualidade',
                 'maquina:id,nome,tipo,consumo_combustivel',
                 'alfaia:id,nome',
+                'recursos.maquina:id,nome,custo_hora,custo_km',
+                'recursos.alfaia:id,nome,custo_hora',
                 'operador:id,name',
                 'funcionario:id,nome,cargo,status,aplicador_numero_autorizacao',
                 'equipa:id,nome,status',
@@ -114,6 +121,27 @@ class OperacaoManagementController extends Controller
                 'maquina_consumo_combustivel' => $operacao->maquina?->consumo_combustivel,
                 'custo_estimado' => $operacao->custo_estimado,
                 'custo_real' => $operacao->custo_real,
+                'custo_recursos' => $operacao->recursos->sum(fn ($recurso) => (float) $recurso->custo_total),
+                // O que o utilizador escreveu a mao, sem as maquinas: e este o
+                // valor que volta para a caixa do formulario, para nao somar
+                // duas vezes o custo dos recursos a cada gravacao.
+                'custo_real_extra' => max(
+                    0,
+                    round((float) ($operacao->custo_real ?? 0)
+                        - (float) $operacao->recursos->sum(fn ($recurso) => (float) $recurso->custo_total), 2)
+                ),
+                'recursos' => $operacao->recursos->map(fn ($recurso) => [
+                    'maquina_id' => $recurso->maquina_id ? (string) $recurso->maquina_id : '',
+                    'alfaia_id' => $recurso->alfaia_id ? (string) $recurso->alfaia_id : '',
+                    'nome' => $recurso->nome ?? '',
+                    'papel' => $recurso->papel ?? '',
+                    'unidades' => $recurso->unidades ?? 1,
+                    'horas' => $recurso->horas === null ? '' : (string) (float) $recurso->horas,
+                    'km' => $recurso->km === null ? '' : (string) (float) $recurso->km,
+                    'custo_hora' => $recurso->custo_hora === null ? '' : (string) (float) $recurso->custo_hora,
+                    'custo_km' => $recurso->custo_km === null ? '' : (string) (float) $recurso->custo_km,
+                    'custo_total' => (float) $recurso->custo_total,
+                ])->values(),
                 'colheita_quantidade_total' => $operacao->colheita?->quantidade_total,
                 'colheita_quantidade_perdas' => $operacao->colheita?->quantidade_perdas,
                 'colheita_qualidade' => $operacao->colheita?->qualidade,
@@ -183,10 +211,10 @@ class OperacaoManagementController extends Controller
                 ]),
             'maquinas' => Maquina::query()
                 ->orderBy('nome')
-                ->get(['id', 'nome', 'tipo', 'consumo_combustivel']),
+                ->get(['id', 'nome', 'tipo', 'consumo_combustivel', 'custo_hora', 'custo_km']),
             'alfaias' => Alfaia::query()
                 ->orderBy('nome')
-                ->get(['id', 'nome']),
+                ->get(['id', 'nome', 'custo_hora']),
             'operadores' => User::query()
                 ->orderBy('name')
                 ->get(['id', 'name']),
@@ -267,6 +295,7 @@ class OperacaoManagementController extends Controller
                     ]);
 
                     $operacao->produtos()->sync($produtosParcela);
+                    $this->syncRecursos($operacao, $request, $parcelaId, $isBulkOperation ? $distributionWeights : []);
                     $this->syncColheita($operacao->fresh(), $request);
                     StockConsumption::syncOperation($operacao->fresh(), [], $produtosParcela);
                 }
@@ -302,6 +331,7 @@ class OperacaoManagementController extends Controller
 
                 $operacao->update($data);
                 $operacao->produtos()->sync($produtos);
+                $this->syncRecursos($operacao, $request, (int) $operacao->parcela_id, []);
                 $this->syncColheita($operacao->fresh(), $request);
                 StockConsumption::syncOperation($operacao->fresh(), $previousProducts, $produtos, $previousFuel);
             });
@@ -501,6 +531,78 @@ Regras: dose, area_tratada, volume_calda devem ser números ou null; intervalo_s
         return null;
     }
 
+    /**
+     * Maquinas, alfaias e transporte da operacao.
+     *
+     * Sao varios por operacao e cada um tem o seu custo; as colunas
+     * maquina_id/alfaia_id ficam como estao (o formulario e' que as define) e
+     * so as linhas geram Custos. Numa operacao registada em varias parcelas de
+     * uma vez, as horas e os km repartem-se pelo peso da parcela, tal como as
+     * quantidades de produto.
+     *
+     * @param  array<int, float>  $weights
+     */
+    private function syncRecursos(Operacao $operacao, Request $request, int $parcelaId, array $weights): void
+    {
+        $linhas = collect($request->input('recursos', []))
+            ->filter(fn ($linha) => is_array($linha) && (
+                ! empty($linha['maquina_id']) || ! empty($linha['alfaia_id']) || ! empty($linha['nome'])
+            ))
+            ->map(fn (array $linha) => [
+                'maquina' => $linha['maquina_id'] ?? null,
+                'alfaia' => $linha['alfaia_id'] ?? null,
+                'nome' => $linha['nome'] ?? null,
+                'papel' => $linha['papel'] ?? null,
+                'unidades' => $linha['unidades'] ?? 1,
+                'horas' => $linha['horas'] ?? null,
+                'km' => $linha['km'] ?? null,
+                'custo_hora' => $linha['custo_hora'] ?? null,
+                'custo_km' => $linha['custo_km'] ?? null,
+            ])
+            ->values()
+            ->all();
+
+        $custoBase = $this->nullableFloat($request->input('custo_real')) ?? 0.0;
+
+        // Numa operacao registada em varias parcelas de uma vez, o custo
+        // escrito a mao e' do conjunto: cada parcela leva a sua parte, senao
+        // o mesmo dinheiro era contado tantas vezes quantas as parcelas.
+        if ($weights !== []) {
+            $linhas = $this->distributedRecursosPayload($linhas, $parcelaId, $weights);
+            $custoBase = round($custoBase * (float) ($weights[$parcelaId] ?? 0), 2);
+        }
+
+        $this->custoRecursos->sincronizar(
+            $operacao->fresh(),
+            $linhas,
+            1,
+            definirPrincipal: false,
+            custoBase: $custoBase,
+        );
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $recursos
+     * @param  array<int, float>  $weights
+     * @return array<int, array<string, mixed>>
+     */
+    private function distributedRecursosPayload(array $recursos, int $parcelaId, array $weights): array
+    {
+        $weight = (float) ($weights[$parcelaId] ?? 0);
+
+        return collect($recursos)
+            ->map(function (array $linha) use ($weight) {
+                foreach (['horas', 'km'] as $campo) {
+                    if (($linha[$campo] ?? null) !== null && $linha[$campo] !== '') {
+                        $linha[$campo] = round((float) $linha[$campo] * $weight, 2);
+                    }
+                }
+
+                return $linha;
+            })
+            ->all();
+    }
+
     private function syncColheita(Operacao $operacao, Request $request): void
     {
         if ($operacao->tipo !== 'colheita') {
@@ -640,7 +742,11 @@ Regras: dose, area_tratada, volume_calda devem ser números ou null; intervalo_s
         }
 
         unset($data['produtos']);
+        unset($data['recursos']);
         unset($data['parcela_ids']);
+        // O custo real passa a ser escrito pelo CustoRecursosService, que lhe
+        // soma as maquinas. Deixa-lo aqui sobrepunha-se a essa soma.
+        unset($data['custo_real']);
         unset($data['colheita_quantidade_total']);
         unset($data['colheita_quantidade_perdas']);
         unset($data['colheita_qualidade']);

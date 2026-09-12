@@ -36,13 +36,21 @@ class LoginRequest extends FormRequest
     /**
      * Attempt to authenticate the request's credentials.
      *
+     * A sessao e sempre "lembrada", esteja a caixa marcada ou nao.
+     *
+     * Quem usa isto sao duas ou tres pessoas, sempre nas mesmas maquinas, e a
+     * sessao a cair sozinha no meio de um registo de operacoes custa mais do que
+     * vale a pena. O logout continua a ser explicito: so sai quem clica em sair.
+     * Se algum dia isto for usado em maquinas partilhadas, volta-se a
+     * `$this->boolean('remember')`.
+     *
      * @throws ValidationException
      */
     public function authenticate(): void
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        if (! Auth::attempt($this->only('email', 'password'), true)) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([

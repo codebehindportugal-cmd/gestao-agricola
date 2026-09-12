@@ -6,11 +6,13 @@ use App\Http\Controllers\Api\RespondeJson;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\StoreTrabalhoApiRequest;
 use App\Http\Resources\Api\V1\OperacaoResource;
+use App\Models\Colheita;
 use App\Models\Cultura;
 use App\Models\Custo;
 use App\Models\Funcionario;
 use App\Models\Jornada;
 use App\Models\Operacao;
+use App\Services\CustoRecursosService;
 use App\Services\ResolvedorReferencias;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -23,6 +25,10 @@ use Illuminate\Validation\ValidationException;
  *
  * Cria uma Operacao e uma Jornada por funcionario e por dia trabalhado,
  * mais um Custo agregado de tipo mao_obra (o que a tesouraria contabiliza).
+ *
+ * As maquinas, alfaias e viaturas usadas vao em maquinas[], cada uma com as
+ * suas horas ou km; o CustoRecursosService transforma-as em Custos tipo
+ * maquina. Sem isso uma apanha ficava registada so com a mao de obra.
  */
 class TrabalhoController extends Controller
 {
@@ -30,8 +36,10 @@ class TrabalhoController extends Controller
 
     private const MAX_JORNADAS = 2000;
 
-    public function __construct(private readonly ResolvedorReferencias $resolvedor)
-    {
+    public function __construct(
+        private readonly ResolvedorReferencias $resolvedor,
+        private readonly CustoRecursosService $custoRecursos,
+    ) {
     }
 
     public function store(StoreTrabalhoApiRequest $request): JsonResponse
@@ -67,7 +75,7 @@ class TrabalhoController extends Controller
         }
 
         try {
-            [$operacao, $jornadas, $custo, $avisosCriacao] = DB::transaction(function () use ($data, $dias) {
+            [$operacao, $jornadas, $custo, $recursos, $avisosCriacao] = DB::transaction(function () use ($data, $dias) {
                 $avisos = [];
 
                 $campanha = $this->resolverOpcional('resolverCampanha', $data['campanha'] ?? null);
@@ -200,7 +208,25 @@ class TrabalhoController extends Controller
                     ]);
                 }
 
-                return [$operacao->fresh()->load(['campanha', 'parcela', 'cultura']), $jornadas, $custo, $avisos];
+                // Maquinas, alfaias e transporte. A maquina/alfaia singulares
+                // continuam a valer: entram como mais uma linha.
+                $linhasRecursos = $this->linhasRecursos($data, $maquina?->id, $alfaia?->id);
+                $recursos = collect();
+
+                if ($linhasRecursos !== []) {
+                    $resultado = $this->custoRecursos->sincronizar($operacao, $linhasRecursos, count($dias));
+
+                    $recursos = $resultado['recursos'];
+                    $avisos = array_merge($avisos, $resultado['avisos']);
+                }
+
+                $this->ligarColheita($data['colheita'] ?? null, $operacao, $avisos);
+
+                $operacao = $operacao->fresh()->load([
+                    'campanha', 'parcela', 'cultura', 'recursos.maquina', 'recursos.alfaia',
+                ]);
+
+                return [$operacao, $jornadas, $custo, $recursos, $avisos];
             });
         } catch (ValidationException $exception) {
             return $this->erro422($exception->errors());
@@ -216,7 +242,86 @@ class TrabalhoController extends Controller
                 'valor' => $custo->valor,
                 'data' => $custo->data_custo?->toDateString() ?? (string) $custo->data_custo,
             ],
+            'recursos' => $recursos->map(fn ($recurso) => [
+                'id' => $recurso->id,
+                'descricao' => $recurso->descricao,
+                'unidades' => $recurso->unidades,
+                'horas' => $recurso->horas,
+                'km' => $recurso->km,
+                'custo_hora' => $recurso->custo_hora,
+                'custo_km' => $recurso->custo_km,
+                'custo_total' => $recurso->custo_total,
+            ])->values(),
+            'custo_mao_obra' => $custo?->valor ?? 0,
+            'custo_maquinas' => round((float) $recursos->sum(fn ($recurso) => (float) $recurso->custo_total), 2),
+            'custo_total' => $operacao->custo_real,
         ], array_merge($avisos, $avisosCriacao));
+    }
+
+    /**
+     * As linhas de recursos do pedido, juntando a maquina/alfaia singulares
+     * (formato antigo) ao array maquinas[].
+     *
+     * Uma linha sem horas nem km herda as horas por dia da mao de obra: a
+     * maquina andou o mesmo tempo que a equipa, que e o caso normal.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<int, array<string, mixed>>
+     */
+    private function linhasRecursos(array $data, ?int $maquinaId, ?int $alfaiaId): array
+    {
+        $linhas = [];
+
+        foreach ($data['maquinas'] ?? [] as $linha) {
+            $temMedida = isset($linha['horas']) || isset($linha['horas_por_dia'])
+                || isset($linha['km']) || isset($linha['custo_total']);
+
+            if (! $temMedida) {
+                $linha['horas_por_dia'] = $data['horas_por_dia'];
+            }
+
+            $linhas[] = $linha;
+        }
+
+        // So se o pedido nao trouxer maquinas[]: com as duas listas, a singular
+        // e um resumo da outra e duplicava o custo.
+        if ($linhas === [] && ($maquinaId !== null || $alfaiaId !== null)) {
+            $linhas[] = array_filter([
+                'maquina' => $maquinaId,
+                'alfaia' => $alfaiaId,
+                'horas_por_dia' => $data['horas_por_dia'],
+            ], fn ($valor) => $valor !== null);
+        }
+
+        return $linhas;
+    }
+
+    /**
+     * Liga a colheita indicada a esta operacao, para a colheita saber o que a
+     * apanha custou. Nao mexe numa colheita que ja tenha operacao.
+     *
+     * @param  array<int, string>  $avisos
+     */
+    private function ligarColheita(mixed $referencia, Operacao $operacao, array &$avisos): void
+    {
+        if ($referencia === null || $referencia === '') {
+            return;
+        }
+
+        /** @var Colheita $colheita */
+        $colheita = $this->resolvedor->resolverColheita($this->valorReferencia($referencia));
+
+        if ($colheita->operacao_id !== null && $colheita->operacao_id !== $operacao->id) {
+            $avisos[] = sprintf(
+                'colheita #%d ja estava ligada a operacao #%d; nao foi alterada.',
+                $colheita->id,
+                $colheita->operacao_id
+            );
+
+            return;
+        }
+
+        $colheita->forceFill(['operacao_id' => $operacao->id])->save();
     }
 
     /**

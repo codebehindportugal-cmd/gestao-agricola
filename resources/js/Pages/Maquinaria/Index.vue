@@ -57,6 +57,8 @@ const maquinaBase = {
     horas_manutencao: '',
     consumo_agua_ha: '',
     consumo_combustivel: '',
+    custo_hora: '',
+    custo_km: '',
     estado: 'operacional',
     observacoes: '',
 };
@@ -69,6 +71,7 @@ const alfaiaBase = {
     comprimento: '',
     largura: '',
     consumo_agua_ha: '',
+    custo_hora: '',
     estado: 'operacional',
     observacoes: '',
 };
@@ -198,6 +201,8 @@ const normalizeMaquina = (form) => form.transform((data) => ({
     horas_manutencao: data.horas_manutencao || null,
     consumo_agua_ha: data.consumo_agua_ha || null,
     consumo_combustivel: data.consumo_combustivel || null,
+    custo_hora: data.custo_hora || null,
+    custo_km: data.custo_km || null,
     observacoes: data.observacoes || null,
 }));
 
@@ -208,6 +213,7 @@ const normalizeAlfaia = (form) => form.transform((data) => ({
     comprimento: data.comprimento || null,
     largura: data.largura || null,
     consumo_agua_ha: data.consumo_agua_ha || null,
+    custo_hora: data.custo_hora || null,
     observacoes: data.observacoes || null,
 }));
 
@@ -241,6 +247,8 @@ const openEditMaquina = (maquina) => {
         horas_manutencao: maquina.horas_manutencao?.toString() ?? '',
         consumo_agua_ha: maquina.consumo_agua_ha?.toString() ?? '',
         consumo_combustivel: maquina.consumo_combustivel?.toString() ?? '',
+        custo_hora: maquina.custo_hora?.toString() ?? '',
+        custo_km: maquina.custo_km?.toString() ?? '',
         estado: maquina.estado ?? 'operacional',
         observacoes: maquina.observacoes ?? '',
     });
@@ -298,6 +306,7 @@ const openEditAlfaia = (alfaia) => {
         comprimento: alfaia.comprimento?.toString() ?? '',
         largura: alfaia.largura?.toString() ?? '',
         consumo_agua_ha: alfaia.consumo_agua_ha?.toString() ?? '',
+        custo_hora: alfaia.custo_hora?.toString() ?? '',
         estado: alfaia.estado ?? 'operacional',
         observacoes: alfaia.observacoes ?? '',
     });
@@ -592,6 +601,14 @@ const cleanFilters = () => {
                                         {{ maquina.consumo_agua_ha ? `${formatNumber(maquina.consumo_agua_ha)} L/ha` : '-' }}
                                     </p>
                                 </div>
+                                <div v-if="maquina.custo_hora || maquina.custo_km" class="rounded-3xl bg-emerald-50 p-4 sm:col-span-2">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Custo de utilização</p>
+                                    <p class="mt-2 text-xl font-black text-emerald-900">
+                                        <span v-if="maquina.custo_hora">{{ formatNumber(maquina.custo_hora) }} €/h</span>
+                                        <span v-if="maquina.custo_hora && maquina.custo_km"> · </span>
+                                        <span v-if="maquina.custo_km">{{ formatNumber(maquina.custo_km) }} €/km</span>
+                                    </p>
+                                </div>
                                 <div v-if="usesFuelConsumption(maquina.tipo)" class="rounded-3xl bg-amber-50 p-4 sm:col-span-2">
                                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Consumo de combustível</p>
                                     <p class="mt-2 text-xl font-black text-amber-900">
@@ -641,10 +658,10 @@ const cleanFilters = () => {
                         </div>
 
                         <article v-for="alfaia in alfaias.data" :key="alfaia.id" class="rounded-[32px] border border-white/80 bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.20)]">
-                            <div class="flex items-start justify-between gap-4">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                                 <div>
                                     <div class="flex flex-wrap items-center gap-3">
-                                        <h3 class="text-2xl font-black text-slate-900">{{ alfaia.nome }}</h3>
+                                        <h3 class="break-words text-xl font-black sm:text-2xl text-slate-900">{{ alfaia.nome }}</h3>
                                         <span class="rounded-full px-3 py-1 text-xs font-semibold" :class="alfaiaStatusClass(alfaia.estado)">
                                             {{ labelize(alfaia.estado) }}
                                         </span>
@@ -654,7 +671,7 @@ const cleanFilters = () => {
                                         Associada a: {{ alfaia.maquina_nome || 'Sem máquina' }}
                                     </p>
                                 </div>
-                                <div class="rounded-3xl bg-emerald-50 px-4 py-3 text-center">
+                                <div class="shrink-0 self-start rounded-3xl bg-emerald-50 px-4 py-3 text-center">
                                     <p class="text-2xl font-black text-emerald-700">{{ alfaia.operacoes_count }}</p>
                                     <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">usos</p>
                                 </div>
@@ -871,6 +888,19 @@ const cleanFilters = () => {
                         <TextInput v-model="maquinaForm.consumo_combustivel" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="maquinaForm.errors.consumo_combustivel" />
                     </div>
+                    <!-- Custo de utilizacao: e o que faz as maquinas entrarem no custo das operacoes -->
+                    <div>
+                        <InputLabel value="Custo por hora (EUR/h)" />
+                        <TextInput v-model="maquinaForm.custo_hora" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                        <p class="mt-1 text-xs text-slate-400">Combustivel, desgaste e amortizacao por hora de trabalho.</p>
+                        <InputError class="mt-2" :message="maquinaForm.errors.custo_hora" />
+                    </div>
+                    <div>
+                        <InputLabel value="Custo por km (EUR/km)" />
+                        <TextInput v-model="maquinaForm.custo_km" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                        <p class="mt-1 text-xs text-slate-400">Para viaturas de transporte, em alternativa ao custo por hora.</p>
+                        <InputError class="mt-2" :message="maquinaForm.errors.custo_km" />
+                    </div>
                     <div class="sm:col-span-2">
                         <InputLabel value="Observações" />
                         <textarea v-model="maquinaForm.observacoes" rows="4" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500" />
@@ -935,6 +965,12 @@ const cleanFilters = () => {
                         <InputLabel value="Consumo de Água (L/ha)" />
                         <TextInput v-model="alfaiaForm.consumo_agua_ha" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
                         <InputError class="mt-2" :message="alfaiaForm.errors.consumo_agua_ha" />
+                    </div>
+                    <div class="sm:col-span-2">
+                        <InputLabel value="Custo por hora (EUR/h)" />
+                        <TextInput v-model="alfaiaForm.custo_hora" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                        <p class="mt-1 text-xs text-slate-400">Usado quando a alfaia entra numa operacao sem trator associado.</p>
+                        <InputError class="mt-2" :message="alfaiaForm.errors.custo_hora" />
                     </div>
                     <div class="sm:col-span-2">
                         <InputLabel value="Estado" />

@@ -376,6 +376,66 @@ const syncContextFromParcela = (form) => {
     syncCampanhaFromCultura(form);
 };
 
+// --- Maquinas, alfaias e transporte da operacao -----------------------------
+// Uma operacao pode levar varios: dois tratores, dois empilhadores e um carro.
+// Cada linha traz as suas horas ou km e o custo sai dai.
+const recursoFormBase = () => ({
+    maquina_id: '',
+    alfaia_id: '',
+    nome: '',
+    papel: '',
+    unidades: 1,
+    horas: '',
+    km: '',
+    custo_hora: '',
+    custo_km: '',
+});
+
+const addRecursoRow = (form) => {
+    form.recursos = [...(form.recursos ?? []), recursoFormBase()];
+};
+
+const removeRecursoRow = (form, index) => {
+    form.recursos = (form.recursos ?? []).filter((_, rowIndex) => rowIndex !== index);
+};
+
+// Ao escolher a maquina, herda o custo/hora e o custo/km do cadastro; o
+// utilizador pode sempre escrever outro (um trator alugado custa diferente).
+const applyRecursoDefaults = (form, index) => {
+    const row = form.recursos[index];
+    const maquina = props.maquinas.find((item) => String(item.id) === String(row.maquina_id));
+    const alfaia = props.alfaias.find((item) => String(item.id) === String(row.alfaia_id));
+
+    if (!row.custo_hora) {
+        row.custo_hora = (maquina?.custo_hora ?? alfaia?.custo_hora)?.toString() ?? '';
+    }
+
+    if (!row.custo_km && maquina?.custo_km) {
+        row.custo_km = maquina.custo_km.toString();
+    }
+
+    if (!row.horas && !row.km && props.form.duracao_horas) {
+        row.horas = props.form.duracao_horas.toString();
+    }
+};
+
+const recursoCusto = (recurso) => {
+    const unidades = Math.max(1, parseInt(recurso.unidades, 10) || 1);
+    const porHoras = (parseFloat(recurso.horas) || 0) * (parseFloat(recurso.custo_hora) || 0);
+    const porKm = (parseFloat(recurso.km) || 0) * (parseFloat(recurso.custo_km) || 0);
+
+    return (porHoras + porKm) * unidades;
+};
+
+const totalCustoRecursos = computed(
+    () => (props.form.recursos ?? []).reduce((total, recurso) => total + recursoCusto(recurso), 0),
+);
+
+// O que a operacao custou ao todo: o valor escrito a mao mais as maquinas.
+const custoRealTotal = computed(
+    () => (parseFloat(props.form.custo_real) || 0) + totalCustoRecursos.value,
+);
+
 const totalCustoProdutos = computed(() => props.form.produtos?.reduce((total, produto) => {
     const quantidade = parseFloat(produto.quantidade) || 0;
     const custoUnitario = parseFloat(produto.custo_unitario) || 0;
@@ -759,6 +819,122 @@ const setActiveTab = (tabId) => {
                     </select>
                     <InputError class="mt-2" :message="form.errors.operador_id" />
                 </div>
+
+                <!-- Todas as maquinas da operacao, com o custo de cada uma -->
+                <div class="sm:col-span-2 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h3 class="text-sm font-black text-slate-900">Máquinas e transporte</h3>
+                            <p class="mt-1 text-xs text-slate-500">
+                                Acrescenta aqui todas as máquinas, alfaias e viaturas usadas. Cada linha entra no custo da operação.
+                            </p>
+                        </div>
+                        <SecondaryButton
+                            type="button"
+                            class="shrink-0 rounded-full px-4 py-2 text-xs normal-case tracking-normal"
+                            @click="addRecursoRow(form)"
+                        >
+                            Adicionar máquina
+                        </SecondaryButton>
+                    </div>
+
+                    <p v-if="!form.recursos?.length" class="mt-4 text-xs text-slate-400">
+                        Sem máquinas nesta operação. Sem linhas aqui, a operação fica só com o custo escrito à mão.
+                    </p>
+
+                    <div v-else class="mt-4 space-y-3">
+                        <div
+                            v-for="(recurso, index) in form.recursos"
+                            :key="`recurso-${index}`"
+                            class="grid gap-3 rounded-2xl bg-white p-4 sm:grid-cols-2"
+                        >
+                            <div>
+                                <InputLabel value="Máquina" />
+                                <select
+                                    v-model="recurso.maquina_id"
+                                    class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                                    @change="applyRecursoDefaults(form, index)"
+                                >
+                                    <option value="">Sem máquina</option>
+                                    <option v-for="maquina in maquinas" :key="maquina.id" :value="String(maquina.id)">{{ maquina.nome }}</option>
+                                </select>
+                                <InputError class="mt-2" :message="form.errors[`recursos.${index}.maquina_id`]" />
+                            </div>
+
+                            <div>
+                                <InputLabel value="Alfaia" />
+                                <select
+                                    v-model="recurso.alfaia_id"
+                                    class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                                    @change="applyRecursoDefaults(form, index)"
+                                >
+                                    <option value="">Sem alfaia</option>
+                                    <option v-for="alfaia in alfaias" :key="alfaia.id" :value="String(alfaia.id)">{{ alfaia.nome }}</option>
+                                </select>
+                                <InputError class="mt-2" :message="form.errors[`recursos.${index}.alfaia_id`]" />
+                            </div>
+
+                            <div v-if="!recurso.maquina_id && !recurso.alfaia_id">
+                                <InputLabel value="Nome (fora do cadastro)" />
+                                <TextInput v-model="recurso.nome" class="mt-2 block w-full rounded-2xl" placeholder="Carro de transporte, trator alugado..." />
+                                <InputError class="mt-2" :message="form.errors[`recursos.${index}.nome`]" />
+                            </div>
+
+                            <div>
+                                <InputLabel value="Função" />
+                                <TextInput v-model="recurso.papel" class="mt-2 block w-full rounded-2xl" placeholder="apanha, transporte, carga..." />
+                            </div>
+
+                            <div>
+                                <InputLabel value="Unidades iguais" />
+                                <TextInput v-model="recurso.unidades" type="number" step="1" min="1" class="mt-2 block w-full rounded-2xl" />
+                                <p class="mt-1 text-xs text-slate-400">Dois empilhadores iguais: uma linha com 2.</p>
+                                <InputError class="mt-2" :message="form.errors[`recursos.${index}.unidades`]" />
+                            </div>
+
+                            <div>
+                                <InputLabel value="Horas totais" />
+                                <TextInput v-model="recurso.horas" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                                <InputError class="mt-2" :message="form.errors[`recursos.${index}.horas`]" />
+                            </div>
+
+                            <div>
+                                <InputLabel value="Custo por hora (€/h)" />
+                                <TextInput v-model="recurso.custo_hora" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                                <InputError class="mt-2" :message="form.errors[`recursos.${index}.custo_hora`]" />
+                            </div>
+
+                            <div>
+                                <InputLabel value="Km percorridos" />
+                                <TextInput v-model="recurso.km" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                                <InputError class="mt-2" :message="form.errors[`recursos.${index}.km`]" />
+                            </div>
+
+                            <div>
+                                <InputLabel value="Custo por km (€/km)" />
+                                <TextInput v-model="recurso.custo_km" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                                <InputError class="mt-2" :message="form.errors[`recursos.${index}.custo_km`]" />
+                            </div>
+
+                            <div class="sm:col-span-2 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                                <p class="text-sm font-bold text-emerald-700">
+                                    Custo desta linha: € {{ formatCurrency(recursoCusto(recurso)) }}
+                                </p>
+                                <button
+                                    type="button"
+                                    class="rounded-full px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                                    @click="removeRecursoRow(form, index)"
+                                >
+                                    Remover
+                                </button>
+                            </div>
+                        </div>
+
+                        <p class="text-right text-sm font-black text-slate-900">
+                            Total de máquinas e transporte: € {{ formatCurrency(totalCustoRecursos) }}
+                        </p>
+                    </div>
+                </div>
             </div>
 
             <div v-show="activeTab === 'produtos'" class="space-y-4">
@@ -1019,8 +1195,9 @@ const setActiveTab = (tabId) => {
 
             <div v-show="activeTab === 'custos'" class="space-y-4">
                 <div class="rounded-2xl bg-amber-50 p-4 text-sm text-slate-600">
-                    Os custos de produtos são calculados automaticamente a partir das quantidades e preços unitários.
-                    Aqui podes registar o custo total estimado e o custo real da operação (mão de obra, máquinas, etc.).
+                    Os custos de produtos são calculados a partir das quantidades e preços unitários, e os das máquinas
+                    a partir das linhas do separador Recursos. Aqui escreves apenas o que não está em nenhum dos dois —
+                    mão de obra, serviços contratados.
                 </div>
 
                 <div class="grid gap-4 sm:grid-cols-2">
@@ -1034,12 +1211,23 @@ const setActiveTab = (tabId) => {
                     </div>
 
                     <div>
-                        <InputLabel value="Custo real (€)" />
+                        <InputLabel value="Outros custos reais (€)" />
                         <div class="relative mt-2">
                             <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">€</span>
                             <TextInput v-model="form.custo_real" type="number" step="0.01" min="0" class="block w-full rounded-2xl pl-8" />
                         </div>
+                        <p class="mt-1 text-xs text-slate-400">Mão de obra e serviços. As máquinas somam-se a este valor.</p>
                         <InputError class="mt-2" :message="form.errors.custo_real" />
+                    </div>
+
+                    <div v-if="totalCustoRecursos > 0" class="sm:col-span-2 rounded-2xl bg-emerald-50 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Calculado automaticamente</p>
+                        <p class="mt-2 text-sm font-medium text-emerald-900">
+                            Máquinas e transporte: € {{ formatCurrency(totalCustoRecursos) }}
+                        </p>
+                        <p class="mt-1 text-sm font-black text-emerald-900">
+                            Custo real da operação: € {{ formatCurrency(custoRealTotal) }}
+                        </p>
                     </div>
 
                     <div v-if="form.produtos?.length" class="sm:col-span-2 rounded-2xl bg-emerald-50 p-4">

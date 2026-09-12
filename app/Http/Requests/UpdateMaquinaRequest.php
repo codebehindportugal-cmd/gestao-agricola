@@ -25,6 +25,8 @@ class UpdateMaquinaRequest extends FormRequest
             'horas_manutencao' => 'nullable|numeric|min:0',
             'consumo_agua_ha' => 'nullable|numeric|min:0',
             'consumo_combustivel' => 'nullable|numeric|min:0',
+            'custo_hora' => 'nullable|numeric|min:0',
+            'custo_km' => 'nullable|numeric|min:0',
             'estado' => 'in:operacional,em_manutencao,danificada,retirada',
             'observacoes' => 'nullable|string',
         ];

@@ -381,10 +381,10 @@ const estadoLabel = (estado) => ({
                         :key="cultura.id"
                         class="rounded-[32px] border border-white/80 bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]"
                     >
-                        <div class="flex items-start justify-between gap-4">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                             <div>
                                 <div class="flex flex-wrap items-center gap-3">
-                                    <h2 class="text-2xl font-black text-slate-900">{{ cultura.nome }}</h2>
+                                    <h2 class="break-words text-xl font-black sm:text-2xl text-slate-900">{{ cultura.nome }}</h2>
                                     <span
                                         class="rounded-full px-3 py-1 text-xs font-semibold"
                                         :class="estadoBadgeClass(cultura.estado)"
@@ -399,7 +399,7 @@ const estadoLabel = (estado) => ({
                                     {{ cultura.ciclo_produtivo === 'permanente' ? 'Cultura permanente' : 'Cultura anual' }}
                                 </p>
                             </div>
-                            <div class="text-right">
+                            <div class="min-w-0 break-words sm:text-right">
                                 <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">{{ cultura.grupo_cultura || 'outro' }}</p>
                                 <p class="text-lg font-black text-slate-900">{{ cultura.tipo }}</p>
                                 <p class="text-sm text-slate-500">{{ cultura.variedade || 'Sem variedade' }}</p>

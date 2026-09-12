@@ -21,6 +21,7 @@ class Alfaia extends Model
         'comprimento',
         'largura',
         'consumo_agua_ha',
+        'custo_hora',
         'estado',
         'observacoes',
     ];
@@ -29,6 +30,7 @@ class Alfaia extends Model
         'comprimento' => 'decimal:2',
         'largura' => 'decimal:2',
         'consumo_agua_ha' => 'decimal:2',
+        'custo_hora' => 'decimal:2',
     ];
 
     // Relacionamentos
@@ -40,5 +42,11 @@ class Alfaia extends Model
     public function operacoes(): HasMany
     {
         return $this->hasMany(Operacao::class);
+    }
+
+    /** Linhas de utilizacao desta alfaia em operacoes. */
+    public function utilizacoes(): HasMany
+    {
+        return $this->hasMany(OperacaoRecurso::class);
     }
 }

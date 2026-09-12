@@ -57,6 +57,8 @@ class MaquinariaManagementController extends Controller
                 'horas_manutencao' => $maquina->horas_manutencao,
                 'consumo_agua_ha' => $maquina->consumo_agua_ha,
                 'consumo_combustivel' => $maquina->consumo_combustivel,
+                'custo_hora' => $maquina->custo_hora,
+                'custo_km' => $maquina->custo_km,
                 'estado' => $maquina->estado,
                 'observacoes' => $maquina->observacoes,
                 'alfaias_count' => $maquina->alfaias_count,
@@ -94,6 +96,7 @@ class MaquinariaManagementController extends Controller
                 'comprimento' => $alfaia->comprimento,
                 'largura' => $alfaia->largura,
                 'consumo_agua_ha' => $alfaia->consumo_agua_ha,
+                'custo_hora' => $alfaia->custo_hora,
                 'estado' => $alfaia->estado,
                 'observacoes' => $alfaia->observacoes,
                 'operacoes_count' => $alfaia->operacoes_count,
@@ -340,7 +343,7 @@ class MaquinariaManagementController extends Controller
     {
         $data = $request->validated();
 
-        foreach (['marca', 'modelo', 'matricula', 'numero_serie', 'ano_aquisicao', 'horas_uso', 'horas_manutencao', 'consumo_agua_ha', 'consumo_combustivel', 'observacoes'] as $field) {
+        foreach (['marca', 'modelo', 'matricula', 'numero_serie', 'ano_aquisicao', 'horas_uso', 'horas_manutencao', 'consumo_agua_ha', 'consumo_combustivel', 'custo_hora', 'custo_km', 'observacoes'] as $field) {
             if (array_key_exists($field, $data) && $data[$field] === '') {
                 $data[$field] = null;
             }
@@ -357,7 +360,7 @@ class MaquinariaManagementController extends Controller
     {
         $data = $request->validated();
 
-        foreach (['maquina_id', 'descricao', 'comprimento', 'largura', 'consumo_agua_ha', 'observacoes'] as $field) {
+        foreach (['maquina_id', 'descricao', 'comprimento', 'largura', 'consumo_agua_ha', 'custo_hora', 'observacoes'] as $field) {
             if (array_key_exists($field, $data) && $data[$field] === '') {
                 $data[$field] = null;
             }

@@ -85,7 +85,10 @@ class CampanhaController extends Controller
 
         $campanha->load([
             'cultura.parcela.terreno',
-            'colheitas',
+            // A operacao de apanha e os seus recursos: e de la que vem o custo
+            // da colheita (mao de obra, tratores, empilhadores, transporte).
+            'colheitas.operacao.recursos.maquina:id,nome',
+            'colheitas.operacao.recursos.alfaia:id,nome',
             'custos' => fn ($q) => $q->orderByRaw('data_custo IS NULL, data_custo ASC'),
             'operacoes' => fn ($q) => $q
                 ->with([
@@ -149,6 +152,16 @@ class CampanhaController extends Controller
                 'quantidade_perdas' => (float) ($c->quantidade_perdas ?? 0),
                 'qualidade' => $c->qualidade,
                 'observacoes' => $c->observacoes,
+                'custo_apanha' => $c->custo_apanha,
+                'custo_por_kg' => $c->custo_por_kg,
+                'custo_detalhe' => $c->detalheCustoApanha(),
+                'recursos' => $c->operacao?->recursos->map(fn ($recurso) => [
+                    'id' => $recurso->id,
+                    'descricao' => $recurso->descricao,
+                    'horas' => $recurso->horas === null ? null : (float) $recurso->horas,
+                    'km' => $recurso->km === null ? null : (float) $recurso->km,
+                    'custo_total' => (float) $recurso->custo_total,
+                ])->values() ?? collect(),
             ])->values(),
             'custos' => $campanha->custos->map(fn ($c) => [
                 'id' => $c->id,

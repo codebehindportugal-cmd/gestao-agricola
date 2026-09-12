@@ -415,17 +415,17 @@ const formatCurrency = (value) => {
                         </div>
 
                         <article v-for="equipa in equipas.data" :key="equipa.id" class="rounded-[32px] border border-white/80 bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.22)]">
-                            <div class="flex items-start justify-between gap-4">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                                 <div>
                                     <div class="flex flex-wrap items-center gap-3">
-                                        <h3 class="text-2xl font-black text-slate-900">{{ equipa.nome }}</h3>
+                                        <h3 class="break-words text-xl font-black sm:text-2xl text-slate-900">{{ equipa.nome }}</h3>
                                         <span class="rounded-full px-3 py-1 text-xs font-semibold" :class="equipaStatusClass(equipa.status)">
                                             {{ labelize(equipa.status) }}
                                         </span>
                                     </div>
                                     <p class="mt-2 text-sm text-slate-500">Líder: {{ equipa.lider_nome || 'Sem líder' }}</p>
                                 </div>
-                                <div class="rounded-3xl bg-emerald-50 px-4 py-3 text-center">
+                                <div class="shrink-0 self-start rounded-3xl bg-emerald-50 px-4 py-3 text-center">
                                     <p class="text-2xl font-black text-emerald-700">{{ equipa.funcionarios_count }}</p>
                                     <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">membros</p>
                                 </div>

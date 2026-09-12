@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Api\RespondeJson;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\StoreFaturaApiRequest;
+use App\Http\Requests\Api\V1\StoreFaturasLoteApiRequest;
 use App\Models\Campanha;
 use App\Models\Custo;
 use App\Models\Despesa;
@@ -16,8 +17,11 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator as ValidatorFacade;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * Ingestao de faturas de compra.
@@ -53,185 +57,16 @@ class FaturaController extends Controller
         $data = $request->validated();
         $avisos = [];
 
-        // Uma fatura e identificada pelo numero + fornecedor: nao ha coluna
-        // referencia_externa em despesas, e essa combinacao ja e unica na pratica.
-        if (! empty($data['numero_fatura'])) {
-            $existente = Despesa::query()
-                ->where('numero_fatura', $data['numero_fatura'])
-                ->when(! empty($data['fornecedor']), fn ($q) => $q->where('fornecedor', $data['fornecedor']))
-                ->first();
+        $existente = $this->jaRegistada($data);
 
-            if ($existente) {
-                $avisos[] = "fatura ja registada ({$data['numero_fatura']})";
+        if ($existente !== null) {
+            $avisos[] = "fatura ja registada ({$data['numero_fatura']})";
 
-                return $this->criado($this->formatar($existente->load(['items.produto', 'campanha']), null), $avisos);
-            }
+            return $this->criado($this->formatar($existente->load(['items.produto', 'campanha']), null), $avisos);
         }
 
         try {
-            [$despesa, $custo, $movimentos, $avisosCriacao] = DB::transaction(function () use ($data) {
-                $avisos = [];
-
-                $campanha = null;
-                $maquina = null;
-
-                if (! empty($data['campanha'])) {
-                    $campanha = $this->resolvedor->resolverCampanha($this->valorReferencia($data['campanha']));
-                } else {
-                    $campanha = $this->campanhaPelaData($data['data'], $avisos);
-                }
-
-                // Faturas de pecas ligam-se a maquina, para o custo entrar no
-                // desgaste daquele tractor e nao num saco geral.
-                if (! empty($data['maquina'])) {
-                    $maquina = $this->resolvedor->resolverMaquina($this->valorReferencia($data['maquina']));
-                }
-
-                $criarProdutos = $data['criar_produtos'] ?? true;
-                $actualizarCusto = $data['actualizar_custo_unitario'] ?? true;
-
-                $linhas = [];
-                $totalCalculado = 0.0;
-
-                foreach ($data['linhas'] as $indice => $linha) {
-                    // O estabelecimento que vendeu o produto e campo do caderno
-                    // de campo; por omissao e o fornecedor da propria fatura.
-                    $linha['estabelecimento_venda_nome'] ??= $data['fornecedor'] ?? null;
-
-                    // O tamanho da embalagem que a propria fatura declara: o
-                    // campo do pedido, ou o que vem escrito na designacao.
-                    $declarado = $this->conteudoDeclarado($linha);
-
-                    $produto = $this->resolverProduto($linha, $criarProdutos, $indice, $avisos, $declarado);
-                    $embalagem = $this->conteudoEfetivo($declarado, $produto, $indice, $avisos);
-
-                    if ($produto !== null) {
-                        $actualizacoes = [];
-
-                        if ($actualizarCusto) {
-                            // O custo do catalogo e' por unidade de stock: o
-                            // preco pago (ja com desconto) a dividir pelo que
-                            // leva a embalagem desta linha.
-                            $precoUnitario = round(
-                                $this->precoLiquido($linha) / $embalagem['conteudo'],
-                                4
-                            );
-
-                            if ((float) $produto->custo_unitario !== $precoUnitario) {
-                                $actualizacoes['custo_unitario'] = $precoUnitario;
-                            }
-                        }
-
-                        // O codigo e o DGAV ficam gravados no produto para a
-                        // fatura seguinte o apanhar logo, sem criar um duplicado.
-                        if (! empty($linha['codigo']) && blank($produto->codigo_interno)) {
-                            $actualizacoes['codigo_interno'] = $linha['codigo'];
-                        }
-
-                        if (! empty($linha['numero_autorizacao_dgav']) && blank($produto->numero_autorizacao_dgav)) {
-                            $actualizacoes['numero_autorizacao_dgav'] = $linha['numero_autorizacao_dgav'];
-                        }
-
-                        if (blank($produto->unidade_medida) && filled($embalagem['unidade'])) {
-                            $actualizacoes['unidade_medida'] = $embalagem['unidade'];
-                        }
-
-                        foreach (['estabelecimento_venda_nome', 'estabelecimento_venda_autorizacao'] as $campo) {
-                            if (! empty($linha[$campo]) && blank($produto->{$campo})) {
-                                $actualizacoes[$campo] = $linha[$campo];
-                            }
-                        }
-
-                        if ($actualizacoes !== []) {
-                            $produto->update($actualizacoes);
-                        }
-                    }
-
-                    $quantidade = (float) $linha['quantidade'];
-                    $preco = (float) $linha['preco_unitario'];
-                    $desconto = (float) ($linha['desconto_percentagem'] ?? 0);
-                    $iva = (float) ($linha['iva_percentagem'] ?? 0);
-                    // O desconto entra antes do IVA, como na fatura.
-                    $totalCalculado += $quantidade * $preco * (1 - $desconto / 100) * (1 + $iva / 100);
-
-                    $linhas[] = [
-                        'descricao' => $linha['descricao'],
-                        'quantidade' => $quantidade,
-                        'conteudo_embalagem' => $embalagem['conteudo'],
-                        'unidade_embalagem' => $embalagem['unidade'],
-                        'preco_unitario' => $preco,
-                        'desconto_percentagem' => $desconto,
-                        'iva_percentagem' => $iva,
-                        'produto_id' => $produto?->id,
-                        'notas' => $linha['notas'] ?? null,
-                    ];
-                }
-
-                $totalCalculado = round($totalCalculado, 2);
-                $valor = isset($data['valor']) ? (float) $data['valor'] : $totalCalculado;
-
-                if (isset($data['valor']) && abs($valor - $totalCalculado) > 0.02) {
-                    $avisos[] = sprintf(
-                        'o total indicado (%.2f) nao bate com a soma das linhas com IVA (%.2f); foi guardado o total indicado.',
-                        $valor,
-                        $totalCalculado
-                    );
-                }
-
-                $categoria = $data['categoria'] ?? 'outro';
-
-                $despesa = Despesa::query()->create([
-                    'titulo' => $data['titulo'] ?? $this->tituloPorOmissao($data),
-                    'numero_fatura' => $data['numero_fatura'] ?? null,
-                    'fornecedor' => $data['fornecedor'] ?? null,
-                    'valor' => $valor,
-                    'data' => $data['data'],
-                    'campanha_id' => $campanha?->id,
-                    'categoria' => $categoria,
-                    'notas' => $data['notas'] ?? null,
-                ]);
-
-                foreach ($linhas as $linha) {
-                    $despesa->items()->create($linha);
-                }
-
-                $despesa->load(['items.produto', 'campanha']);
-
-                $movimentos = [];
-
-                if ($data['dar_entrada_em_stock'] ?? true) {
-                    $movimentos = $this->stock->processarEntradas($despesa);
-
-                    if ($movimentos === []) {
-                        $avisos[] = 'nenhuma linha ficou ligada a um produto; nao houve entrada em stock.';
-                    }
-                }
-
-                $custo = null;
-
-                if (($data['criar_custo'] ?? true) && $valor > 0) {
-                    // Sem campanha e sem maquina, o custo nao tem onde encostar:
-                    // nasce rateavel para o RateioCustosService o repartir pelas
-                    // campanhas do periodo, em vez de ficar fora de todas as contas.
-                    $rateavel = $data['rateavel'] ?? ($campanha === null && $maquina === null);
-
-                    $custo = Custo::query()->create([
-                        'descricao' => $this->stock->referencia($despesa),
-                        'tipo' => self::CATEGORIA_PARA_TIPO_CUSTO[$categoria] ?? 'outro',
-                        'valor' => $valor,
-                        'data_custo' => $data['data'],
-                        'campanha_id' => $campanha?->id,
-                        'maquina_id' => $maquina?->id,
-                        'rateavel' => $rateavel && $campanha === null,
-                        'base_rateio' => $rateavel && $campanha === null
-                            ? ($data['base_rateio'] ?? 'kg')
-                            : null,
-                        'referencia_externa' => 'fatura-'.$despesa->id,
-                    ]);
-                }
-
-                return [$despesa, $custo, $movimentos, $avisos];
-            });
+            [$despesa, $custo, $movimentos, $avisosCriacao] = $this->registar($data);
         } catch (ValidationException $exception) {
             return $this->erro422($exception->errors());
         }
@@ -240,6 +75,366 @@ class FaturaController extends Controller
             $this->formatar($despesa, $custo, $movimentos),
             array_merge($avisos, $avisosCriacao)
         );
+    }
+
+    /**
+     * Varias faturas num pedido.
+     *
+     * Serve o caso real: o Andre fotografa as faturas de papel em pilha e
+     * manda-as todas de uma vez. Cada fatura e validada e registada por si, em
+     * transaccao propria — uma que falhe devolve o erro dela e as outras entram,
+     * porque obrigar a repetir o lote inteiro por causa de uma linha mal lida
+     * era pior do que inserir a mao. O resultado vem fatura a fatura, pela ordem
+     * em que foram enviadas.
+     *
+     * A foto de cada uma continua a ir em POST /faturas/{despesa}/ficheiro, com
+     * o `despesa_id` que este endpoint devolve: o corpo deste e' JSON e uma
+     * dezena de fotos de telemovel nao cabe la.
+     */
+    public function lote(StoreFaturasLoteApiRequest $request): JsonResponse
+    {
+        // input() e nao validated(): o pedido so valida o envelope, e cada
+        // fatura e validada em baixo com as regras completas. Tirar aqui os
+        // campos de dentro seria perde-los.
+        $faturas = (array) $request->input('faturas', []);
+
+        $resultados = [];
+        $erros = [];
+        $registadas = 0;
+        $repetidas = 0;
+        $falhadas = 0;
+
+        foreach (array_values($faturas) as $indice => $fatura) {
+            $validador = ValidatorFacade::make(
+                $fatura,
+                StoreFaturaApiRequest::regrasFatura(),
+                StoreFaturaApiRequest::mensagensFatura()
+            );
+
+            $referencia = is_array($fatura) ? ($fatura['numero_fatura'] ?? null) : null;
+
+            if ($validador->fails()) {
+                $falhadas++;
+                $erros["faturas.{$indice}"] = $validador->errors()->toArray();
+                $resultados[] = $this->resultadoLote($indice, $referencia, 'erro', null, [], $validador->errors()->toArray());
+
+                continue;
+            }
+
+            $data = $validador->validated();
+            $referencia = $data['numero_fatura'] ?? null;
+
+            // Duas fotos da mesma fatura no mesmo lote: a primeira registou e ja
+            // esta gravada, por isso a segunda cai aqui como repetida.
+            $existente = $this->jaRegistada($data);
+
+            if ($existente !== null) {
+                $repetidas++;
+                $resultados[] = $this->resultadoLote(
+                    $indice,
+                    $referencia,
+                    'repetida',
+                    $this->formatar($existente->load(['items.produto', 'campanha']), null),
+                    ["fatura ja registada ({$referencia})"]
+                );
+
+                continue;
+            }
+
+            try {
+                [$despesa, $custo, $movimentos, $avisosCriacao] = $this->registar($data);
+
+                $registadas++;
+                $resultados[] = $this->resultadoLote(
+                    $indice,
+                    $referencia,
+                    'registada',
+                    $this->formatar($despesa, $custo, $movimentos),
+                    $avisosCriacao
+                );
+            } catch (ValidationException $excepcao) {
+                $falhadas++;
+                $erros["faturas.{$indice}"] = $excepcao->errors();
+                $resultados[] = $this->resultadoLote($indice, $referencia, 'erro', null, [], $excepcao->errors());
+            } catch (Throwable $excepcao) {
+                // Sem isto, um erro numa fatura do meio devolvia 500 e o
+                // cliente ficava sem saber quais das anteriores entraram — e
+                // elas entraram, cada uma tem a sua transaccao.
+                Log::error('falha ao registar fatura do lote', [
+                    'indice' => $indice,
+                    'numero_fatura' => $referencia,
+                    'excepcao' => $excepcao,
+                ]);
+
+                $falhadas++;
+                $erros["faturas.{$indice}"] = ['fatura' => ['Erro inesperado ao registar: '.$excepcao->getMessage()]];
+                $resultados[] = $this->resultadoLote(
+                    $indice,
+                    $referencia,
+                    'erro',
+                    null,
+                    [],
+                    ['fatura' => ['Erro inesperado ao registar: '.$excepcao->getMessage()]]
+                );
+            }
+        }
+
+        $total = count($resultados);
+
+        $dados = [
+            'total' => $total,
+            'registadas' => $registadas,
+            'repetidas' => $repetidas,
+            'falhadas' => $falhadas,
+            'faturas' => $resultados,
+        ];
+
+        $avisos = [sprintf(
+            '%d faturas: %d registadas, %d repetidas, %d falhadas.',
+            $total,
+            $registadas,
+            $repetidas,
+            $falhadas
+        )];
+
+        // 201 quando tudo passou, 207 quando o lote foi parcial (ha registos
+        // para ver e erros para corrigir), 422 quando nao entrou nada.
+        $estado = match (true) {
+            $falhadas === 0 => 201,
+            $registadas + $repetidas > 0 => 207,
+            default => 422,
+        };
+
+        return response()->json([
+            'sucesso' => $falhadas === 0,
+            'dados' => $dados,
+            'avisos' => $avisos,
+            'erros' => $erros,
+        ], $estado);
+    }
+
+    /**
+     * Uma linha do resultado do lote.
+     *
+     * @param  array<string, mixed>|null  $dados
+     * @param  array<int, string>  $avisos
+     * @param  array<string, mixed>  $erros
+     * @return array<string, mixed>
+     */
+    private function resultadoLote(
+        int $indice,
+        ?string $referencia,
+        string $estado,
+        ?array $dados = null,
+        array $avisos = [],
+        array $erros = []
+    ): array {
+        return [
+            'indice' => $indice,
+            'numero_fatura' => $referencia,
+            'estado' => $estado,
+            'sucesso' => $estado !== 'erro',
+            'despesa_id' => $dados['despesa']['id'] ?? null,
+            'dados' => $dados,
+            'avisos' => $avisos,
+            'erros' => $erros,
+        ];
+    }
+
+    /**
+     * A despesa que esta fatura ja criou, se existir.
+     *
+     * Uma fatura e identificada pelo numero + fornecedor: nao ha coluna
+     * referencia_externa em despesas, e essa combinacao ja e unica na pratica.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function jaRegistada(array $data): ?Despesa
+    {
+        if (empty($data['numero_fatura'])) {
+            return null;
+        }
+
+        return Despesa::query()
+            ->where('numero_fatura', $data['numero_fatura'])
+            ->when(! empty($data['fornecedor']), fn ($q) => $q->where('fornecedor', $data['fornecedor']))
+            ->first();
+    }
+
+    /**
+     * Grava uma fatura: despesa, linhas, produtos, stock e custo.
+     *
+     * Tudo numa transaccao — meia fatura registada e pior do que nenhuma. E o
+     * mesmo caminho para o POST /faturas e para cada fatura do lote.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{0: Despesa, 1: ?Custo, 2: array<int, mixed>, 3: array<int, string>}
+     */
+    private function registar(array $data): array
+    {
+        return DB::transaction(function () use ($data) {
+            $avisos = [];
+
+            $campanha = null;
+            $maquina = null;
+
+            if (! empty($data['campanha'])) {
+                $campanha = $this->resolvedor->resolverCampanha($this->valorReferencia($data['campanha']));
+            } else {
+                $campanha = $this->campanhaPelaData($data['data'], $avisos);
+            }
+
+            // Faturas de pecas ligam-se a maquina, para o custo entrar no
+            // desgaste daquele tractor e nao num saco geral.
+            if (! empty($data['maquina'])) {
+                $maquina = $this->resolvedor->resolverMaquina($this->valorReferencia($data['maquina']));
+            }
+
+            $criarProdutos = $data['criar_produtos'] ?? true;
+            $actualizarCusto = $data['actualizar_custo_unitario'] ?? true;
+
+            $linhas = [];
+            $totalCalculado = 0.0;
+
+            foreach ($data['linhas'] as $indice => $linha) {
+                // O estabelecimento que vendeu o produto e campo do caderno
+                // de campo; por omissao e o fornecedor da propria fatura.
+                $linha['estabelecimento_venda_nome'] ??= $data['fornecedor'] ?? null;
+
+                // O tamanho da embalagem que a propria fatura declara: o
+                // campo do pedido, ou o que vem escrito na designacao.
+                $declarado = $this->conteudoDeclarado($linha);
+
+                $produto = $this->resolverProduto($linha, $criarProdutos, $indice, $avisos, $declarado);
+                $embalagem = $this->conteudoEfetivo($declarado, $produto, $indice, $avisos);
+
+                if ($produto !== null) {
+                    $actualizacoes = [];
+
+                    if ($actualizarCusto) {
+                        // O custo do catalogo e' por unidade de stock: o
+                        // preco pago (ja com desconto) a dividir pelo que
+                        // leva a embalagem desta linha.
+                        $precoUnitario = round(
+                            $this->precoLiquido($linha) / $embalagem['conteudo'],
+                            4
+                        );
+
+                        if ((float) $produto->custo_unitario !== $precoUnitario) {
+                            $actualizacoes['custo_unitario'] = $precoUnitario;
+                        }
+                    }
+
+                    // O codigo e o DGAV ficam gravados no produto para a
+                    // fatura seguinte o apanhar logo, sem criar um duplicado.
+                    if (! empty($linha['codigo']) && blank($produto->codigo_interno)) {
+                        $actualizacoes['codigo_interno'] = $linha['codigo'];
+                    }
+
+                    if (! empty($linha['numero_autorizacao_dgav']) && blank($produto->numero_autorizacao_dgav)) {
+                        $actualizacoes['numero_autorizacao_dgav'] = $linha['numero_autorizacao_dgav'];
+                    }
+
+                    if (blank($produto->unidade_medida) && filled($embalagem['unidade'])) {
+                        $actualizacoes['unidade_medida'] = $embalagem['unidade'];
+                    }
+
+                    foreach (['estabelecimento_venda_nome', 'estabelecimento_venda_autorizacao'] as $campo) {
+                        if (! empty($linha[$campo]) && blank($produto->{$campo})) {
+                            $actualizacoes[$campo] = $linha[$campo];
+                        }
+                    }
+
+                    if ($actualizacoes !== []) {
+                        $produto->update($actualizacoes);
+                    }
+                }
+
+                $quantidade = (float) $linha['quantidade'];
+                $preco = (float) $linha['preco_unitario'];
+                $desconto = (float) ($linha['desconto_percentagem'] ?? 0);
+                $iva = (float) ($linha['iva_percentagem'] ?? 0);
+                // O desconto entra antes do IVA, como na fatura.
+                $totalCalculado += $quantidade * $preco * (1 - $desconto / 100) * (1 + $iva / 100);
+
+                $linhas[] = [
+                    'descricao' => $linha['descricao'],
+                    'quantidade' => $quantidade,
+                    'conteudo_embalagem' => $embalagem['conteudo'],
+                    'unidade_embalagem' => $embalagem['unidade'],
+                    'preco_unitario' => $preco,
+                    'desconto_percentagem' => $desconto,
+                    'iva_percentagem' => $iva,
+                    'produto_id' => $produto?->id,
+                    'notas' => $linha['notas'] ?? null,
+                ];
+            }
+
+            $totalCalculado = round($totalCalculado, 2);
+            $valor = isset($data['valor']) ? (float) $data['valor'] : $totalCalculado;
+
+            if (isset($data['valor']) && abs($valor - $totalCalculado) > 0.02) {
+                $avisos[] = sprintf(
+                    'o total indicado (%.2f) nao bate com a soma das linhas com IVA (%.2f); foi guardado o total indicado.',
+                    $valor,
+                    $totalCalculado
+                );
+            }
+
+            $categoria = $data['categoria'] ?? 'outro';
+
+            $despesa = Despesa::query()->create([
+                'titulo' => $data['titulo'] ?? $this->tituloPorOmissao($data),
+                'numero_fatura' => $data['numero_fatura'] ?? null,
+                'fornecedor' => $data['fornecedor'] ?? null,
+                'valor' => $valor,
+                'data' => $data['data'],
+                'campanha_id' => $campanha?->id,
+                'categoria' => $categoria,
+                'notas' => $data['notas'] ?? null,
+            ]);
+
+            foreach ($linhas as $linha) {
+                $despesa->items()->create($linha);
+            }
+
+            $despesa->load(['items.produto', 'campanha']);
+
+            $movimentos = [];
+
+            if ($data['dar_entrada_em_stock'] ?? true) {
+                $movimentos = $this->stock->processarEntradas($despesa);
+
+                if ($movimentos === []) {
+                    $avisos[] = 'nenhuma linha ficou ligada a um produto; nao houve entrada em stock.';
+                }
+            }
+
+            $custo = null;
+
+            if (($data['criar_custo'] ?? true) && $valor > 0) {
+                // Sem campanha e sem maquina, o custo nao tem onde encostar:
+                // nasce rateavel para o RateioCustosService o repartir pelas
+                // campanhas do periodo, em vez de ficar fora de todas as contas.
+                $rateavel = $data['rateavel'] ?? ($campanha === null && $maquina === null);
+
+                $custo = Custo::query()->create([
+                    'descricao' => $this->stock->referencia($despesa),
+                    'tipo' => self::CATEGORIA_PARA_TIPO_CUSTO[$categoria] ?? 'outro',
+                    'valor' => $valor,
+                    'data_custo' => $data['data'],
+                    'campanha_id' => $campanha?->id,
+                    'maquina_id' => $maquina?->id,
+                    'rateavel' => $rateavel && $campanha === null,
+                    'base_rateio' => $rateavel && $campanha === null
+                        ? ($data['base_rateio'] ?? 'kg')
+                        : null,
+                    'referencia_externa' => 'fatura-'.$despesa->id,
+                ]);
+            }
+
+            return [$despesa, $custo, $movimentos, $avisos];
+        });
     }
 
     /**

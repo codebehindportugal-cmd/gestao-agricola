@@ -17,6 +17,24 @@ class ColheitaResource extends JsonResource
             'qualidade' => $this->qualidade,
             'referencia_externa' => $this->referencia_externa,
             'observacoes' => $this->observacoes,
+            'custo_apanha' => $this->custo_apanha,
+            'custo_por_kg' => $this->custo_por_kg,
+            'custo_detalhe' => $this->detalheCustoApanha(),
+            'operacao' => $this->whenLoaded('operacao', fn () => $this->operacao ? [
+                'id' => $this->operacao->id,
+                'tipo' => $this->operacao->tipo,
+                'custo_real' => $this->operacao->custo_real,
+                'recursos' => $this->operacao->relationLoaded('recursos')
+                    ? $this->operacao->recursos->map(fn ($recurso) => [
+                        'id' => $recurso->id,
+                        'descricao' => $recurso->descricao,
+                        'unidades' => $recurso->unidades,
+                        'horas' => $recurso->horas,
+                        'km' => $recurso->km,
+                        'custo_total' => $recurso->custo_total,
+                    ])->values()
+                    : null,
+            ] : null),
             'campanha' => $this->whenLoaded('campanha', fn () => $this->campanha ? [
                 'id' => $this->campanha->id,
                 'ano' => $this->campanha->ano,

@@ -147,7 +147,7 @@ function deleteCusto(custo) {
                         Campanhas
                     </Link>
                     <div class="flex flex-wrap items-center gap-3">
-                        <h1 class="text-3xl font-black text-slate-900">{{ campanha.cultura_nome }}</h1>
+                        <h1 class="text-2xl font-black text-slate-900 sm:text-3xl">{{ campanha.cultura_nome }}</h1>
                         <span class="rounded-full px-3 py-1 text-xs font-semibold" :class="statusBadgeClass(campanha.status)">
                             {{ statusLabel(campanha.status) }}
                         </span>
@@ -188,30 +188,30 @@ function deleteCusto(custo) {
 
                 <!-- Resumo numérico (4 cards) -->
                 <section class="grid grid-cols-2 gap-4 md:grid-cols-4">
-                    <article class="rounded-[28px] bg-white p-5 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <article class="rounded-[28px] bg-white p-4 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)] sm:p-5">
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Produção real</p>
-                        <p class="mt-2 text-2xl font-black text-slate-900">{{ formatNumber(resumo.producao_real, 0) }} kg</p>
+                        <p class="mt-2 text-lg font-black sm:text-2xl text-slate-900">{{ formatNumber(resumo.producao_real, 0) }} kg</p>
                         <p v-if="campanha.producao_esperada" class="mt-1 text-xs text-slate-400">
                             previsto: {{ formatNumber(campanha.producao_esperada, 0) }} kg
                         </p>
                     </article>
-                    <article class="rounded-[28px] bg-white p-5 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <article class="rounded-[28px] bg-white p-4 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)] sm:p-5">
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Custo total</p>
-                        <p class="mt-2 text-2xl font-black text-amber-700">{{ formatCurrency(resumo.custo_total) }}</p>
+                        <p class="mt-2 text-lg font-black sm:text-2xl text-amber-700">{{ formatCurrency(resumo.custo_total) }}</p>
                         <p v-if="campanha.custo_estimado" class="mt-1 text-xs text-slate-400">
                             estimado: {{ formatCurrency(campanha.custo_estimado) }}
                         </p>
                     </article>
-                    <article class="rounded-[28px] bg-white p-5 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <article class="rounded-[28px] bg-white p-4 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)] sm:p-5">
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Custo / kg</p>
-                        <p class="mt-2 text-2xl font-black text-slate-900">
+                        <p class="mt-2 text-lg font-black sm:text-2xl text-slate-900">
                             {{ resumo.custo_por_kg > 0 ? formatCurrency(resumo.custo_por_kg) : '—' }}
                         </p>
                         <p class="mt-1 text-xs text-slate-400">por quilograma colhido</p>
                     </article>
-                    <article class="rounded-[28px] bg-white p-5 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <article class="rounded-[28px] bg-white p-4 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)] sm:p-5">
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Custo / ha</p>
-                        <p class="mt-2 text-2xl font-black text-slate-900">
+                        <p class="mt-2 text-lg font-black sm:text-2xl text-slate-900">
                             {{ resumo.custo_por_ha > 0 ? formatCurrency(resumo.custo_por_ha) : '—' }}
                         </p>
                         <p class="mt-1 text-xs text-slate-400">{{ campanha.area_ha > 0 ? `${formatNumber(campanha.area_ha)} ha` : 'área não definida' }}</p>
@@ -220,30 +220,30 @@ function deleteCusto(custo) {
 
                 <!-- Vendas e margem -->
                 <section class="grid grid-cols-2 gap-4 md:grid-cols-4">
-                    <article class="rounded-[28px] bg-white p-5 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <article class="rounded-[28px] bg-white p-4 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)] sm:p-5">
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Vendas</p>
-                        <p class="mt-2 text-2xl font-black text-emerald-700">{{ formatCurrency(resumo.receita_total ?? 0) }}</p>
+                        <p class="mt-2 text-lg font-black sm:text-2xl text-emerald-700">{{ formatCurrency(resumo.receita_total ?? 0) }}</p>
                         <p class="mt-1 text-xs text-slate-400">{{ vendas.length }} registo(s)</p>
                     </article>
-                    <article class="rounded-[28px] bg-white p-5 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <article class="rounded-[28px] bg-white p-4 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)] sm:p-5">
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Preço médio</p>
-                        <p class="mt-2 text-2xl font-black text-slate-900">
+                        <p class="mt-2 text-lg font-black sm:text-2xl text-slate-900">
                             {{ resumo.preco_medio_venda > 0 ? formatCurrency(resumo.preco_medio_venda) : '—' }}
                         </p>
                         <p class="mt-1 text-xs text-slate-400">
                             {{ resumo.quantidade_vendida > 0 ? `${formatNumber(resumo.quantidade_vendida, 0)} kg vendidos` : 'sem quantidade registada' }}
                         </p>
                     </article>
-                    <article class="rounded-[28px] bg-white p-5 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <article class="rounded-[28px] bg-white p-4 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)] sm:p-5">
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Margem</p>
-                        <p class="mt-2 text-2xl font-black" :class="(resumo.margem ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-600'">
+                        <p class="mt-2 text-lg font-black sm:text-2xl" :class="(resumo.margem ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-600'">
                             {{ formatCurrency(resumo.margem ?? 0) }}
                         </p>
                         <p class="mt-1 text-xs text-slate-400">vendas menos custos</p>
                     </article>
-                    <article class="rounded-[28px] bg-white p-5 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <article class="rounded-[28px] bg-white p-4 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)] sm:p-5">
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Margem / kg</p>
-                        <p class="mt-2 text-2xl font-black text-slate-900">
+                        <p class="mt-2 text-lg font-black sm:text-2xl text-slate-900">
                             {{ resumo.preco_medio_venda > 0 && resumo.custo_por_kg > 0
                                 ? formatCurrency(resumo.preco_medio_venda - resumo.custo_por_kg)
                                 : '—' }}
@@ -424,6 +424,32 @@ function deleteCusto(custo) {
                                 <p class="text-xs text-slate-400">
                                     <span v-if="c.qualidade">{{ c.qualidade }}</span>
                                     <span v-if="c.quantidade_perdas > 0"> · {{ formatNumber(c.quantidade_perdas, 0) }} kg perdas</span>
+                                </p>
+                                <!-- Mão de obra, máquinas e transporte da apanha -->
+                                <p v-if="c.custo_apanha > 0" class="mt-1 text-xs text-slate-500">
+                                    <span v-if="c.custo_detalhe.mao_obra > 0">
+                                        mão de obra {{ formatCurrency(c.custo_detalhe.mao_obra) }}
+                                    </span>
+                                    <span v-if="c.custo_detalhe.maquinas > 0">
+                                        · máquinas {{ formatCurrency(c.custo_detalhe.maquinas) }}
+                                    </span>
+                                    <span v-if="c.custo_detalhe.outros > 0">
+                                        · outros {{ formatCurrency(c.custo_detalhe.outros) }}
+                                    </span>
+                                </p>
+                                <p v-if="c.recursos && c.recursos.length" class="mt-0.5 text-xs text-slate-400">
+                                    {{ c.recursos.map((r) => r.descricao).join(' · ') }}
+                                </p>
+                            </div>
+                            <div class="shrink-0 text-left sm:text-right">
+                                <p v-if="c.custo_apanha > 0" class="text-sm font-bold text-amber-700">
+                                    {{ formatCurrency(c.custo_apanha) }}
+                                </p>
+                                <p v-if="c.custo_por_kg > 0" class="text-xs text-slate-400">
+                                    {{ formatCurrency(c.custo_por_kg) }}/kg
+                                </p>
+                                <p v-else class="text-xs text-slate-300">
+                                    apanha sem custo registado
                                 </p>
                             </div>
                         </div>

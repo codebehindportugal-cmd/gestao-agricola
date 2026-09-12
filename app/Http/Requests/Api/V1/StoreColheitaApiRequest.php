@@ -19,6 +19,12 @@ class StoreColheitaApiRequest extends FormRequest
             'campanha' => ['required'],
             'cultura' => ['required'],
             'parcela' => ['nullable'],
+
+            // Operacao de apanha que deu origem a esta colheita. E por aqui
+            // que a colheita sabe o que custou apanhar: mao de obra, tratores,
+            // empilhadores, transporte.
+            'operacao' => ['nullable'],
+
             'data' => ['required', 'date'],
             'quantidade_total' => ['required', 'numeric', 'gt:0'],
             'unidade' => ['nullable', 'string', 'max:50'],

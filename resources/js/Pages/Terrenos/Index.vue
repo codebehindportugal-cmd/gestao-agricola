@@ -350,10 +350,10 @@ const updateEditPolygonArea = (area) => {
                         :key="terreno.id"
                         class="rounded-[32px] border border-white/80 bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]"
                     >
-                        <div class="flex items-start justify-between gap-4">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                             <div>
                                 <div class="flex flex-wrap items-center gap-3">
-                                    <h2 class="text-2xl font-black text-slate-900">{{ terreno.nome }}</h2>
+                                    <h2 class="break-words text-xl font-black sm:text-2xl text-slate-900">{{ terreno.nome }}</h2>
                                     <span
                                         class="rounded-full px-3 py-1 text-xs font-semibold capitalize"
                                         :class="estadoBadgeClass(terreno.estado)"
@@ -365,7 +365,7 @@ const updateEditPolygonArea = (area) => {
                                     Atualizado em {{ terreno.updated_at || 'sem registo' }}
                                 </p>
                             </div>
-                            <p class="text-right text-3xl font-black text-slate-900">
+                            <p class="shrink-0 text-3xl font-black text-slate-900 sm:text-right">
                                 {{ formatArea(terreno.area_total) }}
                                 <span class="block text-sm font-medium text-slate-500">ha</span>
                             </p>

@@ -24,6 +24,8 @@ class Maquina extends Model
         'horas_manutencao',
         'consumo_agua_ha',
         'consumo_combustivel',
+        'custo_hora',
+        'custo_km',
         'estado',
         'observacoes',
     ];
@@ -33,6 +35,8 @@ class Maquina extends Model
         'horas_manutencao' => 'decimal:2',
         'consumo_agua_ha' => 'decimal:2',
         'consumo_combustivel' => 'decimal:2',
+        'custo_hora' => 'decimal:2',
+        'custo_km' => 'decimal:2',
     ];
 
     // Relacionamentos
@@ -54,5 +58,11 @@ class Maquina extends Model
     public function custos(): HasMany
     {
         return $this->hasMany(Custo::class);
+    }
+
+    /** Linhas de utilizacao desta maquina em operacoes. */
+    public function utilizacoes(): HasMany
+    {
+        return $this->hasMany(OperacaoRecurso::class);
     }
 }

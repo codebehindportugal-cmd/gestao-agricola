@@ -8,6 +8,7 @@ use App\Http\Requests\Api\V1\StoreColheitaApiRequest;
 use App\Http\Resources\Api\V1\ColheitaResource;
 use App\Models\Colheita;
 use App\Models\Lote;
+use App\Models\Operacao;
 use App\Services\ResolvedorReferencias;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -45,11 +46,13 @@ class ColheitaController extends Controller
                 $campanha = $this->resolvedor->resolverCampanha($this->valorReferencia($data['campanha']));
                 $cultura = $this->resolvedor->resolverCultura($this->valorReferencia($data['cultura']));
                 $parcela = $this->resolverParcela($data['parcela'] ?? null, (int) $cultura->parcela_id);
+                $operacao = $this->resolverOperacaoDeApanha($data['operacao'] ?? null);
 
                 $colheita = Colheita::query()->create([
                     'campanha_id' => $campanha->id,
                     'cultura_id' => $cultura->id,
                     'parcela_id' => $parcela->id,
+                    'operacao_id' => $operacao?->id,
                     'data_colheita' => $data['data'],
                     'quantidade_total' => $data['quantidade_total'],
                     'unidade_medida' => $data['unidade_medida'] ?? $data['unidade'] ?? 'kg',
@@ -84,6 +87,32 @@ class ColheitaController extends Controller
         return $this->criado([
             'colheita' => ColheitaResource::make($colheita)->resolve(),
         ]);
+    }
+
+    /**
+     * A operacao de apanha a que esta colheita pertence, se indicada.
+     *
+     * colheitas.operacao_id e unico: uma operacao so pode dar uma colheita. Se
+     * ja estiver tomada, e erro de quem envia e nao um silencio a esconder um
+     * custo mal atribuido.
+     */
+    private function resolverOperacaoDeApanha(mixed $referencia): ?Operacao
+    {
+        if ($referencia === null || $referencia === '') {
+            return null;
+        }
+
+        $operacao = $this->resolvedor->resolverOperacao($this->valorReferencia($referencia));
+
+        $jaLigada = Colheita::query()->where('operacao_id', $operacao->id)->exists();
+
+        if ($jaLigada) {
+            throw ValidationException::withMessages([
+                'operacao' => ["A operacao #{$operacao->id} ja esta ligada a outra colheita."],
+            ]);
+        }
+
+        return $operacao;
     }
 
     private function resolverParcela(mixed $referencia, int $parcelaIdDaCultura): mixed
@@ -131,6 +160,6 @@ class ColheitaController extends Controller
 
     private function relacoes(): array
     {
-        return ['campanha', 'cultura', 'parcela', 'lotes.terreno'];
+        return ['campanha', 'cultura', 'parcela', 'lotes.terreno', 'operacao.recursos.maquina', 'operacao.recursos.alfaia'];
     }
 }

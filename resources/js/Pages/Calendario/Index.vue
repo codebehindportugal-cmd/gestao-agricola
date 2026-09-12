@@ -276,23 +276,26 @@ const eliminar = (item, serie = false) => {
 
                 <!-- Barra de controlo -->
                 <div class="bg-white rounded-lg shadow p-4 flex flex-wrap items-center gap-3">
-                    <div class="flex items-center gap-2">
+                    <!-- No telemovel esta barra tem 311px: o min-w-[10rem] reservava
+                         160px de folga que nada podia encolher e empurrava o "Hoje"
+                         (e depois o "Novo") para fora do ecra. -->
+                    <div class="flex flex-wrap items-center gap-2">
                         <SecondaryButton @click="navegar(-1)">&larr;</SecondaryButton>
-                        <span class="text-lg font-semibold text-gray-800 min-w-[10rem] text-center">
+                        <span class="min-w-[7rem] text-center text-lg font-semibold text-gray-800">
                             {{ MESES[mes - 1] }} {{ ano }}
                         </span>
                         <SecondaryButton @click="navegar(1)">&rarr;</SecondaryButton>
                         <SecondaryButton @click="irParaHoje">Hoje</SecondaryButton>
                     </div>
 
-                    <div class="flex items-center gap-2 ml-auto">
+                    <div class="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
                         <select v-model="filtroCategoria" @change="aplicarFiltros"
-                            class="border-gray-300 rounded-md text-sm">
+                            class="min-w-0 flex-1 rounded-md border-gray-300 text-sm sm:flex-none">
                             <option value="">Todas as categorias</option>
                             <option v-for="c in opcoes.categorias" :key="c" :value="c">{{ ROTULOS_CATEGORIA[c] }}</option>
                         </select>
                         <select v-model="filtroEstado" @change="aplicarFiltros"
-                            class="border-gray-300 rounded-md text-sm">
+                            class="min-w-0 flex-1 rounded-md border-gray-300 text-sm sm:flex-none">
                             <option value="">Todos os estados</option>
                             <option value="pendente">Pendente</option>
                             <option value="concluido">Concluído</option>
@@ -307,9 +310,11 @@ const eliminar = (item, serie = false) => {
                     <h3 class="font-semibold text-red-800 mb-2">Em atraso ({{ atrasados.length }})</h3>
                     <ul class="space-y-1">
                         <li v-for="item in atrasados" :key="item.id"
-                            class="flex items-center gap-3 text-sm text-red-900">
+                            class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-red-900">
                             <span class="font-medium">{{ dataCurta(item.data) }}</span>
-                            <span>{{ item.titulo }}</span>
+                            <!-- min-w-0: sem isto um titulo como "Contribuicoes Seguranca
+                                 Social" alargava a linha e levava o "marcar feito" para fora. -->
+                            <span class="min-w-0 flex-1 truncate">{{ item.titulo }}</span>
                             <span v-if="item.valor" class="font-semibold">{{ euros(item.valor) }}</span>
                             <button v-if="permissoes.editar" class="ml-auto text-xs underline"
                                 @click="abrirConcluir(item)">marcar feito</button>
@@ -493,7 +498,10 @@ const eliminar = (item, serie = false) => {
                     </div>
                 </div>
 
-                <div class="flex items-center justify-between pt-2">
+                <!-- Eliminar de um lado, Cancelar/Guardar do outro: no telemovel os
+                     dois grupos nao cabem na mesma linha (340px em 295px) e o
+                     "Guardar" ficava cortado fora do painel. -->
+                <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
                     <div>
                         <DangerButton v-if="emEdicao && permissoes.eliminar" type="button"
                             @click="eliminar(emEdicao, false); mostrarForm = false">
@@ -505,7 +513,7 @@ const eliminar = (item, serie = false) => {
                             Eliminar série
                         </button>
                     </div>
-                    <div class="flex gap-3">
+                    <div class="flex flex-wrap gap-3">
                         <SecondaryButton type="button" @click="mostrarForm = false">Cancelar</SecondaryButton>
                         <PrimaryButton :disabled="aGuardar">Guardar</PrimaryButton>
                     </div>

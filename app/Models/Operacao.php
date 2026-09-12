@@ -129,4 +129,28 @@ class Operacao extends Model
     {
         return $this->hasOne(Colheita::class);
     }
+
+    /**
+     * Todas as maquinas e alfaias usadas na operacao, nao so a principal.
+     *
+     * As colunas maquina_id/alfaia_id ficam como recurso principal (o caderno
+     * de campo DGAV le-as); esta relacao e a lista completa e a unica que
+     * carrega custos.
+     */
+    public function recursos(): HasMany
+    {
+        return $this->hasMany(OperacaoRecurso::class);
+    }
+
+    /** Custo de maquinaria e transporte desta operacao. */
+    public function getCustoRecursosAttribute(): float
+    {
+        return round((float) $this->recursos()->sum('custo_total'), 2);
+    }
+
+    /** Custo de mao de obra: os custos tipo mao_obra ligados a operacao. */
+    public function getCustoMaoObraAttribute(): float
+    {
+        return round((float) $this->custos()->where('tipo', 'mao_obra')->sum('valor'), 2);
+    }
 }
