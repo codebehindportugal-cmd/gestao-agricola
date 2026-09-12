@@ -92,9 +92,8 @@ class ColheitaController extends Controller
     /**
      * A operacao de apanha a que esta colheita pertence, se indicada.
      *
-     * colheitas.operacao_id e unico: uma operacao so pode dar uma colheita. Se
-     * ja estiver tomada, e erro de quem envia e nao um silencio a esconder um
-     * custo mal atribuido.
+     * Varias colheitas podem partilhar a mesma apanha - um pomar cada -, e o
+     * custo da operacao reparte-se pelos quilos de cada uma.
      */
     private function resolverOperacaoDeApanha(mixed $referencia): ?Operacao
     {
@@ -102,17 +101,7 @@ class ColheitaController extends Controller
             return null;
         }
 
-        $operacao = $this->resolvedor->resolverOperacao($this->valorReferencia($referencia));
-
-        $jaLigada = Colheita::query()->where('operacao_id', $operacao->id)->exists();
-
-        if ($jaLigada) {
-            throw ValidationException::withMessages([
-                'operacao' => ["A operacao #{$operacao->id} ja esta ligada a outra colheita."],
-            ]);
-        }
-
-        return $operacao;
+        return $this->resolvedor->resolverOperacao($this->valorReferencia($referencia));
     }
 
     private function resolverParcela(mixed $referencia, int $parcelaIdDaCultura): mixed
@@ -160,6 +149,11 @@ class ColheitaController extends Controller
 
     private function relacoes(): array
     {
-        return ['campanha', 'cultura', 'parcela', 'lotes.terreno', 'operacao.recursos.maquina', 'operacao.recursos.alfaia'];
+        return [
+            'campanha', 'cultura', 'parcela', 'lotes.terreno',
+            'operacao.recursos.maquina', 'operacao.recursos.alfaia',
+            // As irmas da mesma apanha, para o custo repartido sair certo.
+            'operacao.colheitas:id,operacao_id,quantidade_total',
+        ];
     }
 }

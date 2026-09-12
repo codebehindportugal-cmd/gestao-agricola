@@ -220,7 +220,9 @@ class TrabalhoController extends Controller
                     $avisos = array_merge($avisos, $resultado['avisos']);
                 }
 
-                $this->ligarColheita($data['colheita'] ?? null, $operacao, $avisos);
+                foreach ($this->referenciasDeColheitas($data) as $referencia) {
+                    $this->ligarColheita($referencia, $operacao, $avisos);
+                }
 
                 $operacao = $operacao->fresh()->load([
                     'campanha', 'parcela', 'cultura', 'recursos.maquina', 'recursos.alfaia',
@@ -297,8 +299,26 @@ class TrabalhoController extends Controller
     }
 
     /**
+     * As colheitas a ligar: a singular (formato antigo) mais o array.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<int, mixed>
+     */
+    private function referenciasDeColheitas(array $data): array
+    {
+        $referencias = $data['colheitas'] ?? [];
+
+        if (! empty($data['colheita'])) {
+            $referencias[] = $data['colheita'];
+        }
+
+        return $referencias;
+    }
+
+    /**
      * Liga a colheita indicada a esta operacao, para a colheita saber o que a
-     * apanha custou. Nao mexe numa colheita que ja tenha operacao.
+     * apanha custou. Varias colheitas podem partilhar a apanha, mas nao se
+     * rouba uma colheita a outra operacao.
      *
      * @param  array<int, string>  $avisos
      */

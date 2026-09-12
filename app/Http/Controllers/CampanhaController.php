@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Campanha;
+use App\Models\Colheita;
 use App\Models\Custo;
 use App\Models\Cultura;
 use App\Models\Operacao;
+use App\Models\Parcela;
 use App\Models\Produto;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -87,9 +90,15 @@ class CampanhaController extends Controller
             'cultura.parcela.terreno',
             // A operacao de apanha e os seus recursos: e de la que vem o custo
             // da colheita (mao de obra, tratores, empilhadores, transporte).
+            'colheitas.parcela.terreno:id,nome',
             'colheitas.operacao.recursos.maquina:id,nome',
             'colheitas.operacao.recursos.alfaia:id,nome',
+            // As colheitas irmas da mesma apanha: e sobre os quilos delas que
+            // o custo da operacao se reparte.
+            'colheitas.operacao.colheitas:id,operacao_id,quantidade_total',
             'custos' => fn ($q) => $q->orderByRaw('data_custo IS NULL, data_custo ASC'),
+            'parcelas.terreno:id,nome',
+            'parcelas.culturas:id,parcela_id',
             'operacoes' => fn ($q) => $q
                 ->with([
                     'parcela:id,nome',
@@ -98,6 +107,7 @@ class CampanhaController extends Controller
                     'funcionario:id,nome',
                     'operador:id,name',
                     'produtos',
+                    'colheitas:id,operacao_id,quantidade_total',
                 ])
                 ->orderBy('data_hora_inicio'),
         ]);
@@ -147,7 +157,15 @@ class CampanhaController extends Controller
             ])->values(),
             'colheitas' => $campanha->colheitas->map(fn ($c) => [
                 'id' => $c->id,
+                'parcela_id' => $c->parcela_id,
+                'operacao_id' => $c->operacao_id,
+                // O pomar, que e como ele identifica as colheitas.
+                'pomar' => trim(implode(' — ', array_filter([
+                    $c->parcela?->terreno?->nome,
+                    $c->parcela?->nome,
+                ]))) ?: null,
                 'data_colheita' => optional($c->data_colheita)?->format('d/m/Y'),
+                'data_colheita_iso' => optional($c->data_colheita)?->format('Y-m-d'),
                 'quantidade_total' => (float) ($c->quantidade_total ?? 0),
                 'quantidade_perdas' => (float) ($c->quantidade_perdas ?? 0),
                 'qualidade' => $c->qualidade,
@@ -155,6 +173,11 @@ class CampanhaController extends Controller
                 'custo_apanha' => $c->custo_apanha,
                 'custo_por_kg' => $c->custo_por_kg,
                 'custo_detalhe' => $c->detalheCustoApanha(),
+                // Quando a apanha deu mais do que uma colheita, o ecra diz de
+                // que total e' que esta fatia saiu.
+                'apanha_partilhada' => $c->colheitasDaMesmaApanha()->count() > 1,
+                'apanha_custo_total' => $c->custo_total_apanha,
+                'apanha_quantidade_total' => $c->quantidade_apanha,
                 'recursos' => $c->operacao?->recursos->map(fn ($recurso) => [
                     'id' => $recurso->id,
                     'descricao' => $recurso->descricao,
@@ -207,6 +230,28 @@ class CampanhaController extends Controller
                 'preco_medio_venda' => $campanha->preco_medio_venda,
                 'margem' => round($campanha->receita_total - $custoTotal, 2),
             ],
+            // Para registar colheitas: as parcelas da campanha (identificadas
+            // pelo terreno, que e como o André as trata) e as apanhas a que a
+            // colheita se pode ligar.
+            'parcelas' => $campanha->parcelasEfetivas()
+                ->map(fn ($parcela) => [
+                    'id' => $parcela->id,
+                    'nome' => $parcela->nome,
+                    'terreno_nome' => $parcela->terreno?->nome,
+                    'cultura_id' => $parcela->culturas->first()?->id,
+                ])
+                ->sortBy('terreno_nome')
+                ->values(),
+            'apanhas' => $operacoes
+                ->filter(fn ($op) => $op->tipo === 'colheita')
+                ->map(fn ($op) => [
+                    'id' => $op->id,
+                    'data' => optional($op->data_hora_inicio)?->format('d/m/Y'),
+                    'custo' => $campanha->custoEfetivoOperacao($op),
+                    'colheitas' => $op->colheitas->count(),
+                ])
+                ->sortByDesc('data')
+                ->values(),
             'can' => [
                 'update' => $request->user()->can('update', $campanha),
                 'manage_custos' => $request->user()->can('update', $campanha),
@@ -282,6 +327,108 @@ class CampanhaController extends Controller
         return redirect()
             ->route('app.campanhas.show', $campanha)
             ->with('success', 'Custo removido com sucesso.');
+    }
+
+    /**
+     * Registar uma colheita na campanha.
+     *
+     * Ate aqui as colheitas so entravam pela API ou pelo formulario da
+     * operacao, que so faz uma. Uma apanha passa por varios pomares e cada um
+     * e uma colheita, por isso tem de se poder registar aqui, uma a uma.
+     */
+    public function storeColheita(Request $request, Campanha $campanha): \Illuminate\Http\RedirectResponse
+    {
+        $this->authorize('update', $campanha);
+
+        $data = $this->validarColheita($request, $campanha);
+
+        Colheita::query()->create($this->dadosDaColheita($data, $campanha));
+
+        return redirect()
+            ->route('app.campanhas.show', $campanha)
+            ->with('success', 'Colheita registada com sucesso.');
+    }
+
+    public function updateColheita(Request $request, Campanha $campanha, Colheita $colheita): \Illuminate\Http\RedirectResponse
+    {
+        $this->authorize('update', $campanha);
+
+        if ($colheita->campanha_id !== $campanha->id) {
+            abort(403);
+        }
+
+        $data = $this->validarColheita($request, $campanha);
+
+        $colheita->update($this->dadosDaColheita($data, $campanha));
+
+        return redirect()
+            ->route('app.campanhas.show', $campanha)
+            ->with('success', 'Colheita atualizada com sucesso.');
+    }
+
+    public function destroyColheita(Campanha $campanha, Colheita $colheita): \Illuminate\Http\RedirectResponse
+    {
+        $this->authorize('update', $campanha);
+
+        if ($colheita->campanha_id !== $campanha->id) {
+            abort(403);
+        }
+
+        $colheita->delete();
+
+        return redirect()
+            ->route('app.campanhas.show', $campanha)
+            ->with('success', 'Colheita removida com sucesso.');
+    }
+
+    /** @return array<string, mixed> */
+    private function validarColheita(Request $request, Campanha $campanha): array
+    {
+        $parcelasDaCampanha = $campanha->parcelasEfetivas()->pluck('id')->all();
+        $apanhasDaCampanha = $campanha->operacoes()->where('tipo', 'colheita')->pluck('id')->all();
+
+        return $request->validate([
+            'parcela_id' => ['required', 'integer', Rule::in($parcelasDaCampanha)],
+            // A apanha e opcional: pode registar-se os quilos antes de se saber
+            // o que a apanha custou.
+            'operacao_id' => ['nullable', 'integer', Rule::in($apanhasDaCampanha)],
+            'data_colheita' => ['required', 'date'],
+            'quantidade_total' => ['required', 'numeric', 'min:0.01'],
+            'quantidade_perdas' => ['nullable', 'numeric', 'min:0'],
+            'qualidade' => ['nullable', 'string', 'max:255'],
+            'observacoes' => ['nullable', 'string'],
+        ], [
+            'parcela_id.required' => 'Escolha o terreno / parcela da colheita.',
+            'parcela_id.in' => 'Essa parcela nao pertence a esta campanha.',
+            'operacao_id.in' => 'Essa apanha nao pertence a esta campanha.',
+            'data_colheita.required' => 'A data da colheita e obrigatoria.',
+            'quantidade_total.required' => 'Indique os quilos apanhados.',
+            'quantidade_total.min' => 'Os quilos tem de ser superiores a zero.',
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function dadosDaColheita(array $data, Campanha $campanha): array
+    {
+        $parcela = Parcela::query()->with('culturas:id,parcela_id')->findOrFail($data['parcela_id']);
+
+        return [
+            'campanha_id' => $campanha->id,
+            'parcela_id' => $parcela->id,
+            // A colheita exige cultura; numa campanha por especie e a cultura
+            // da propria parcela.
+            'cultura_id' => $parcela->culturas->first()?->id ?? $campanha->cultura_id,
+            'operacao_id' => $data['operacao_id'] ?? null,
+            'data_colheita' => $data['data_colheita'],
+            'quantidade_total' => $data['quantidade_total'],
+            'unidade_medida' => 'kg',
+            'qualidade' => $data['qualidade'] ?: 'comercial',
+            'quantidade_perdas' => $data['quantidade_perdas'] ?: null,
+            'observacoes' => $data['observacoes'] ?? null,
+        ];
     }
 
     public function exportarCadernoCampo(Campanha $campanha)

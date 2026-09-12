@@ -20,6 +20,8 @@ const props = defineProps({
     vendas: { type: Array, default: () => [] },
     can: { type: Object, required: true },
     tiposCusto: { type: Array, default: () => [] },
+    parcelas: { type: Array, default: () => [] },
+    apanhas: { type: Array, default: () => [] },
 });
 
 const page = usePage();
@@ -136,6 +138,65 @@ function submitCusto() {
 function deleteCusto(custo) {
     if (!confirm(`Remover o custo "${custo.descricao}"?`)) return;
     router.delete(route('app.campanhas.custos.destroy', [props.campanha.id, custo.id]));
+}
+
+// ── Modal de colheitas ───────────────────────────────────────────────────────
+// Uma apanha passa por vários pomares e cada um é uma colheita; é aqui que se
+// registam, um a um, com os quilos de cada.
+
+const colheitaModalOpen = ref(false);
+const editingColheita = ref(null);
+
+const colheitaForm = useForm({
+    parcela_id: '',
+    operacao_id: '',
+    data_colheita: '',
+    quantidade_total: '',
+    quantidade_perdas: '',
+    qualidade: 'comercial',
+    observacoes: '',
+});
+
+const parcelaLabel = (parcela) =>
+    [parcela.terreno_nome, parcela.nome].filter(Boolean).join(' — ') || `Parcela ${parcela.id}`;
+
+const apanhaLabel = (apanha) =>
+    `${apanha.data} · ${formatCurrency(apanha.custo)}` +
+    (apanha.colheitas ? ` · ${apanha.colheitas} colheita${apanha.colheitas > 1 ? 's' : ''}` : '');
+
+function openColheitaModal(colheita = null) {
+    editingColheita.value = colheita;
+    colheitaForm.clearErrors();
+    colheitaForm.parcela_id = colheita?.parcela_id?.toString() ?? '';
+    colheitaForm.operacao_id = colheita?.operacao_id?.toString() ?? '';
+    colheitaForm.data_colheita = colheita?.data_colheita_iso ?? '';
+    colheitaForm.quantidade_total = colheita?.quantidade_total ?? '';
+    colheitaForm.quantidade_perdas = colheita?.quantidade_perdas || '';
+    colheitaForm.qualidade = colheita?.qualidade ?? 'comercial';
+    colheitaForm.observacoes = colheita?.observacoes ?? '';
+    colheitaModalOpen.value = true;
+}
+
+function closeColheitaModal() {
+    colheitaModalOpen.value = false;
+    editingColheita.value = null;
+    colheitaForm.reset();
+    colheitaForm.clearErrors();
+}
+
+function submitColheita() {
+    const payload = { onSuccess: closeColheitaModal };
+
+    if (editingColheita.value) {
+        colheitaForm.patch(route('app.campanhas.colheitas.update', [props.campanha.id, editingColheita.value.id]), payload);
+    } else {
+        colheitaForm.post(route('app.campanhas.colheitas.store', props.campanha.id), payload);
+    }
+}
+
+function deleteColheita(colheita) {
+    if (!confirm(`Remover a colheita de ${colheita.quantidade_total} kg de ${colheita.data_colheita}?`)) return;
+    router.delete(route('app.campanhas.colheitas.destroy', [props.campanha.id, colheita.id]));
 }
 </script>
 
@@ -415,12 +476,21 @@ function deleteCusto(custo) {
                 </section>
 
                 <!-- Colheitas -->
-                <section v-if="colheitas.length" class="rounded-[32px] bg-white shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                    <div class="p-6 pb-4">
+                <section class="rounded-[32px] bg-white shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <div class="flex items-center justify-between p-6 pb-4">
                         <h2 class="text-lg font-black text-slate-900">
                             Colheitas
                             <span class="ml-2 text-base font-semibold text-slate-400">({{ colheitas.length }})</span>
                         </h2>
+                        <button
+                            v-if="can.manage_custos"
+                            type="button"
+                            class="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                            @click="openColheitaModal()"
+                        >
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                            Adicionar colheita
+                        </button>
                     </div>
                     <div class="divide-y divide-slate-100 px-2 pb-4">
                         <div
@@ -430,7 +500,10 @@ function deleteCusto(custo) {
                         >
                             <div class="w-24 shrink-0 text-sm text-slate-400">{{ c.data_colheita }}</div>
                             <div class="flex-1">
-                                <p class="font-semibold text-slate-800">{{ formatNumber(c.quantidade_total, 0) }} kg</p>
+                                <p class="font-semibold text-slate-800">
+                                    {{ formatNumber(c.quantidade_total, 0) }} kg
+                                    <span v-if="c.pomar" class="ml-1 font-normal text-slate-500">· {{ c.pomar }}</span>
+                                </p>
                                 <p class="text-xs text-slate-400">
                                     <span v-if="c.qualidade">{{ c.qualidade }}</span>
                                     <span v-if="c.quantidade_perdas > 0"> · {{ formatNumber(c.quantidade_perdas, 0) }} kg perdas</span>
@@ -450,6 +523,11 @@ function deleteCusto(custo) {
                                 <p v-if="c.recursos && c.recursos.length" class="mt-0.5 text-xs text-slate-400">
                                     {{ c.recursos.map((r) => r.descricao).join(' · ') }}
                                 </p>
+                                <!-- Apanha que deu várias colheitas: de que total saiu esta fatia -->
+                                <p v-if="c.apanha_partilhada" class="mt-0.5 text-xs text-slate-400">
+                                    parte de uma apanha de {{ formatCurrency(c.apanha_custo_total) }}
+                                    em {{ formatNumber(c.apanha_quantidade_total, 0) }} kg
+                                </p>
                             </div>
                             <div class="shrink-0 text-left sm:text-right">
                                 <p v-if="c.custo_apanha > 0" class="text-sm font-bold text-amber-700">
@@ -462,7 +540,29 @@ function deleteCusto(custo) {
                                     apanha sem custo registado
                                 </p>
                             </div>
+                            <div v-if="can.manage_custos" class="flex shrink-0 gap-2">
+                                <button
+                                    type="button"
+                                    class="rounded-full px-3 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
+                                    @click="openColheitaModal(c)"
+                                >
+                                    Editar
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded-full px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                                    @click="deleteColheita(c)"
+                                >
+                                    Remover
+                                </button>
+                            </div>
                         </div>
+                    </div>
+                    <div v-if="!colheitas.length" class="px-6 pb-6">
+                        <p class="text-sm text-slate-400">
+                            Nenhuma colheita registada. Use "Adicionar colheita" para registar os quilos de cada
+                            pomar — ligue-os à apanha e o custo reparte-se pelos quilos de cada um.
+                        </p>
                     </div>
                 </section>
 
@@ -547,6 +647,116 @@ function deleteCusto(custo) {
                 <SecondaryButton type="button" @click="closeCustoModal">Cancelar</SecondaryButton>
                 <PrimaryButton type="submit" :disabled="custoForm.processing">
                     {{ editingCusto ? 'Guardar alterações' : 'Adicionar custo' }}
+                </PrimaryButton>
+            </div>
+        </form>
+    </Modal>
+
+    <!-- Modal de colheita -->
+    <Modal :show="colheitaModalOpen" max-width="lg" @close="closeColheitaModal">
+        <form class="p-6" @submit.prevent="submitColheita">
+            <h2 class="text-lg font-black text-slate-900">
+                {{ editingColheita ? 'Editar colheita' : 'Nova colheita' }}
+            </h2>
+            <p class="mt-1 text-sm text-slate-500">
+                Os quilos de um pomar. Ligue-os à apanha e o custo dela reparte-se pelos quilos de todas as
+                colheitas dessa apanha.
+            </p>
+
+            <div class="mt-5 space-y-4">
+                <div>
+                    <InputLabel value="Terreno / parcela *" />
+                    <select
+                        v-model="colheitaForm.parcela_id"
+                        class="mt-1 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                    >
+                        <option value="">Escolher…</option>
+                        <option v-for="parcela in parcelas" :key="parcela.id" :value="String(parcela.id)">
+                            {{ parcelaLabel(parcela) }}
+                        </option>
+                    </select>
+                    <InputError :message="colheitaForm.errors.parcela_id" class="mt-1" />
+                </div>
+
+                <div>
+                    <InputLabel value="Apanha" />
+                    <select
+                        v-model="colheitaForm.operacao_id"
+                        class="mt-1 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                    >
+                        <option value="">Sem apanha associada</option>
+                        <option v-for="apanha in apanhas" :key="apanha.id" :value="String(apanha.id)">
+                            {{ apanhaLabel(apanha) }}
+                        </option>
+                    </select>
+                    <p class="mt-1 text-xs text-slate-400">
+                        Sem apanha, a colheita fica sem custo — os quilos contam, o €/kg não.
+                    </p>
+                    <InputError :message="colheitaForm.errors.operacao_id" class="mt-1" />
+                </div>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <InputLabel value="Data da colheita *" />
+                        <TextInput
+                            v-model="colheitaForm.data_colheita"
+                            type="date"
+                            class="mt-1 block w-full rounded-2xl border-slate-200"
+                        />
+                        <InputError :message="colheitaForm.errors.data_colheita" class="mt-1" />
+                    </div>
+
+                    <div>
+                        <InputLabel value="Qualidade" />
+                        <TextInput
+                            v-model="colheitaForm.qualidade"
+                            type="text"
+                            class="mt-1 block w-full rounded-2xl border-slate-200"
+                        />
+                        <InputError :message="colheitaForm.errors.qualidade" class="mt-1" />
+                    </div>
+
+                    <div>
+                        <InputLabel value="Quilos apanhados *" />
+                        <TextInput
+                            v-model="colheitaForm.quantidade_total"
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            placeholder="0"
+                            class="mt-1 block w-full rounded-2xl border-slate-200"
+                        />
+                        <InputError :message="colheitaForm.errors.quantidade_total" class="mt-1" />
+                    </div>
+
+                    <div>
+                        <InputLabel value="Perdas (kg)" />
+                        <TextInput
+                            v-model="colheitaForm.quantidade_perdas"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            class="mt-1 block w-full rounded-2xl border-slate-200"
+                        />
+                        <InputError :message="colheitaForm.errors.quantidade_perdas" class="mt-1" />
+                    </div>
+                </div>
+
+                <div>
+                    <InputLabel value="Observações" />
+                    <TextInput
+                        v-model="colheitaForm.observacoes"
+                        type="text"
+                        class="mt-1 block w-full rounded-2xl border-slate-200"
+                    />
+                    <InputError :message="colheitaForm.errors.observacoes" class="mt-1" />
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-3">
+                <SecondaryButton type="button" @click="closeColheitaModal">Cancelar</SecondaryButton>
+                <PrimaryButton type="submit" :disabled="colheitaForm.processing">
+                    {{ editingColheita ? 'Guardar alterações' : 'Adicionar colheita' }}
                 </PrimaryButton>
             </div>
         </form>

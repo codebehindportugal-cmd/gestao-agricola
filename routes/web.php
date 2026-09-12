@@ -69,6 +69,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/campanhas/{campanha}/custos', [CampanhaController::class, 'storeCusto'])->name('app.campanhas.custos.store');
     Route::patch('/campanhas/{campanha}/custos/{custo}', [CampanhaController::class, 'updateCusto'])->name('app.campanhas.custos.update');
     Route::delete('/campanhas/{campanha}/custos/{custo}', [CampanhaController::class, 'destroyCusto'])->name('app.campanhas.custos.destroy');
+    Route::post('/campanhas/{campanha}/colheitas', [CampanhaController::class, 'storeColheita'])->name('app.campanhas.colheitas.store');
+    Route::patch('/campanhas/{campanha}/colheitas/{colheita}', [CampanhaController::class, 'updateColheita'])->name('app.campanhas.colheitas.update');
+    Route::delete('/campanhas/{campanha}/colheitas/{colheita}', [CampanhaController::class, 'destroyColheita'])->name('app.campanhas.colheitas.destroy');
     Route::get('/operacoes', [OperacaoManagementController::class, 'index'])->name('app.operacoes.index');
     Route::post('/operacoes', [OperacaoManagementController::class, 'store'])->name('app.operacoes.store');
     Route::post('/operacoes/exploracao-dados', [OperacaoManagementController::class, 'updateExploracaoDados'])->name('app.operacoes.exploracao-dados.update');

@@ -28,6 +28,9 @@ const props = defineProps({
         default: 'bg-emerald-700 hover:bg-emerald-600 focus:bg-emerald-600',
     },
     operacaoId: { type: [Number, String], default: null },
+    // Quantas colheitas esta apanha ja tem. Com mais de uma, a caixa de quilos
+    // aqui nao sabe qual delas descreve e o formulario nao lhes mexe.
+    colheitasCount: { type: Number, default: 0 },
     imagePath: { type: String, default: null },
 });
 
@@ -702,7 +705,13 @@ const setActiveTab = (tabId) => {
                     <InputError class="mt-2" :message="form.errors.data_hora_fim" />
                 </div>
 
-                <div v-if="isColheita(form.tipo)" class="sm:col-span-2 rounded-3xl border border-emerald-100 bg-emerald-50/70 p-4">
+                <div v-if="isColheita(form.tipo) && colheitasCount > 1" class="sm:col-span-2 rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    Esta apanha tem {{ colheitasCount }} colheitas registadas — uma por pomar — e o custo
+                    reparte-se pelos quilos de cada uma. Os quilos editam-se no ecrã da campanha ou pela API;
+                    aqui não se mexe em nenhuma.
+                </div>
+
+                <div v-if="isColheita(form.tipo) && colheitasCount <= 1" class="sm:col-span-2 rounded-3xl border border-emerald-100 bg-emerald-50/70 p-4">
                     <div class="grid gap-4 sm:grid-cols-3">
                         <div>
                             <InputLabel value="Kg apanhados" />

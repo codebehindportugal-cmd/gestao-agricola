@@ -125,9 +125,22 @@ class Operacao extends Model
         return $this->hasMany(Custo::class);
     }
 
+    /**
+     * A primeira colheita da operacao. Mantida para o formulario, que tem uma
+     * unica caixa de quilos; para o custo usa-se sempre colheitas().
+     */
     public function colheita(): HasOne
     {
         return $this->hasOne(Colheita::class);
+    }
+
+    /**
+     * Todas as colheitas desta apanha: uma apanha dura dias e passa por varios
+     * pomares, e o custo reparte-se pelos quilos de cada uma.
+     */
+    public function colheitas(): HasMany
+    {
+        return $this->hasMany(Colheita::class);
     }
 
     /**

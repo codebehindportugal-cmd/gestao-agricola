@@ -767,6 +767,7 @@ const formatNumber = (value) => {
                         :tipo-options="tipoOptions"
                         :estado-options="estadoOptions"
                         :operacao-id="editingOperacao?.id"
+                        :colheitas-count="editingOperacao?.colheitas_count ?? 0"
                         :image-path="editingOperacao?.image_path"
                         submit-label="Atualizar operação"
                         submit-button-class="bg-slate-900 hover:bg-slate-800 focus:bg-slate-800"

@@ -47,7 +47,7 @@ class OperacaoManagementController extends Controller
                 'parcela.terreno:id,nome',
                 'cultura:id,nome,variedade',
                 'campanha:id,cultura_id,ano,data_inicio,data_fim,status',
-                'colheita:id,operacao_id,quantidade_total,quantidade_perdas,qualidade',
+                'colheitas:id,operacao_id,quantidade_total,quantidade_perdas,qualidade',
                 'maquina:id,nome,tipo,consumo_combustivel',
                 'alfaia:id,nome',
                 'recursos.maquina:id,nome,custo_hora,custo_km',
@@ -142,9 +142,19 @@ class OperacaoManagementController extends Controller
                     'custo_km' => $recurso->custo_km === null ? '' : (string) (float) $recurso->custo_km,
                     'custo_total' => (float) $recurso->custo_total,
                 ])->values(),
-                'colheita_quantidade_total' => $operacao->colheita?->quantidade_total,
-                'colheita_quantidade_perdas' => $operacao->colheita?->quantidade_perdas,
-                'colheita_qualidade' => $operacao->colheita?->qualidade,
+                // A caixa de quilos do formulario so serve uma colheita. Com
+                // varias (uma apanha por vários pomares) fica vazia, e o aviso
+                // no formulario explica que se editam na campanha.
+                'colheitas_count' => $operacao->colheitas->count(),
+                'colheita_quantidade_total' => $operacao->colheitas->count() === 1
+                    ? $operacao->colheitas->first()->quantidade_total
+                    : null,
+                'colheita_quantidade_perdas' => $operacao->colheitas->count() === 1
+                    ? $operacao->colheitas->first()->quantidade_perdas
+                    : null,
+                'colheita_qualidade' => $operacao->colheitas->count() === 1
+                    ? $operacao->colheitas->first()->qualidade
+                    : null,
                 'produtos' => $operacao->produtos->map(fn (Produto $produto) => [
                     'produto_id' => $produto->id,
                     'nome' => $produto->nome,
@@ -355,7 +365,7 @@ class OperacaoManagementController extends Controller
                 // fica apagada mas os Custos ficavam na campanha, e passavam a
                 // contar como custo direto.
                 $this->custoRecursos->limpar($operacao);
-                $operacao->colheita()->delete();
+                $operacao->colheitas()->delete();
                 $operacao->delete();
             });
         } catch (\Throwable $exception) {
@@ -607,10 +617,22 @@ Regras: dose, area_tratada, volume_calda devem ser números ou null; intervalo_s
             ->all();
     }
 
+    /**
+     * A colheita que o formulario descreve.
+     *
+     * Uma apanha pode ter varias colheitas (um pomar cada), mas o formulario
+     * tem uma unica caixa de quilos: com mais de uma nao ha como saber qual e
+     * que ele descreve, por isso nao se mexe em nenhuma. Essas editam-se no
+     * ecra da campanha ou pela API.
+     */
     private function syncColheita(Operacao $operacao, Request $request): void
     {
         if ($operacao->tipo !== 'colheita') {
-            $operacao->colheita()->delete();
+            $operacao->colheitas()->delete();
+            return;
+        }
+
+        if ($operacao->colheitas()->count() > 1) {
             return;
         }
 

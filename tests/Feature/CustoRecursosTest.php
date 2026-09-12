@@ -169,6 +169,74 @@ class CustoRecursosTest extends TestCase
         ], $colheita->detalheCustoApanha());
     }
 
+    /**
+     * O caso do André: uma apanha pelos pomares todos, uma colheita por pomar.
+     * O custo reparte-se pelos quilos, nao cai todo na primeira colheita.
+     */
+    public function test_apanha_com_varias_colheitas_reparte_o_custo_pelos_quilos(): void
+    {
+        $contexto = $this->criarContexto();
+
+        $operacao = Operacao::query()->create([
+            'campanha_id' => $contexto['campanha']->id,
+            'parcela_id' => $contexto['parcela']->id,
+            'cultura_id' => $contexto['cultura']->id,
+            'tipo' => 'colheita',
+            'data_hora_inicio' => '2026-08-15 08:00:00',
+            'estado' => 'concluida',
+            'custo_real' => 8000,
+        ]);
+
+        Custo::query()->create([
+            'descricao' => 'Apanha - mao de obra', 'tipo' => 'mao_obra', 'valor' => 8000,
+            'data_custo' => '2026-08-15', 'operacao_id' => $operacao->id,
+            'campanha_id' => $contexto['campanha']->id,
+        ]);
+
+        // 8 000 EUR por 40 000 kg = 0,20 EUR/kg em qualquer dos pomares.
+        $pequena = $this->criarColheita($contexto, $operacao, 10000);
+        $grande = $this->criarColheita($contexto, $operacao, 30000);
+
+        $this->assertSame(0.25, round($pequena->fresh(['operacao'])->quota_apanha, 4));
+        $this->assertSame(2000.0, $pequena->fresh(['operacao'])->custo_apanha);
+        $this->assertSame(6000.0, $grande->fresh(['operacao'])->custo_apanha);
+        $this->assertSame(0.2, $pequena->fresh(['operacao'])->custo_por_kg);
+        $this->assertSame(0.2, $grande->fresh(['operacao'])->custo_por_kg);
+
+        // As fatias somam o custo da apanha: nada se perde nem se inventa.
+        $this->assertSame(
+            8000.0,
+            round($pequena->fresh(['operacao'])->custo_apanha + $grande->fresh(['operacao'])->custo_apanha, 2)
+        );
+
+        // A rubrica tambem leva a sua fatia.
+        $this->assertSame(2000.0, $pequena->fresh(['operacao'])->detalheCustoApanha()['mao_obra']);
+    }
+
+    /** Colheitas sem quilos: reparte-se em partes iguais em vez de dar tudo a uma. */
+    public function test_colheitas_sem_quilos_repartem_o_custo_em_partes_iguais(): void
+    {
+        $contexto = $this->criarContexto();
+
+        $operacao = Operacao::query()->create([
+            'campanha_id' => $contexto['campanha']->id,
+            'parcela_id' => $contexto['parcela']->id,
+            'cultura_id' => $contexto['cultura']->id,
+            'tipo' => 'colheita',
+            'data_hora_inicio' => '2026-08-15 08:00:00',
+            'estado' => 'concluida',
+            'custo_real' => 900,
+        ]);
+
+        $a = $this->criarColheita($contexto, $operacao, 0);
+        $b = $this->criarColheita($contexto, $operacao, 0);
+        $c = $this->criarColheita($contexto, $operacao, 0);
+
+        foreach ([$a, $b, $c] as $colheita) {
+            $this->assertSame(300.0, $colheita->fresh(['operacao'])->custo_apanha);
+        }
+    }
+
     /** Sem operacao ligada nao ha custo, e nao se inventa nenhum. */
     public function test_colheita_sem_operacao_nao_tem_custo(): void
     {
@@ -222,6 +290,20 @@ class CustoRecursosTest extends TestCase
 
         // A maquina principal nao e' tocada pelo formulario: e' o formulario que a define.
         $this->assertNull($operacao->fresh()->maquina_id);
+    }
+
+    private function criarColheita(array $contexto, ?Operacao $operacao, float $kg): Colheita
+    {
+        return Colheita::query()->create([
+            'operacao_id' => $operacao?->id,
+            'campanha_id' => $contexto['campanha']->id,
+            'cultura_id' => $contexto['cultura']->id,
+            'parcela_id' => $contexto['parcela']->id,
+            'data_colheita' => '2026-08-15',
+            'quantidade_total' => $kg,
+            'unidade_medida' => 'kg',
+            'qualidade' => 'comercial',
+        ]);
     }
 
     private function autenticarApi(): User

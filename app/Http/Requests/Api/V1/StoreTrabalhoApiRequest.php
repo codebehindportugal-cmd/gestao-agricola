@@ -22,7 +22,11 @@ class StoreTrabalhoApiRequest extends FormRequest
             'campanha' => ['nullable'],
             'parcela' => ['nullable'],
             'cultura' => ['nullable'],
+            // Uma apanha pode ter dado varias colheitas, uma por pomar; o custo
+            // reparte-se pelos quilos de cada uma.
             'colheita' => ['nullable'],
+            'colheitas' => ['nullable', 'array', 'max:100'],
+            'colheitas.*' => ['required'],
 
             // Recurso principal, mantido por compatibilidade: equivale a uma
             // linha de maquinas[].

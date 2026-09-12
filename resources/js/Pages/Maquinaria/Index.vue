@@ -890,13 +890,13 @@ const cleanFilters = () => {
                     </div>
                     <!-- Custo de utilizacao: e o que faz as maquinas entrarem no custo das operacoes -->
                     <div>
-                        <InputLabel value="Custo por hora (EUR/h)" />
+                        <InputLabel value="Custo por hora (€/h)" />
                         <TextInput v-model="maquinaForm.custo_hora" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
-                        <p class="mt-1 text-xs text-slate-400">Combustivel, desgaste e amortizacao por hora de trabalho.</p>
+                        <p class="mt-1 text-xs text-slate-400">Combustível, desgaste e amortização por hora de trabalho.</p>
                         <InputError class="mt-2" :message="maquinaForm.errors.custo_hora" />
                     </div>
                     <div>
-                        <InputLabel value="Custo por km (EUR/km)" />
+                        <InputLabel value="Custo por km (€/km)" />
                         <TextInput v-model="maquinaForm.custo_km" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
                         <p class="mt-1 text-xs text-slate-400">Para viaturas de transporte, em alternativa ao custo por hora.</p>
                         <InputError class="mt-2" :message="maquinaForm.errors.custo_km" />
@@ -967,9 +967,9 @@ const cleanFilters = () => {
                         <InputError class="mt-2" :message="alfaiaForm.errors.consumo_agua_ha" />
                     </div>
                     <div class="sm:col-span-2">
-                        <InputLabel value="Custo por hora (EUR/h)" />
+                        <InputLabel value="Custo por hora (€/h)" />
                         <TextInput v-model="alfaiaForm.custo_hora" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
-                        <p class="mt-1 text-xs text-slate-400">Usado quando a alfaia entra numa operacao sem trator associado.</p>
+                        <p class="mt-1 text-xs text-slate-400">Usado quando a alfaia entra numa operação sem trator associado.</p>
                         <InputError class="mt-2" :message="alfaiaForm.errors.custo_hora" />
                     </div>
                     <div class="sm:col-span-2">
