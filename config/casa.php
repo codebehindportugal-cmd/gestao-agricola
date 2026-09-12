@@ -33,12 +33,34 @@ return [
     'caminho_go2rtc' => rtrim((string) env('CASA_CAMINHO_GO2RTC', ''), '/'),
 
     /*
-    | Nomes dos streams no go2rtc, na ordem em que aparecem no mosaico.
-    | Devem coincidir com as chaves de streams: em /opt/go2rtc/go2rtc.yaml.
+    | Câmaras do mosaico, pela ordem em que aparecem.
+    |
+    | Formato: 'chave:Rótulo', separados por vírgulas. A chave tem de ser
+    | exactamente a de 'streams:' no /opt/go2rtc/go2rtc.yaml — é o que o go2rtc
+    | procura, e uma chave errada dá 'webrtc/offer: stream not found'. O rótulo
+    | é só o que se lê no canto da imagem.
+    |
+    | Estão separados de propósito: o go2rtc actual serve cam1..cam4 e renomeá-
+    | los obrigava a mexer no CT 106 e a reiniciar o serviço. Assim o ecrã diz
+    | 'Entrada' sem tocar na casa. Sem ':' o rótulo é a própria chave.
     */
     'cameras' => array_values(array_filter(array_map(
-        'trim',
-        explode(',', (string) env('CASA_CAMERAS', 'entrada,quintal,garagem,lateral'))
+        function (string $entrada): ?array {
+            [$chave, $rotulo] = array_pad(explode(':', $entrada, 2), 2, null);
+            $chave = trim((string) $chave);
+
+            if ($chave === '') {
+                return null;
+            }
+
+            $rotulo = trim((string) $rotulo);
+
+            return [
+                'src' => $chave,
+                'rotulo' => $rotulo !== '' ? $rotulo : $chave,
+            ];
+        },
+        explode(',', (string) env('CASA_CAMERAS', 'cam1,cam2,cam3,cam4'))
     ))),
 
     /*

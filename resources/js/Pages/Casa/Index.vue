@@ -157,7 +157,7 @@ function haQuanto(iso) {
 // O baseUrl já vem do servidor com o caminho do go2rtc incluído: a raiz quando
 // se liga direto ao 1984, '/go2rtc' quando passa pelo Caddy.
 const streamUrl = (cam) =>
-    `${props.baseUrl}/stream.html?src=${encodeURIComponent(cam)}&mode=${props.modoVideo}`;
+    `${props.baseUrl}/stream.html?src=${encodeURIComponent(cam.src)}&mode=${props.modoVideo}`;
 
 onMounted(() => {
     temporizadorFeed = setInterval(actualizar, props.intervaloFeed * 1000);
@@ -232,12 +232,12 @@ onUnmounted(() => {
                     >
                         <div
                             v-for="cam in cameras"
-                            :key="cam"
+                            :key="cam.src"
                             class="relative overflow-hidden rounded-lg bg-black"
                             :class="kiosk ? 'min-h-0' : 'aspect-video'"
                         >
                             <iframe
-                                :key="`${cam}-${chaveCamaras}`"
+                                :key="`${cam.src}-${chaveCamaras}`"
                                 :src="streamUrl(cam)"
                                 class="h-full w-full border-0"
                                 allow="autoplay"
@@ -247,7 +247,7 @@ onUnmounted(() => {
                             <span
                                 class="pointer-events-none absolute bottom-2 left-2 rounded bg-black/70 px-2 py-0.5 text-xs uppercase tracking-wide"
                             >
-                                {{ cam }}
+                                {{ cam.rotulo }}
                             </span>
                         </div>
 

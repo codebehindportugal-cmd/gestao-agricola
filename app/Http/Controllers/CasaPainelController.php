@@ -23,14 +23,17 @@ class CasaPainelController extends Controller
     public function index(Request $request): Response
     {
         return Inertia::render('Casa/Index', [
-            'baseUrl' => config('casa.base_url'),
+            'baseUrl' => rtrim((string) config('casa.base_url'), '/').config('casa.caminho_go2rtc'),
             'cameras' => config('casa.cameras'),
             'modoVideo' => config('casa.modo_video'),
             'intervaloFeed' => config('casa.intervalo_feed'),
             'minutosSemContacto' => config('casa.minutos_sem_contacto'),
             'horaRecarga' => config('casa.hora_recarga'),
             'minutosCamaras' => config('casa.minutos_camaras'),
-            'kiosk' => $request->boolean('kiosk'),
+            // Esta pagina e' um ecra de parede: por omissao nao leva navegacao
+            // nem margens. ?app=1 devolve o AppLayout para quando se chega aqui
+            // de dentro do site.
+            'kiosk' => ! $request->boolean('app'),
             'feed' => $this->dados($request),
         ]);
     }
