@@ -16,6 +16,8 @@ class EmitirTokenApi extends Command
         'aplicacoes:write',
         'colheitas:write',
         'receitas:write',
+        // Home Assistant: so' escreve estados e eventos da casa.
+        'casa:write',
     ];
 
     public function handle(): int

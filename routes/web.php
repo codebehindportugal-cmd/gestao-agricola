@@ -12,6 +12,7 @@ use App\Http\Controllers\OperacaoManagementController;
 use App\Http\Controllers\CampanhaController;
 use App\Http\Controllers\CompromissoManagementController;
 use App\Http\Controllers\CampaignContextController;
+use App\Http\Controllers\CasaPainelController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\PermissionController;
@@ -107,6 +108,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/despesas/partilhados/{custo}', [DespesaManagementController::class, 'destroyPartilhado'])->name('app.despesas.partilhados.destroy');
     Route::get('/despesas/resumo-pdf', [DespesaManagementController::class, 'exportarResumoMensal'])->name('app.despesas.resumo-pdf');
     Route::get('/despesas/exportar-csv', [DespesaManagementController::class, 'exportarCsv'])->name('app.despesas.exportar-csv');
+
+    // Painel de casa (camaras + sensores + calendario) para o ecra do escritorio.
+    // O video nao passa aqui: a pagina aponta directamente ao go2rtc da rede de
+    // casa (config/casa.php). Fora de casa as camaras ficam vazias e o resto
+    // do painel continua a funcionar.
+    Route::get('/casa', [CasaPainelController::class, 'index'])->name('app.casa.index');
+    Route::get('/casa/feed', [CasaPainelController::class, 'feed'])->name('app.casa.feed');
 
     Route::get('/stock', [StockManagementController::class, 'index'])->name('app.stock.index');
     Route::post('/stock/produtos', [StockManagementController::class, 'storeProduto'])->name('app.stock.produtos.store');

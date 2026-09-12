@@ -9,6 +9,7 @@ use App\Http\Controllers\OperacaoController;
 use App\Http\Controllers\MaquinaController;
 use App\Http\Controllers\AlfaiaController;
 use App\Http\Controllers\Api\V1\AplicacaoController;
+use App\Http\Controllers\Api\V1\CasaController;
 use App\Http\Controllers\Api\V1\CatalogoController;
 use App\Http\Controllers\Api\V1\ColheitaController;
 use App\Http\Controllers\Api\V1\CompromissoController;
@@ -118,4 +119,13 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->group(functio
 
     Route::post('receitas', [ReceitaController::class, 'store'])
         ->middleware(['abilities:receitas:write', 'api.write.role']);
+
+    // Casa (Home Assistant -> site). O sentido e' sempre este: o servidor nunca
+    // inicia ligacoes para a rede de casa. O token do HA leva so 'casa:write',
+    // por isso nao toca em faturas, custos nem colheitas.
+    Route::post('casa/eventos', [CasaController::class, 'evento'])
+        ->middleware(['abilities:casa:write', 'api.write.role']);
+
+    Route::post('casa/estados', [CasaController::class, 'snapshot'])
+        ->middleware(['abilities:casa:write', 'api.write.role']);
 });
