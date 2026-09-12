@@ -351,6 +351,10 @@ class OperacaoManagementController extends Controller
         try {
             DB::transaction(function () use ($operacao) {
                 StockConsumption::restoreOperation($operacao);
+                // Os custos das maquinas desta operacao vao com ela: a operacao
+                // fica apagada mas os Custos ficavam na campanha, e passavam a
+                // contar como custo direto.
+                $this->custoRecursos->limpar($operacao);
                 $operacao->colheita()->delete();
                 $operacao->delete();
             });

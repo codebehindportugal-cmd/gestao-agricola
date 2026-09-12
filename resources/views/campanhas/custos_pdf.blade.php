@@ -216,7 +216,7 @@
                         <td>{{ $operacao['tipo'] }}</td>
                         <td>{{ $operacao['parcela'] ?: 'N/A' }}</td>
                         <td>
-                            {{ $operacao['maquina'] ?: $operacao['alfaia'] ?: $operacao['responsavel'] ?: $operacao['equipa'] ?: 'N/A' }}
+                            {{ $operacao['recursos'] ?: ($operacao['maquina'] ?: $operacao['alfaia'] ?: $operacao['responsavel'] ?: $operacao['equipa'] ?: 'N/A') }}
                         </td>
                         <td class="right">{{ $number($operacao['duracao_horas']) }}</td>
                         <td class="right">{{ $number($operacao['combustivel_gasto_l']) }} L</td>

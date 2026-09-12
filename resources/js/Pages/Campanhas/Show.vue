@@ -30,6 +30,10 @@ const flashSuccess = computed(() => page.props.flash?.success);
 const formatCurrency = (v) =>
     new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v || 0);
 
+// Os custos ligados a operacoes desta campanha ja entram no custo da operacao;
+// o cabecalho conta so os restantes, que e o que o resumo soma.
+const custosDiretos = computed(() => props.custos.filter((custo) => !custo.ligado_a_operacao));
+
 const formatNumber = (v, decimals = 2) =>
     new Intl.NumberFormat('pt-PT', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(v || 0);
 
@@ -352,7 +356,7 @@ function deleteCusto(custo) {
                     <div class="flex items-center justify-between p-6 pb-4">
                         <h2 class="text-lg font-black text-slate-900">
                             Custos diretos
-                            <span class="ml-2 text-base font-semibold text-slate-400">({{ custos.length }})</span>
+                            <span class="ml-2 text-base font-semibold text-slate-400">({{ custosDiretos.length }})</span>
                         </h2>
                         <button
                             v-if="can.manage_custos"
@@ -377,8 +381,14 @@ function deleteCusto(custo) {
                             <div class="flex-1 min-w-0">
                                 <p class="font-medium text-slate-800">{{ custo.descricao }}</p>
                                 <p v-if="custo.data_custo" class="text-xs text-slate-400">{{ custo.data_custo }}</p>
+                                <p v-if="custo.ligado_a_operacao" class="mt-0.5 text-xs text-slate-400">
+                                    já contado no custo da operação
+                                </p>
                             </div>
-                            <p class="shrink-0 text-right text-base font-bold text-slate-900">{{ formatCurrency(custo.valor) }}</p>
+                            <p
+                                class="shrink-0 text-right text-base font-bold"
+                                :class="custo.ligado_a_operacao ? 'text-slate-400' : 'text-slate-900'"
+                            >{{ formatCurrency(custo.valor) }}</p>
                             <div v-if="can.manage_custos" class="flex shrink-0 gap-2">
                                 <button
                                     type="button"

@@ -170,6 +170,12 @@ class CampanhaController extends Controller
                 'valor' => (float) ($c->valor ?? 0),
                 'data_custo' => optional($c->data_custo)?->format('Y-m-d'),
                 'observacoes' => $c->observacoes,
+                // Custos de mao de obra e de maquinas ligados a uma operacao ja
+                // aparecem no custo dessa operacao. Continuam listados aqui para
+                // se poderem corrigir, mas marcados, senao o ecra parecia estar
+                // a contar o mesmo dinheiro duas vezes.
+                'ligado_a_operacao' => $c->operacao_id !== null
+                    && $campanha->operacoes->contains('id', $c->operacao_id),
             ])->values(),
             'rateio' => $rateio,
             'vendas' => $campanha->receitas()
@@ -414,7 +420,10 @@ class CampanhaController extends Controller
             'custos',
             'colheitas',
         ]);
-        $campanha->setRelation('operacoes', $this->reportOperationsForCampaign($campanha, ['parcela.terreno', 'maquina', 'alfaia', 'operador', 'funcionario', 'equipa', 'produtos']));
+        $campanha->setRelation('operacoes', $this->reportOperationsForCampaign($campanha, [
+            'parcela.terreno', 'maquina', 'alfaia', 'operador', 'funcionario', 'equipa', 'produtos',
+            'recursos.maquina:id,nome', 'recursos.alfaia:id,nome',
+        ]));
 
         $operacoes = $campanha->operacoes->map(function ($operacao) use ($campanha) {
             $custoProdutos = (float) $operacao->produtos
@@ -427,6 +436,14 @@ class CampanhaController extends Controller
                 'parcela' => trim(($operacao->parcela?->terreno?->nome ? "{$operacao->parcela->terreno->nome} - " : '').($operacao->parcela?->nome ?? '')),
                 'maquina' => $operacao->maquina?->nome,
                 'alfaia' => $operacao->alfaia?->nome,
+                // Todas as maquinas e viaturas da operacao, nao so a principal:
+                // numa apanha com dois tratores e um carro, a coluna Recurso
+                // mostrava um nome e escondia o resto.
+                'recursos' => $operacao->recursos
+                    ->map(fn ($recurso) => $recurso->descricao)
+                    ->filter()
+                    ->implode(', '),
+                'custo_recursos' => round((float) $operacao->recursos->sum(fn ($recurso) => (float) $recurso->custo_total), 2),
                 'responsavel' => $operacao->funcionario?->nome ?? $operacao->operador?->name,
                 'equipa' => $operacao->equipa?->nome,
                 'duracao_horas' => (float) ($operacao->duracao_horas ?? 0),
