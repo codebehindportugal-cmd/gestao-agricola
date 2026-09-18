@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class StoreManutencaoRequest extends FormRequest
 {
@@ -14,7 +15,11 @@ class StoreManutencaoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'maquina_id' => 'required|exists:maquinas,id',
+            // Nenhum dos dois e obrigatorio sozinho: uma revisao pode ser da
+            // maquina, da alfaia, ou das duas (a revisao do conjunto). Que
+            // tenha pelo menos uma e verificado em after().
+            'maquina_id' => 'nullable|exists:maquinas,id',
+            'alfaia_id' => 'nullable|exists:alfaias,id',
             'data_manutencao' => 'required|date',
             'tipo' => 'required|string|max:255',
             'descricao' => 'required|string',
@@ -25,11 +30,23 @@ class StoreManutencaoRequest extends FormRequest
         ];
     }
 
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            if (blank($this->input('maquina_id')) && blank($this->input('alfaia_id'))) {
+                $validator->errors()->add(
+                    'maquina_id',
+                    'Indique a máquina, a alfaia, ou as duas.'
+                );
+            }
+        });
+    }
+
     public function messages(): array
     {
         return [
-            'maquina_id.required' => 'A máquina é obrigatória.',
             'maquina_id.exists' => 'A máquina selecionada não existe.',
+            'alfaia_id.exists' => 'A alfaia selecionada não existe.',
             'data_manutencao.required' => 'A data da revisão é obrigatória.',
             'data_manutencao.date' => 'A data da revisão deve ser uma data válida.',
             'tipo.required' => 'O tipo de revisão é obrigatório.',

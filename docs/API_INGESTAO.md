@@ -124,6 +124,8 @@ Gastos que servem varias campanhas ao mesmo tempo nao se prendem a nenhuma: envi
 
 O custo fica com `campanha_id` nulo e e imputado no momento de mostrar as contas, a cada campanha cujo periodo (`data_inicio`..`data_fim`) contem a data do custo. Se a base escolhida ainda nao tem valores, cai na outra; se nenhuma tiver, divide em partes iguais. Aparece no ecra de despesas ("Custos partilhados") e na campanha em "Custos partilhados imputados", e entra no custo/kg.
 
+> Desde 18/09/2026 corre uma so campanha por epoca (`agri:unificar-campanhas`). Com uma unica campanha em curso, a API atribui-a pela data e o rateio entre campanhas nao chega a ter efeito: um custo partilhado da epoca e simplesmente dela. O mecanismo fica para os anos em que voltem a correr varias em paralelo. A reparticao por cultura/parcela *dentro* de uma campanha e outra conta, ainda por fazer.
+
 ```json
 {
   "descricao": "Eletricidade da rega - Julho",
@@ -327,6 +329,7 @@ Campos:
 - `data` (obrigatorio), `numero_fatura`, `fornecedor`, `titulo` (derivado se omitido), `notas`
 - `categoria`: `combustivel`, `sementes`, `fertilizantes`, `fitofarmaceuticos`, `equipamento`, `mao_obra`, `outro` (default `outro`)
 - `campanha` (por id ou nome)
+- `maquina` e `alfaia` (por id ou nome): o equipamento a que a compra pertence. Uma peca da alfaia e gasto da alfaia e nao do tractor que a puxa; as duas podem vir juntas quando a fatura e da revisao do conjunto. Ficam gravadas na `Despesa` e no `Custo`. Nome que nao exista da 422 com os candidatos parecidos.
 - `valor`: total da fatura. Se omitido, e calculado das linhas com IVA; se indicado e divergir mais de 2 centimos, prevalece o indicado e a resposta traz aviso
 - `linhas[]`: `descricao` (obrigatorio), `quantidade` (obrigatorio, > 0), `preco_unitario` (obrigatorio, preco de tabela antes do desconto), `desconto_percentagem` (0 a 100, por omissao 0), `iva_percentagem` (0, 6, 13 ou 23), `produto` (id / nº DGAV / nome), `tipo_produto`, `numero_autorizacao_dgav`, `unidade_medida`, `notas`
 - Interruptores, todos `true` por omissao: `criar_produtos`, `actualizar_custo_unitario`, `dar_entrada_em_stock`, `criar_custo`
@@ -338,7 +341,9 @@ Regras:
 - Linha sem produto identificado fica na fatura mas sem ligacao ao catalogo nem stock, com aviso.
 - Idempotencia por `numero_fatura` (+ `fornecedor` quando indicado): repetir devolve a despesa existente sem duplicar.
 - O desconto entra antes do IVA, como na fatura: `quantidade x preco_unitario x (1 - desconto/100) x (1 + iva/100)`. O custo unitario que vai para o catalogo e para o movimento de stock e o preco **depois** do desconto - e o que se pagou.
-- Mapeamento categoria -> tipo de custo: `combustivel`->`energia`, `sementes`/`fertilizantes`/`fitofarmaceuticos`->`material`, `equipamento`->`maquinaria`, `mao_obra`->`mao_obra`, `outro`->`outro`.
+- Mapeamento categoria -> tipo de custo: `combustivel`->`energia`, `sementes`/`fertilizantes`/`fitofarmaceuticos`->`material`, `equipamento`->`maquinaria`, `pecas`->`manutencao`, `mao_obra`->`mao_obra`, `outro`->`outro`.
+- Fatura com `maquina` ou `alfaia` nunca nasce rateavel: o gasto e daquele equipamento, inteiro. Reparti-lo pelas campanhas do periodo diluia o desgaste por culturas que nao o usaram.
+- Nao mandar o id de uma alfaia no campo `maquina`: resolve para a maquina com esse id, que e outra coisa. `GET /api/v1/maquinas` devolve as maquinas com as alfaias embutidas, para confirmar ids e nomes.
 
 Payload:
 

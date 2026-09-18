@@ -7,6 +7,7 @@ const props = defineProps({
     baseUrl: { type: String, required: true },
     cameras: { type: Array, default: () => [] },
     modoVideo: { type: String, default: 'webrtc' },
+    media: { type: String, default: 'video' },
     intervaloFeed: { type: Number, default: 5 },
     minutosSemContacto: { type: Number, default: 12 },
     horaRecarga: { type: String, default: '' },
@@ -156,8 +157,16 @@ function haQuanto(iso) {
 
 // O baseUrl já vem do servidor com o caminho do go2rtc incluído: a raiz quando
 // se liga direto ao 1984, '/go2rtc' quando passa pelo Caddy.
-const streamUrl = (cam) =>
-    `${props.baseUrl}/stream.html?src=${encodeURIComponent(cam.src)}&mode=${props.modoVideo}`;
+const streamUrl = (cam) => {
+    const p = new URLSearchParams({ src: cam.src, mode: props.modoVideo });
+
+    // Sem áudio negociado o Chrome deixa a imagem arrancar sozinha. É isto que
+    // evita o quadrado preso em 'loading' com um botão de play que ninguém vai
+    // carregar num ecrã de parede.
+    if (props.media) p.set('media', props.media);
+
+    return `${props.baseUrl}/stream.html?${p}`;
+};
 
 onMounted(() => {
     temporizadorFeed = setInterval(actualizar, props.intervaloFeed * 1000);

@@ -70,6 +70,20 @@ return [
     'modo_video' => env('CASA_MODO_VIDEO', 'webrtc'),
 
     /*
+    | Que pistas pedir ao go2rtc: 'video' descarta o áudio.
+    |
+    | Não é para poupar banda — é o que faz a imagem arrancar sozinha. O Chrome
+    | recusa iniciar um vídeo com som sem alguém ter carregado em algo, e o
+    | resultado é um quadrado eternamente em 'loading' com um botão de play,
+    | que num ecrã de parede ninguém vai lá carregar. Sem áudio negociado, o
+    | bloqueio não se aplica.
+    |
+    | Equivale ao '#media=video' no go2rtc.yaml, mas resolve-se deste lado sem
+    | mexer na configuração do CT 106. Vazio deixa o go2rtc decidir (vídeo+som).
+    */
+    'media' => trim((string) env('CASA_MEDIA', 'video')),
+
+    /*
     |--------------------------------------------------------------------------
     | Painel
     |--------------------------------------------------------------------------

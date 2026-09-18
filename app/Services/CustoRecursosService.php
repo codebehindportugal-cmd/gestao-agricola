@@ -192,6 +192,7 @@ class CustoRecursosService
                 'cultura_id' => $operacao->cultura_id,
                 'parcela_id' => $operacao->parcela_id,
                 'maquina_id' => $recurso->maquina_id,
+                'alfaia_id' => $recurso->alfaia_id,
                 'referencia_externa' => $this->prefixoReferencia($operacao).$recurso->id,
             ]);
         }

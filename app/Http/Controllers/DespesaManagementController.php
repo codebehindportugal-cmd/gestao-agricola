@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Alfaia;
 use App\Models\Campanha;
 use App\Models\Colheita;
 use App\Models\Custo;
 use App\Models\Despesa;
 use App\Models\Lote;
 use App\Models\FaturaItem;
+use App\Models\Maquina;
 use App\Models\Produto;
 use App\Models\Receita;
 use App\Services\MovimentoStockService;
@@ -62,6 +64,8 @@ class DespesaManagementController extends Controller
                 'items:id,despesa_id,descricao,quantidade,conteudo_embalagem,unidade_embalagem,preco_unitario,desconto_percentagem,iva_percentagem,produto_id,notas',
                 'campanha:id,nome,cultura_id,ano',
                 'campanha.cultura:id,nome',
+                'maquina:id,nome',
+                'alfaia:id,nome',
             ])
             ->tap(fn ($q) => $this->filtrarPorCampanha($q, $campanhaIds))
             ->when($filters['search'] ?? null, fn ($q, $s) => $q->where(function ($sub) use ($s) {
@@ -94,6 +98,20 @@ class DespesaManagementController extends Controller
             'analytics'         => $this->buildAnalytics($mes, $ano, $campanhaIds),
             'produtos'          => Produto::query()->orderBy('nome')->get(['id', 'nome', 'tipo', 'unidade_medida', 'conteudo', 'custo_unitario']),
             'lotes'             => $this->lotesDisponiveis($campanhaIds),
+            'maquinas'          => Maquina::query()->orderBy('nome')->get(['id', 'nome', 'tipo']),
+            // Com a maquina a que esta ligada, para o formulario poder mostrar
+            // "Amanha de pes (Verde)" e nao obrigar a decorar qual e qual.
+            'alfaias'           => Alfaia::query()
+                ->with('maquina:id,nome')
+                ->orderBy('nome')
+                ->get(['id', 'nome', 'tipo', 'maquina_id'])
+                ->map(fn (Alfaia $a) => [
+                    'id' => $a->id,
+                    'nome' => $a->nome,
+                    'tipo' => $a->tipo,
+                    'maquina_id' => $a->maquina_id,
+                    'maquina_nome' => $a->maquina?->nome,
+                ]),
             'partilhados'       => $this->custosPartilhadosMes($mes, $ano),
             'resumoPartilhados' => $this->buildResumoPartilhados($mes, $ano),
             'tiposCustoPartilhado' => self::TIPOS_CUSTO_PARTILHADO,
@@ -462,6 +480,11 @@ class DespesaManagementController extends Controller
             ],
             'data'      => ['required', 'date'],
             'categoria' => ['required', 'string', 'in:' . implode(',', self::CATEGORIAS)],
+            // Equipamento a que a compra pertence. Uma peca da alfaia e gasto
+            // da alfaia, mesmo que quem a puxe seja o tractor; as duas podem
+            // vir juntas quando a fatura e da revisao do conjunto.
+            'maquina_id' => ['nullable', 'integer', 'exists:maquinas,id'],
+            'alfaia_id'  => ['nullable', 'integer', 'exists:alfaias,id'],
             'notas'     => ['nullable', 'string'],
             'ficheiro'  => ['nullable', 'file', 'mimes:jpeg,jpg,png,webp,pdf', 'max:20480'],
             'items'     => ['nullable', 'array'],
@@ -514,6 +537,9 @@ class DespesaManagementController extends Controller
             // rateio. Vai para o ecra para se ver porque e que a despesa nao
             // esta em nenhuma campanha, em vez de parecer um engano.
             'campanha'           => $d->campanha?->nome_completo,
+            'maquina_id'         => $d->maquina_id,
+            'alfaia_id'          => $d->alfaia_id,
+            'equipamento'        => $d->equipamento_nome,
         ];
     }
 

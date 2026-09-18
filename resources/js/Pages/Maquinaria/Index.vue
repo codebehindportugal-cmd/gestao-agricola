@@ -23,6 +23,7 @@ const props = defineProps({
     alfaiaEstadoOptions: { type: Array, default: () => [] },
     revisaoTipoOptions: { type: Array, default: () => [] },
     maquinaOptions: { type: Array, default: () => [] },
+    alfaiaOptions: { type: Array, default: () => [] },
 });
 
 const page = usePage();
@@ -36,6 +37,7 @@ const filterState = reactive({
     maquina_id: props.filters.maquina_id ?? '',
     revisao_tipo: props.filters.revisao_tipo ?? '',
     revisao_maquina_id: props.filters.revisao_maquina_id ?? '',
+    revisao_alfaia_id: props.filters.revisao_alfaia_id ?? '',
 });
 
 const maquinaModalOpen = ref(false);
@@ -78,6 +80,7 @@ const alfaiaBase = {
 
 const revisaoBase = {
     maquina_id: '',
+    alfaia_id: '',
     data_manutencao: '',
     tipo: 'revisão',
     descricao: '',
@@ -102,6 +105,7 @@ const currentQuery = computed(() => ({
     maquina_id: filterState.maquina_id || undefined,
     revisao_tipo: filterState.revisao_tipo || undefined,
     revisao_maquina_id: filterState.revisao_maquina_id || undefined,
+    revisao_alfaia_id: filterState.revisao_alfaia_id || undefined,
 }));
 
 watch(
@@ -113,6 +117,7 @@ watch(
         filterState.maquina_id,
         filterState.revisao_tipo,
         filterState.revisao_maquina_id,
+        filterState.revisao_alfaia_id,
     ],
     () => {
         router.get(route('app.maquinaria.index'), currentQuery.value, {
@@ -219,6 +224,8 @@ const normalizeAlfaia = (form) => form.transform((data) => ({
 
 const normalizeRevisao = (form) => form.transform((data) => ({
     ...data,
+    maquina_id: data.maquina_id || null,
+    alfaia_id: data.alfaia_id || null,
     custo: data.custo || null,
     duracao_minutos: data.duracao_minutos || null,
     proxima_manutencao: data.proxima_manutencao || null,
@@ -357,10 +364,31 @@ const openCreateRevisao = (maquina = null) => {
     revisaoModalOpen.value = true;
 };
 
+/**
+ * Revisão de uma alfaia. A máquina fica em branco de propósito: um radiador do
+ * triturador é gasto do triturador, e não do tractor que o puxa.
+ */
+const openCreateRevisaoAlfaia = (alfaia) => {
+    editingRevisao.value = null;
+    revisaoForm.defaults({
+        ...revisaoBase,
+        alfaia_id: alfaia?.id?.toString() ?? '',
+    });
+    revisaoForm.reset();
+    revisaoForm.clearErrors();
+    revisaoModalOpen.value = true;
+};
+
+const verRevisoesDaAlfaia = (alfaia) => {
+    filterState.revisao_maquina_id = '';
+    filterState.revisao_alfaia_id = alfaia.id.toString();
+};
+
 const openEditRevisao = (revisao) => {
     editingRevisao.value = revisao;
     revisaoForm.defaults({
         maquina_id: revisao.maquina_id?.toString() ?? '',
+        alfaia_id: revisao.alfaia_id?.toString() ?? '',
         data_manutencao: revisao.data_manutencao ?? '',
         tipo: revisao.tipo ?? 'revisão',
         descricao: revisao.descricao ?? '',
@@ -396,7 +424,7 @@ const submitRevisao = () => {
 };
 
 const deleteRevisao = (revisao) => {
-    if (!window.confirm(`Remover a revisão de "${revisao.maquina_nome}"?`)) {
+    if (!window.confirm(`Remover a revisão de "${revisao.equipamento_nome}"?`)) {
         return;
     }
 
@@ -413,6 +441,7 @@ const cleanFilters = () => {
     filterState.maquina_id = '';
     filterState.revisao_tipo = '';
     filterState.revisao_maquina_id = '';
+    filterState.revisao_alfaia_id = '';
 };
 </script>
 
@@ -534,6 +563,13 @@ const cleanFilters = () => {
                             </select>
                         </div>
                         <div>
+                            <InputLabel value="Alfaia revista" />
+                            <select v-model="filterState.revisao_alfaia_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                <option value="">Todas</option>
+                                <option v-for="alfaia in alfaiaOptions" :key="alfaia.id" :value="String(alfaia.id)">{{ alfaia.nome }}</option>
+                            </select>
+                        </div>
+                        <div>
                             <InputLabel value="Máquina revista" />
                             <select v-model="filterState.revisao_maquina_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
                                 <option value="">Todas</option>
@@ -594,6 +630,13 @@ const cleanFilters = () => {
                                 <div class="rounded-3xl bg-slate-50 p-4">
                                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Operações</p>
                                     <p class="mt-2 text-xl font-black text-slate-900">{{ maquina.operacoes_count }}</p>
+                                </div>
+                                <div class="rounded-3xl bg-amber-50 p-4 sm:col-span-2">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Peças e manutenção</p>
+                                    <p class="mt-2 text-xl font-black text-amber-900">{{ formatCurrency(maquina.custo_acumulado) }}</p>
+                                    <p class="mt-1 text-xs text-amber-700">
+                                        {{ formatCurrency(maquina.custo_pecas) }} em peças · {{ maquina.manutencoes_count }} revisões
+                                    </p>
                                 </div>
                                 <div v-if="isPulverizador(maquina.tipo)" class="rounded-3xl bg-sky-50 p-4 sm:col-span-2">
                                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Consumo de água</p>
@@ -694,11 +737,35 @@ const cleanFilters = () => {
                                 </div>
                             </div>
 
+                            <div class="mt-3 grid gap-3 sm:grid-cols-3">
+                                <div class="rounded-3xl bg-amber-50 p-4">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Peças</p>
+                                    <p class="mt-2 text-sm font-bold text-amber-900">{{ formatCurrency(alfaia.custo_pecas) }}</p>
+                                </div>
+                                <div class="rounded-3xl bg-amber-50 p-4">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Manutenção</p>
+                                    <p class="mt-2 text-sm font-bold text-amber-900">
+                                        {{ formatCurrency(alfaia.custo_manutencoes) }}
+                                        <span class="font-medium text-amber-700">({{ alfaia.manutencoes_count }})</span>
+                                    </p>
+                                </div>
+                                <div class="rounded-3xl bg-slate-900 p-4">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">Já custou</p>
+                                    <p class="mt-2 text-sm font-bold text-white">{{ formatCurrency(alfaia.custo_acumulado) }}</p>
+                                </div>
+                            </div>
+
                             <p class="mt-4 rounded-3xl bg-slate-50 p-4 text-sm leading-7 text-slate-600">
                                 {{ alfaia.descricao || alfaia.observacoes || 'Sem descrição para esta alfaia.' }}
                             </p>
 
                             <div class="mt-5 flex flex-wrap gap-3">
+                                <PrimaryButton v-if="alfaia.can_update" class="rounded-full bg-amber-700 px-4 py-2 text-sm normal-case tracking-normal hover:bg-amber-600 focus:bg-amber-600" @click="openCreateRevisaoAlfaia(alfaia)">
+                                    Nova revisão
+                                </PrimaryButton>
+                                <SecondaryButton v-if="alfaia.manutencoes_count" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="verRevisoesDaAlfaia(alfaia)">
+                                    Ver revisões
+                                </SecondaryButton>
                                 <PrimaryButton v-if="alfaia.can_update" class="rounded-full bg-slate-900 px-4 py-2 text-sm normal-case tracking-normal hover:bg-slate-800 focus:bg-slate-800" @click="openEditAlfaia(alfaia)">
                                     Editar
                                 </PrimaryButton>
@@ -746,7 +813,10 @@ const cleanFilters = () => {
                             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
                                     <div class="flex flex-wrap items-center gap-3">
-                                        <h3 class="text-2xl font-black text-slate-900">{{ revisao.maquina_nome || 'Máquina removida' }}</h3>
+                                        <h3 class="text-2xl font-black text-slate-900">{{ revisao.equipamento_nome || 'Equipamento removido' }}</h3>
+                                        <span v-if="revisao.alfaia_id" class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                            alfaia
+                                        </span>
                                         <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold capitalize text-amber-700">
                                             {{ labelize(revisao.tipo) }}
                                         </span>
@@ -769,8 +839,10 @@ const cleanFilters = () => {
                                     <p class="mt-2 text-sm font-bold text-slate-800">{{ formatDate(revisao.proxima_manutencao) }}</p>
                                 </div>
                                 <div class="rounded-3xl bg-slate-50 p-4">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Máquina</p>
-                                    <p class="mt-2 text-sm font-bold capitalize text-slate-800">{{ labelize(revisao.maquina_tipo || '-') }}</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Equipamento</p>
+                                    <p class="mt-2 text-sm font-bold capitalize text-slate-800">
+                                        {{ labelize(revisao.alfaia_tipo || revisao.maquina_tipo || '-') }}
+                                    </p>
                                 </div>
                             </div>
 
@@ -1002,7 +1074,9 @@ const cleanFilters = () => {
         <Modal :show="revisaoModalOpen" max-width="2xl" @close="closeRevisaoModal">
             <div class="p-6 sm:p-8">
                 <h2 class="text-2xl font-black text-slate-900">{{ editingRevisao ? 'Editar revisão' : 'Nova revisão' }}</h2>
-                <p class="mt-2 text-sm text-slate-500">Regista revisões, inspeções e manutenções feitas às máquinas e viaturas.</p>
+                <p class="mt-2 text-sm text-slate-500">
+                    Regista revisões, inspeções e manutenções. Indica a máquina, a alfaia, ou as duas quando a revisão é do conjunto.
+                </p>
 
                 <form class="mt-6 grid gap-4 sm:grid-cols-2" @submit.prevent="submitRevisao">
                     <div v-if="revisaoErrors.length" class="sm:col-span-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -1012,15 +1086,25 @@ const cleanFilters = () => {
                         </ul>
                     </div>
 
-                    <div class="sm:col-span-2">
+                    <div>
                         <InputLabel value="Máquina" />
                         <select v-model="revisaoForm.maquina_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
-                            <option value="">Seleciona uma máquina</option>
+                            <option value="">Nenhuma</option>
                             <option v-for="maquina in maquinaOptions" :key="maquina.id" :value="String(maquina.id)">
                                 {{ maquina.nome }} - {{ labelize(maquina.tipo) }}
                             </option>
                         </select>
                         <InputError class="mt-2" :message="revisaoForm.errors.maquina_id" />
+                    </div>
+                    <div>
+                        <InputLabel value="Alfaia" />
+                        <select v-model="revisaoForm.alfaia_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                            <option value="">Nenhuma</option>
+                            <option v-for="alfaia in alfaiaOptions" :key="alfaia.id" :value="String(alfaia.id)">
+                                {{ alfaia.nome }} - {{ labelize(alfaia.tipo) }}
+                            </option>
+                        </select>
+                        <InputError class="mt-2" :message="revisaoForm.errors.alfaia_id" />
                     </div>
                     <div>
                         <InputLabel value="Data da revisão" />

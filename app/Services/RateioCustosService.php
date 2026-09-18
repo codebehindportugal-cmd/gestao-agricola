@@ -22,6 +22,13 @@ use Illuminate\Support\Collection;
  * Se a base escolhida ainda nao tem valores (campanha em curso, sem colheita
  * registada), cai na outra; se nenhuma tiver, divide em partes iguais - mais
  * vale imputar por igual do que deixar o custo de fora da conta.
+ *
+ * Desde a campanha unica (agri:unificar-campanhas, 18/09/2026) ha so uma
+ * campanha em curso, e um custo partilhado passa a ser dela: a API atribui-a
+ * pela data e o comando repontou os que estavam sem nenhuma. Este servico
+ * continua aqui para os anos em que voltem a correr varias campanhas em
+ * paralelo, e nao se aplica a custos que ja tenham campanha_id. A reparticao
+ * por cultura/parcela *dentro* de uma campanha e outra conta, ainda por fazer.
  */
 class RateioCustosService
 {

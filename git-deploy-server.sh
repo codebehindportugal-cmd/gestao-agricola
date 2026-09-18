@@ -6,12 +6,45 @@
 #
 # Mesmo desenho do painel Ateneya: falha alto e cedo, nunca deixa a producao a
 # meio, e diz o que fazer quando o servidor nao se consegue autenticar.
+#
+# Opcoes (tambem aceites como variaveis de ambiente, para quem corre o script
+# ja dentro do servidor):
+#
+#   --testes     Corre a suite de testes ANTES de migrar e aborta se falhar.
+#                Precisa das dependencias de dev, que nao estao na producao:
+#                o script instala-as, corre, e repoe o vendor sem dev.
+#                Os testes usam SQLite em memoria (ver phpunit.xml) — nao
+#                tocam na base de dados de producao.
+#                Limitar a uns quantos: --testes=FaturaAlfaiaTest
+#   --unificar   Aplica a campanha unica (agri:unificar-campanhas --confirmar).
+#                Sem esta opcao o script mostra apenas o plano, que nao altera
+#                nada. E uma operacao de dados que so se faz uma vez.
+#
+# Do Windows:   enviar-producao.bat "mensagem" --testes --unificar
 
 set -euo pipefail
 
 SERVER="${SERVER:-agro.codebehind.pt}"
 SSH_USER="${SSH_USER:-root}"
 BRANCH="${BRANCH:-main}"
+
+CORRER_TESTES="${CORRER_TESTES:-0}"
+FILTRO_TESTES="${FILTRO_TESTES:-FaturaAlfaiaTest|UnificarCampanhasTest}"
+UNIFICAR_CAMPANHAS="${UNIFICAR_CAMPANHAS:-0}"
+
+# As opcoes vem pela linha de comandos porque o deploy entra por
+# "ssh ... bash -s -- --local": as variaveis de ambiente do Windows nao
+# atravessam o SSH, os argumentos sim.
+ARGS_RESTANTES=()
+for arg in "$@"; do
+  case "$arg" in
+    --testes) CORRER_TESTES=1 ;;
+    --testes=*) CORRER_TESTES=1; FILTRO_TESTES="${arg#*=}" ;;
+    --unificar) UNIFICAR_CAMPANHAS=1 ;;
+    *) ARGS_RESTANTES+=("$arg") ;;
+  esac
+done
+set -- "${ARGS_RESTANTES[@]+"${ARGS_RESTANTES[@]}"}"
 
 # Plesk: a app vive em /var/www/vhosts/<dominio>/httpdocs. Detecta o primeiro
 # caminho que exista, para o script nao morrer no "cd" e abortar em silencio.
@@ -36,9 +69,17 @@ if [ "${1:-}" != "--local" ]; then
     echo "ERRO: nao encontrei chave SSH nenhuma em $HOME/.ssh" >&2
     exit 1
   fi
+  # As opcoes ja foram lidas em cima e tem de ser reenviadas ao servidor: o
+  # que corre la e uma segunda copia deste script, que nao sabe nada daqui.
+  OPCOES_REMOTAS="--local"
+  # O filtro leva '|' e a shell do servidor ve esta linha como comando: sem as
+  # plicas, "--testes=A|B" virava um pipe e o deploy morria com "B: not found".
+  [ "$CORRER_TESTES" = "1" ] && OPCOES_REMOTAS="$OPCOES_REMOTAS --testes='$FILTRO_TESTES'"
+  [ "$UNIFICAR_CAMPANHAS" = "1" ] && OPCOES_REMOTAS="$OPCOES_REMOTAS --unificar"
+
   # bash -s envia este mesmo ficheiro por stdin: nao depende do caminho remoto.
   exec ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$SERVER" \
-    "bash -s -- --local" < "$0"
+    "bash -s -- $OPCOES_REMOTAS" < "$0"
 fi
 
 # ---------- corre NO SERVIDOR ----------
@@ -139,6 +180,35 @@ else
   echo "AVISO: sem backup da BD (nao e mysql ou falta o mysqldump)." >&2
 fi
 
+# 7b. Testes, quando pedidos com --testes.
+#
+# Antes da migracao de proposito: se o codigo novo nao passa nos seus proprios
+# testes, mais vale nao lhe deixar mexer na base de dados. O phpunit e as
+# outras dependencias de dev nao estao na producao (passo 5 instala --no-dev),
+# por isso instalam-se aqui e tira-se-lhes o lugar a seguir — se o script
+# morrer no meio, o passo 5 do proximo deploy repoe o vendor na mesma.
+if [ "$CORRER_TESTES" = "1" ]; then
+  echo "==> Testes: a instalar as dependencias de desenvolvimento"
+  composer install --optimize-autoloader --quiet
+
+  echo "==> php artisan test --filter=\"$FILTRO_TESTES\""
+  set +e
+  php artisan test --filter="$FILTRO_TESTES"
+  RESULTADO_TESTES=$?
+  set -e
+
+  echo "==> A repor o vendor sem dependencias de desenvolvimento"
+  composer install --no-dev --optimize-autoloader --quiet
+
+  if [ "$RESULTADO_TESTES" != "0" ]; then
+    echo "" >&2
+    echo "ERRO: os testes falharam (codigo $RESULTADO_TESTES)." >&2
+    echo "      A base de dados NAO foi migrada; o codigo no servidor ja e o novo." >&2
+    echo "      Corrigir e voltar a correr o deploy." >&2
+    exit 1
+  fi
+fi
+
 # 8. Migracoes e caches.
 php artisan migrate --force
 
@@ -150,6 +220,23 @@ if [ ! -e public/storage ]; then
   echo "==> storage:link (public/storage nao existia)"
   php artisan storage:link || echo "AVISO: o storage:link falhou; as fotos das faturas nao vao aparecer." >&2
 fi
+# 8b. Campanha unica 2025/2026 (agri:unificar-campanhas).
+#
+# Junta as campanhas da epoca numa so e reponta tudo o que lhes apontava. E
+# uma operacao de dados que se faz uma vez, nao em cada deploy: sem --unificar
+# mostra-se so o plano, que nao altera nada e serve para ver o que aconteceria.
+# O backup do passo 7 e de ha segundos, por isso da para voltar atras.
+if php artisan list --raw 2>/dev/null | grep -q '^agri:unificar-campanhas'; then
+  if [ "$UNIFICAR_CAMPANHAS" = "1" ]; then
+    echo "==> agri:unificar-campanhas --confirmar"
+    php artisan agri:unificar-campanhas --confirmar
+  else
+    echo "==> Plano da campanha unica (nada e alterado):"
+    php artisan agri:unificar-campanhas || true
+    echo "    Para aplicar: enviar-producao.bat \"mensagem\" --unificar"
+  fi
+fi
+
 php artisan optimize:clear
 php artisan config:cache
 php artisan route:cache

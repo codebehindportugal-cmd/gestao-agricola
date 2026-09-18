@@ -65,4 +65,26 @@ class Maquina extends Model
     {
         return $this->hasMany(OperacaoRecurso::class);
     }
+
+    /** Faturas de compra ligadas a maquina. */
+    public function despesas(): HasMany
+    {
+        return $this->hasMany(Despesa::class);
+    }
+
+    /** Pecas e reparacoes faturadas a esta maquina. Ver Alfaia::custo_pecas. */
+    public function getCustoPecasAttribute(): float
+    {
+        return round((float) $this->despesas()->sum('valor'), 2);
+    }
+
+    public function getCustoManutencoesAttribute(): float
+    {
+        return round((float) $this->manutencoes()->sum('custo'), 2);
+    }
+
+    public function getCustoAcumuladoAttribute(): float
+    {
+        return round($this->custo_pecas + $this->custo_manutencoes, 2);
+    }
 }

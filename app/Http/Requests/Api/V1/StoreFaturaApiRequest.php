@@ -44,6 +44,9 @@ class StoreFaturaApiRequest extends FormRequest
             'categoria' => ['nullable', 'string', Rule::in(DespesaManagementController::CATEGORIAS)],
             'campanha' => ['nullable'],
             'maquina' => ['nullable'],
+            // Pecas e reparacoes de uma alfaia (o triturador, o pulverizador)
+            // pertencem a ela e nao ao tractor que a puxa.
+            'alfaia' => ['nullable'],
             'notas' => ['nullable', 'string'],
 
             'criar_produtos' => ['nullable', 'boolean'],

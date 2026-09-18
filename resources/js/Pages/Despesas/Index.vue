@@ -21,6 +21,8 @@ const props = defineProps({
     analytics: { type: Object, default: () => ({ tem_items: false }) },
     produtos: { type: Array, default: () => [] },
     lotes: { type: Array, default: () => [] },
+    maquinas: { type: Array, default: () => [] },
+    alfaias: { type: Array, default: () => [] },
     partilhados: { type: Array, default: () => [] },
     resumoPartilhados: { type: Object, default: () => ({}) },
     tiposCustoPartilhado: { type: Array, default: () => [] },
@@ -79,6 +81,10 @@ const form = useForm({
     valor: '',
     data_despesa: new Date().toISOString().split('T')[0],
     categoria: 'outro',
+    // Equipamento da compra: peças do triturador são gasto do triturador, e
+    // não do tractor que o puxa.
+    maquina_id: '',
+    alfaia_id: '',
     notas: '',
     ficheiro: null,
     items: [],
@@ -159,6 +165,8 @@ function abrirCriar() {
     form.reset();
     form.data_despesa = new Date().toISOString().split('T')[0];
     form.categoria = 'outro';
+    form.maquina_id = '';
+    form.alfaia_id = '';
     form.items = [];
     ficheiroPreview.value = null;
     ficheiroNome.value = '';
@@ -173,6 +181,8 @@ function abrirEditar(despesa) {
     form.valor = despesa.total_fatura;
     form.data_despesa = despesa.data;
     form.categoria = despesa.categoria;
+    form.maquina_id = despesa.maquina_id ?? '';
+    form.alfaia_id = despesa.alfaia_id ?? '';
     form.notas = despesa.notas ?? '';
     form.ficheiro = null;
     form.items = despesa.items.map(i => ({
@@ -898,6 +908,9 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                           title="Gasto geral da exploração: é repartido pelas campanhas do período, pelos quilos colhidos.">
                                         Geral (repartido)
                                     </span>
+                                    <span v-if="d.equipamento" class="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
+                                        {{ d.equipamento }}
+                                    </span>
                                 </div>
 
                                 <!-- linhas resumo -->
@@ -1155,6 +1168,34 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                     </select>
                                 </div>
                             </div>
+
+                            <!-- equipamento: máquina e/ou alfaia -->
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Máquina</label>
+                                    <select v-model="form.maquina_id"
+                                            class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400">
+                                        <option value="">Nenhuma</option>
+                                        <option v-for="m in maquinas" :key="m.id" :value="m.id">{{ m.nome }}</option>
+                                    </select>
+                                    <p v-if="form.errors.maquina_id" class="mt-1 text-xs text-red-600">{{ form.errors.maquina_id }}</p>
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Alfaia</label>
+                                    <select v-model="form.alfaia_id"
+                                            class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400">
+                                        <option value="">Nenhuma</option>
+                                        <option v-for="a in alfaias" :key="a.id" :value="a.id">
+                                            {{ a.nome }}<template v-if="a.maquina_nome"> ({{ a.maquina_nome }})</template>
+                                        </option>
+                                    </select>
+                                    <p v-if="form.errors.alfaia_id" class="mt-1 text-xs text-red-600">{{ form.errors.alfaia_id }}</p>
+                                </div>
+                                <p class="col-span-2 -mt-1 text-xs text-slate-400">
+                                    Peças e reparações de uma alfaia pertencem à alfaia, não ao tractor que a puxa.
+                                </p>
+                            </div>
+
                             <!-- notas -->
                             <div>
                                 <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Notas</label>

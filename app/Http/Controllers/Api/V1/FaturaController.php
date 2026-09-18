@@ -62,7 +62,7 @@ class FaturaController extends Controller
         if ($existente !== null) {
             $avisos[] = "fatura ja registada ({$data['numero_fatura']})";
 
-            return $this->criado($this->formatar($existente->load(['items.produto', 'campanha']), null), $avisos);
+            return $this->criado($this->formatar($existente->load(['items.produto', 'campanha', 'maquina', 'alfaia']), null), $avisos);
         }
 
         try {
@@ -134,7 +134,7 @@ class FaturaController extends Controller
                     $indice,
                     $referencia,
                     'repetida',
-                    $this->formatar($existente->load(['items.produto', 'campanha']), null),
+                    $this->formatar($existente->load(['items.produto', 'campanha', 'maquina', 'alfaia']), null),
                     ["fatura ja registada ({$referencia})"]
                 );
 
@@ -277,6 +277,7 @@ class FaturaController extends Controller
 
             $campanha = null;
             $maquina = null;
+            $alfaia = null;
 
             if (! empty($data['campanha'])) {
                 $campanha = $this->resolvedor->resolverCampanha($this->valorReferencia($data['campanha']));
@@ -288,6 +289,13 @@ class FaturaController extends Controller
             // desgaste daquele tractor e nao num saco geral.
             if (! empty($data['maquina'])) {
                 $maquina = $this->resolvedor->resolverMaquina($this->valorReferencia($data['maquina']));
+            }
+
+            // O mesmo para as alfaias: um radiador do triturador e gasto do
+            // triturador, mesmo que quem o puxe seja o Hurlimann. As duas
+            // podem vir juntas - a revisao do conjunto - e gravam-se as duas.
+            if (! empty($data['alfaia'])) {
+                $alfaia = $this->resolvedor->resolverAlfaia($this->valorReferencia($data['alfaia']));
             }
 
             $criarProdutos = $data['criar_produtos'] ?? true;
@@ -390,6 +398,8 @@ class FaturaController extends Controller
                 'valor' => $valor,
                 'data' => $data['data'],
                 'campanha_id' => $campanha?->id,
+                'maquina_id' => $maquina?->id,
+                'alfaia_id' => $alfaia?->id,
                 'categoria' => $categoria,
                 'notas' => $data['notas'] ?? null,
             ]);
@@ -398,7 +408,7 @@ class FaturaController extends Controller
                 $despesa->items()->create($linha);
             }
 
-            $despesa->load(['items.produto', 'campanha']);
+            $despesa->load(['items.produto', 'campanha', 'maquina', 'alfaia']);
 
             $movimentos = [];
 
@@ -413,10 +423,17 @@ class FaturaController extends Controller
             $custo = null;
 
             if (($data['criar_custo'] ?? true) && $valor > 0) {
-                // Sem campanha e sem maquina, o custo nao tem onde encostar:
-                // nasce rateavel para o RateioCustosService o repartir pelas
-                // campanhas do periodo, em vez de ficar fora de todas as contas.
-                $rateavel = $data['rateavel'] ?? ($campanha === null && $maquina === null);
+                $temEquipamento = $maquina !== null || $alfaia !== null;
+
+                // Um custo so pode ser rateado se nao pertencer a ninguem: com
+                // campanha ja tem dono, e com equipamento e gasto daquele
+                // tractor ou daquela alfaia, inteiro - reparti-lo pelas
+                // campanhas do periodo diluia o desgaste por culturas que nao o
+                // usaram. Por isso o `rateavel` do pedido so pode desligar o
+                // rateio, nunca liga-lo contra estas duas condicoes.
+                $rateavel = $campanha === null
+                    && ! $temEquipamento
+                    && ($data['rateavel'] ?? true);
 
                 $custo = Custo::query()->create([
                     'descricao' => $this->stock->referencia($despesa),
@@ -425,10 +442,9 @@ class FaturaController extends Controller
                     'data_custo' => $data['data'],
                     'campanha_id' => $campanha?->id,
                     'maquina_id' => $maquina?->id,
-                    'rateavel' => $rateavel && $campanha === null,
-                    'base_rateio' => $rateavel && $campanha === null
-                        ? ($data['base_rateio'] ?? 'kg')
-                        : null,
+                    'alfaia_id' => $alfaia?->id,
+                    'rateavel' => $rateavel,
+                    'base_rateio' => $rateavel ? ($data['base_rateio'] ?? 'kg') : null,
                     'referencia_externa' => 'fatura-'.$despesa->id,
                 ]);
             }
@@ -830,6 +846,15 @@ class FaturaController extends Controller
                     'id' => $despesa->campanha->id,
                     'nome' => $despesa->campanha->nome_completo,
                 ],
+                'maquina' => $despesa->maquina === null ? null : [
+                    'id' => $despesa->maquina->id,
+                    'nome' => $despesa->maquina->nome,
+                ],
+                'alfaia' => $despesa->alfaia === null ? null : [
+                    'id' => $despesa->alfaia->id,
+                    'nome' => $despesa->alfaia->nome,
+                    'maquina_id' => $despesa->alfaia->maquina_id,
+                ],
                 'linhas' => $despesa->items->map(fn ($item) => [
                     'id' => $item->id,
                     'descricao' => $item->descricao,
@@ -854,6 +879,8 @@ class FaturaController extends Controller
                 'tipo' => $custo->tipo,
                 'valor' => $custo->valor,
                 'data' => $custo->data_custo?->toDateString(),
+                'maquina_id' => $custo->maquina_id,
+                'alfaia_id' => $custo->alfaia_id,
                 'rateavel' => (bool) $custo->rateavel,
                 'base_rateio' => $custo->base_rateio,
             ],

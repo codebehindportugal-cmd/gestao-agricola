@@ -23,7 +23,7 @@ class MaquinariaManagementController extends Controller
         $this->authorize('viewAny', Maquina::class);
         $this->authorize('viewAny', Alfaia::class);
 
-        $filters = $request->only(['search', 'tipo', 'estado', 'alfaia_estado', 'maquina_id', 'revisao_tipo', 'revisao_maquina_id']);
+        $filters = $request->only(['search', 'tipo', 'estado', 'alfaia_estado', 'maquina_id', 'revisao_tipo', 'revisao_maquina_id', 'revisao_alfaia_id']);
         $user = $request->user();
 
         $maquinas = Maquina::query()
@@ -64,13 +64,16 @@ class MaquinariaManagementController extends Controller
                 'alfaias_count' => $maquina->alfaias_count,
                 'operacoes_count' => $maquina->operacoes_count,
                 'manutencoes_count' => $maquina->manutencoes_count,
+                'custo_pecas' => $maquina->custo_pecas,
+                'custo_manutencoes' => $maquina->custo_manutencoes,
+                'custo_acumulado' => $maquina->custo_acumulado,
                 'can_update' => $user->can('update', $maquina),
                 'can_delete' => $user->can('delete', $maquina),
             ]);
 
         $alfaias = Alfaia::query()
             ->with('maquina:id,nome,tipo')
-            ->withCount('operacoes')
+            ->withCount(['operacoes', 'manutencoes'])
             ->when($filters['search'] ?? null, function ($query, $search) {
                 $query->where(function ($subQuery) use ($search) {
                     $subQuery
@@ -100,41 +103,61 @@ class MaquinariaManagementController extends Controller
                 'estado' => $alfaia->estado,
                 'observacoes' => $alfaia->observacoes,
                 'operacoes_count' => $alfaia->operacoes_count,
+                'manutencoes_count' => $alfaia->manutencoes_count,
+                // Pecas e reparacoes proprias da alfaia: o que ela ja custou
+                // para la do desgaste horario.
+                'custo_pecas' => $alfaia->custo_pecas,
+                'custo_manutencoes' => $alfaia->custo_manutencoes,
+                'custo_acumulado' => $alfaia->custo_acumulado,
                 'can_update' => $user->can('update', $alfaia),
                 'can_delete' => $user->can('delete', $alfaia),
             ]);
 
         $revisoes = Manutencao::query()
-            ->with('maquina:id,nome,tipo')
+            ->with(['maquina:id,nome,tipo', 'alfaia:id,nome,tipo,maquina_id'])
             ->when($filters['search'] ?? null, function ($query, $search) {
                 $query->where(function ($subQuery) use ($search) {
                     $subQuery
                         ->where('tipo', 'like', "%{$search}%")
                         ->orWhere('descricao', 'like', "%{$search}%")
                         ->orWhere('observacoes', 'like', "%{$search}%")
-                        ->orWhereHas('maquina', fn ($machineQuery) => $machineQuery->where('nome', 'like', "%{$search}%"));
+                        ->orWhereHas('maquina', fn ($machineQuery) => $machineQuery->where('nome', 'like', "%{$search}%"))
+                        ->orWhereHas('alfaia', fn ($alfaiaQuery) => $alfaiaQuery->where('nome', 'like', "%{$search}%"));
                 });
             })
             ->when($filters['revisao_tipo'] ?? null, fn ($query, $tipo) => $query->where('tipo', $tipo))
             ->when($filters['revisao_maquina_id'] ?? null, fn ($query, $maquinaId) => $query->where('maquina_id', $maquinaId))
+            ->when($filters['revisao_alfaia_id'] ?? null, fn ($query, $alfaiaId) => $query->where('alfaia_id', $alfaiaId))
             ->orderByDesc('data_manutencao')
             ->paginate(6, ['*'], 'revisoes_page')
             ->withQueryString()
-            ->through(fn (Manutencao $revisao) => [
-                'id' => $revisao->id,
-                'maquina_id' => $revisao->maquina_id,
-                'maquina_nome' => $revisao->maquina?->nome,
-                'maquina_tipo' => $revisao->maquina?->tipo,
-                'data_manutencao' => optional($revisao->data_manutencao)?->format('Y-m-d'),
-                'tipo' => $revisao->tipo,
-                'descricao' => $revisao->descricao,
-                'custo' => $revisao->custo,
-                'duracao_minutos' => $revisao->duracao_minutos,
-                'proxima_manutencao' => optional($revisao->proxima_manutencao)?->format('Y-m-d'),
-                'observacoes' => $revisao->observacoes,
-                'can_update' => $revisao->maquina ? $user->can('update', $revisao->maquina) : false,
-                'can_delete' => $revisao->maquina ? $user->can('update', $revisao->maquina) : false,
-            ]);
+            ->through(function (Manutencao $revisao) use ($user) {
+                // Quem pode mexer na revisao e quem pode mexer no equipamento
+                // dela — o tractor, a alfaia, ou qualquer um dos dois quando a
+                // revisao e do conjunto.
+                $podeEditar = ($revisao->maquina && $user->can('update', $revisao->maquina))
+                    || ($revisao->alfaia && $user->can('update', $revisao->alfaia));
+
+                return [
+                    'id' => $revisao->id,
+                    'maquina_id' => $revisao->maquina_id,
+                    'maquina_nome' => $revisao->maquina?->nome,
+                    'maquina_tipo' => $revisao->maquina?->tipo,
+                    'alfaia_id' => $revisao->alfaia_id,
+                    'alfaia_nome' => $revisao->alfaia?->nome,
+                    'alfaia_tipo' => $revisao->alfaia?->tipo,
+                    'equipamento_nome' => $revisao->equipamento_nome,
+                    'data_manutencao' => optional($revisao->data_manutencao)?->format('Y-m-d'),
+                    'tipo' => $revisao->tipo,
+                    'descricao' => $revisao->descricao,
+                    'custo' => $revisao->custo,
+                    'duracao_minutos' => $revisao->duracao_minutos,
+                    'proxima_manutencao' => optional($revisao->proxima_manutencao)?->format('Y-m-d'),
+                    'observacoes' => $revisao->observacoes,
+                    'can_update' => $podeEditar,
+                    'can_delete' => $podeEditar,
+                ];
+            });
 
         return Inertia::render('Maquinaria/Index', [
             'maquinas' => $maquinas,
@@ -190,6 +213,16 @@ class MaquinariaManagementController extends Controller
                     'nome' => $maquina->nome,
                     'tipo' => $maquina->tipo,
                     'estado' => $maquina->estado,
+                ]),
+            'alfaiaOptions' => Alfaia::query()
+                ->orderBy('nome')
+                ->get(['id', 'nome', 'tipo', 'estado', 'maquina_id'])
+                ->map(fn (Alfaia $alfaia) => [
+                    'id' => $alfaia->id,
+                    'nome' => $alfaia->nome,
+                    'tipo' => $alfaia->tipo,
+                    'estado' => $alfaia->estado,
+                    'maquina_id' => $alfaia->maquina_id,
                 ]),
         ]);
     }
@@ -286,9 +319,7 @@ class MaquinariaManagementController extends Controller
 
     public function storeRevisao(StoreManutencaoRequest $request): RedirectResponse
     {
-        $validated = $request->validated();
-        $maquina = Maquina::query()->findOrFail($validated['maquina_id']);
-        $this->authorize('update', $maquina);
+        $this->autorizarEquipamento($request->validated());
 
         try {
             Manutencao::query()->create($this->normalizeRevisaoPayload($request));
@@ -303,10 +334,14 @@ class MaquinariaManagementController extends Controller
 
     public function updateRevisao(UpdateManutencaoRequest $request, Manutencao $revisao): RedirectResponse
     {
-        $this->authorize('update', $revisao->maquina);
-        $validated = $request->validated();
-        $novaMaquina = Maquina::query()->findOrFail($validated['maquina_id']);
-        $this->authorize('update', $novaMaquina);
+        // O equipamento de onde a revisao sai e aquele para onde vai: mudar uma
+        // revisao de um tractor para uma alfaia exige poder mexer nos dois.
+        $this->autorizarEquipamento([
+            'maquina_id' => $revisao->maquina_id,
+            'alfaia_id' => $revisao->alfaia_id,
+        ]);
+
+        $this->autorizarEquipamento($request->validated());
 
         try {
             $revisao->update($this->normalizeRevisaoPayload($request));
@@ -321,7 +356,10 @@ class MaquinariaManagementController extends Controller
 
     public function destroyRevisao(Request $request, Manutencao $revisao): RedirectResponse
     {
-        $this->authorize('update', $revisao->maquina);
+        $this->autorizarEquipamento([
+            'maquina_id' => $revisao->maquina_id,
+            'alfaia_id' => $revisao->alfaia_id,
+        ]);
 
         try {
             $revisao->delete();
@@ -334,9 +372,28 @@ class MaquinariaManagementController extends Controller
             ->with('success', 'Revisão removida com sucesso.');
     }
 
+    /**
+     * Quem mexe numa revisao tem de poder mexer no equipamento dela.
+     *
+     * Uma revisao tem maquina, alfaia, ou as duas. Autoriza-se o que vier; a
+     * garantia de que vem pelo menos um esta na validacao do pedido.
+     *
+     * @param  array<string, mixed>  $dados
+     */
+    private function autorizarEquipamento(array $dados): void
+    {
+        if (! blank($dados['maquina_id'] ?? null)) {
+            $this->authorize('update', Maquina::query()->findOrFail($dados['maquina_id']));
+        }
+
+        if (! blank($dados['alfaia_id'] ?? null)) {
+            $this->authorize('update', Alfaia::query()->findOrFail($dados['alfaia_id']));
+        }
+    }
+
     private function redirectFilters(Request $request): array
     {
-        return array_filter($request->only(['search', 'tipo', 'estado', 'alfaia_estado', 'maquina_id', 'revisao_tipo', 'revisao_maquina_id']));
+        return array_filter($request->only(['search', 'tipo', 'estado', 'alfaia_estado', 'maquina_id', 'revisao_tipo', 'revisao_maquina_id', 'revisao_alfaia_id']));
     }
 
     private function normalizeMaquinaPayload(Request $request): array
@@ -373,7 +430,7 @@ class MaquinariaManagementController extends Controller
     {
         $data = $request->validated();
 
-        foreach (['custo', 'duracao_minutos', 'proxima_manutencao', 'observacoes'] as $field) {
+        foreach (['maquina_id', 'alfaia_id', 'custo', 'duracao_minutos', 'proxima_manutencao', 'observacoes'] as $field) {
             if (array_key_exists($field, $data) && $data[$field] === '') {
                 $data[$field] = null;
             }

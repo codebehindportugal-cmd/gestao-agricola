@@ -49,4 +49,53 @@ class Alfaia extends Model
     {
         return $this->hasMany(OperacaoRecurso::class);
     }
+
+    /** Revisoes e reparacoes proprias da alfaia. */
+    public function manutencoes(): HasMany
+    {
+        return $this->hasMany(Manutencao::class);
+    }
+
+    /** Custos imputados a alfaia (pecas, reparacoes, utilizacao em operacoes). */
+    public function custos(): HasMany
+    {
+        return $this->hasMany(Custo::class);
+    }
+
+    /** Faturas de compra ligadas a alfaia. */
+    public function despesas(): HasMany
+    {
+        return $this->hasMany(Despesa::class);
+    }
+
+    /**
+     * Pecas e reparacoes faturadas a esta alfaia.
+     *
+     * Conta-se pelas despesas e nao pelos custos: a fatura que entra pela API
+     * cria os dois (despesa e custo) e a que e escrita no ecra so cria a
+     * despesa - somar custos deixava metade de fora e somar ambos contava a
+     * mesma fatura duas vezes.
+     */
+    public function getCustoPecasAttribute(): float
+    {
+        return round((float) $this->despesas()->sum('valor'), 2);
+    }
+
+    public function getCustoManutencoesAttribute(): float
+    {
+        return round((float) $this->manutencoes()->sum('custo'), 2);
+    }
+
+    /**
+     * O que a alfaia ja custou em pecas e manutencao.
+     *
+     * Cuidado com a mesma reparacao registada duas vezes: a fatura da oficina
+     * como despesa e o mesmo trabalho como manutencao com custo preenchido.
+     * Sao somadas as duas - quando a revisao tem fatura, deixar a manutencao
+     * sem custo.
+     */
+    public function getCustoAcumuladoAttribute(): float
+    {
+        return round($this->custo_pecas + $this->custo_manutencoes, 2);
+    }
 }

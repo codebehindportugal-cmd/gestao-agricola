@@ -75,7 +75,8 @@ class ResolvedorReferencias
                 'id' => $parcela->id,
                 'nome' => $parcela->nome,
                 'codigo' => $parcela->numero_parcela,
-            ]
+            ],
+            ['nome', 'numero_parcela']
         );
 
         return $parcela;
@@ -111,7 +112,8 @@ class ResolvedorReferencias
                 'id' => $operacao->id,
                 'tipo' => $operacao->tipo,
                 'data' => $operacao->data_hora_inicio?->toDateString(),
-            ]
+            ],
+            ['tipo']
         );
 
         return $operacao;
@@ -136,7 +138,8 @@ class ResolvedorReferencias
                     'id' => $produto->id,
                     'nome' => $produto->nome,
                     'numero_autorizacao_dgav' => $produto->numero_autorizacao_dgav,
-                ]
+                ],
+                ['nome', 'codigo_interno', 'numero_autorizacao_dgav']
             );
 
             return $produto;
@@ -215,7 +218,8 @@ class ResolvedorReferencias
                 'id' => $colheita->id,
                 'data' => $colheita->data_colheita?->toDateString(),
                 'referencia_externa' => $colheita->referencia_externa,
-            ]
+            ],
+            ['referencia_externa']
         );
 
         return $colheita;
@@ -232,7 +236,8 @@ class ResolvedorReferencias
             fn (Lote $lote) => [
                 'id' => $lote->id,
                 'codigo' => $lote->numero_lote,
-            ]
+            ],
+            ['numero_lote']
         );
 
         return $lote;
@@ -280,7 +285,8 @@ class ResolvedorReferencias
         int|string|null $valor,
         string $campo,
         callable $aplicarTexto,
-        callable $formatarCandidato
+        callable $formatarCandidato,
+        array $colunasParecidas = ['nome']
     ): Model {
         if ($valor === null || $valor === '') {
             throw ValidationException::withMessages([
@@ -319,9 +325,57 @@ class ResolvedorReferencias
             ]);
         }
 
-        throw ValidationException::withMessages([
-            $campo => ["Referencia de {$campo} nao encontrada: {$valor}."],
-        ]);
+        // Nao encontrado: em vez de um "nao existe" seco, dizer o que existe
+        // parecido. Quem envia a fatura escreve o nome de cabeca ("Amanha de
+        // pes" com ou sem til) e nao tem a lista a mao.
+        $parecidos = $this->parecidos($query, $texto, $colunasParecidas);
+
+        $mensagens = ["Referencia de {$campo} nao encontrada: {$valor}."];
+
+        if ($parecidos->isNotEmpty()) {
+            $mensagens[] = [
+                'valor' => $valor,
+                'candidatos' => $parecidos->map($formatarCandidato)->values()->all(),
+            ];
+        }
+
+        throw ValidationException::withMessages([$campo => $mensagens]);
+    }
+
+    /**
+     * Registos com nome parecido com o que veio no pedido.
+     *
+     * Duas tentativas na mesma consulta: o texto em qualquer sitio do nome, e
+     * nomes comecados pela primeira palavra.
+     *
+     * Em producao (MySQL, collation utf8mb4 ..._ci) o LIKE ignora acentos e
+     * "Amanha" encontra "Amanhã". No SQLite dos testes nao ignora - nao
+     * escrever testes que dependam disso.
+     *
+     * @param  Builder<Model>  $query
+     * @param  array<int, string>  $colunas
+     * @return Collection<int, Model>
+     */
+    private function parecidos(Builder $query, string $texto, array $colunas): Collection
+    {
+        if ($colunas === [] || mb_strlen($texto) < 3) {
+            return collect();
+        }
+
+        $primeira = preg_split('/\s+/u', $texto)[0] ?? '';
+
+        return (clone $query)
+            ->where(function (Builder $externo) use ($texto, $primeira, $colunas): void {
+                foreach ($colunas as $coluna) {
+                    $externo->orWhere($coluna, 'like', '%'.$texto.'%');
+
+                    if (mb_strlen($primeira) >= 3) {
+                        $externo->orWhere($coluna, 'like', $primeira.'%');
+                    }
+                }
+            })
+            ->limit(5)
+            ->get();
     }
 
     private function extrairAno(string $texto): ?int

@@ -20,6 +20,8 @@ class Despesa extends Model
         'valor',
         'data',
         'campanha_id',
+        'maquina_id',
+        'alfaia_id',
         'categoria',
         'ficheiro_path',
         'notas',
@@ -38,6 +40,26 @@ class Despesa extends Model
     public function campanha(): BelongsTo
     {
         return $this->belongsTo(Campanha::class);
+    }
+
+    /** Maquina a que a compra pertence (pecas, oleos, revisoes). */
+    public function maquina(): BelongsTo
+    {
+        return $this->belongsTo(Maquina::class);
+    }
+
+    /** Alfaia a que a compra pertence, quando nao e do tractor que a puxa. */
+    public function alfaia(): BelongsTo
+    {
+        return $this->belongsTo(Alfaia::class);
+    }
+
+    /** Equipamento da despesa, para listas e titulos. */
+    public function getEquipamentoNomeAttribute(): ?string
+    {
+        $nomes = array_filter([$this->maquina?->nome, $this->alfaia?->nome]);
+
+        return $nomes === [] ? null : implode(' + ', $nomes);
     }
 
     public function movimentos(): HasMany

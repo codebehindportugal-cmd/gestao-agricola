@@ -24,6 +24,7 @@ class Custo extends Model
         'cultura_id',
         'parcela_id',
         'maquina_id',
+        'alfaia_id',
         'funcionario_id',
         'referencia_externa',
         'observacoes',
@@ -68,6 +69,12 @@ class Custo extends Model
     public function maquina(): BelongsTo
     {
         return $this->belongsTo(Maquina::class);
+    }
+
+    /** Alfaia a que o custo pertence (pecas e reparacoes proprias). */
+    public function alfaia(): BelongsTo
+    {
+        return $this->belongsTo(Alfaia::class);
     }
 
     public function funcionario(): BelongsTo

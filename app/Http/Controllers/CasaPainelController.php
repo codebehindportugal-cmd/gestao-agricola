@@ -26,6 +26,7 @@ class CasaPainelController extends Controller
             'baseUrl' => rtrim((string) config('casa.base_url'), '/').config('casa.caminho_go2rtc'),
             'cameras' => config('casa.cameras'),
             'modoVideo' => config('casa.modo_video'),
+            'media' => config('casa.media'),
             'intervaloFeed' => config('casa.intervalo_feed'),
             'minutosSemContacto' => config('casa.minutos_sem_contacto'),
             'horaRecarga' => config('casa.hora_recarga'),
