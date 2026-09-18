@@ -657,32 +657,60 @@ Regras: dose, area_tratada, volume_calda devem ser números ou null; intervalo_s
         }
     }
 
+    /**
+     * A campanha a que a operacao pertence.
+     *
+     * Ate 18/09/2026 esta funcao CRIAVA uma campanha por cultura e ano sempre
+     * que registava uma operacao numa cultura que ainda nao tivesse uma. Era
+     * dai que vinham as campanhas que apareciam sozinhas na lista — "Antonio
+     * Coito 2026", "Buga Pereiras 2026", "Cimeira 1 2026" — uma por cultura
+     * tocada, a comecar a 1 de Janeiro e sem fim. Com uma campanha por epoca,
+     * isso desfazia a unificacao a cada operacao registada.
+     *
+     * Agora so procura: a campanha cujo periodo contem a data da operacao.
+     * Havendo varias abertas (o estado antigo), prefere a que cobre a parcela
+     * e depois a da cultura. Nao encontrando nenhuma, a operacao fica sem
+     * campanha — o ecra mostra-o e corrige-se a mao — em vez de inventar uma.
+     */
     private function resolveCampanhaId(array $data): ?int
     {
         if (! empty($data['campanha_id'])) {
             return (int) $data['campanha_id'];
         }
 
-        if (empty($data['cultura_id'])) {
+        $dia = \Illuminate\Support\Carbon::parse($data['data_hora_inicio'] ?? now())->startOfDay();
+
+        $candidatas = Campanha::query()
+            ->whereDate('data_inicio', '<=', $dia)
+            ->where(fn ($query) => $query->whereNull('data_fim')->orWhereDate('data_fim', '>=', $dia))
+            ->orderBy('id')
+            ->get(['id', 'cultura_id']);
+
+        if ($candidatas->isEmpty()) {
             return null;
         }
 
-        $date = \Illuminate\Support\Carbon::parse($data['data_hora_inicio'] ?? now());
-        $cultura = Cultura::query()->find($data['cultura_id'], ['id', 'quantidade_esperada']);
+        if ($candidatas->count() === 1) {
+            return (int) $candidatas->first()->id;
+        }
 
-        $campanha = Campanha::query()->firstOrCreate(
-            [
-                'cultura_id' => (int) $data['cultura_id'],
-                'ano' => (int) $date->year,
-            ],
-            [
-                'data_inicio' => $date->copy()->startOfYear()->toDateString(),
-                'status' => 'em_curso',
-                'producao_esperada' => $cultura?->quantidade_esperada,
-            ]
-        );
+        $parcelaId = (int) ($data['parcela_id'] ?? 0);
 
-        return $campanha->id;
+        if ($parcelaId > 0) {
+            $daParcela = Campanha::query()
+                ->whereIn('id', $candidatas->pluck('id'))
+                ->whereHas('parcelas', fn ($query) => $query->whereKey($parcelaId))
+                ->orderBy('id')
+                ->first(['id']);
+
+            if ($daParcela !== null) {
+                return (int) $daParcela->id;
+            }
+        }
+
+        $daCultura = $candidatas->firstWhere('cultura_id', (int) ($data['cultura_id'] ?? 0));
+
+        return $daCultura === null ? null : (int) $daCultura->id;
     }
 
     private function culturaIdForOperationParcela(int $parcelaId, mixed $requestedCulturaId = null): ?int
