@@ -2,6 +2,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import Pagination from '@/Components/Pagination.vue';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
+import { comprimirImagem, emMb } from '@/composables/useCompressaoImagem';
 import { computed, ref, watch } from 'vue';
 import { useQRScanner } from '@/composables/useQRScanner.js';
 
@@ -73,6 +74,8 @@ const showModal = ref(false);
 const editingDespesa = ref(null);
 const ficheiroPreview = ref(null);
 const ficheiroNome = ref('');
+// { antes, depois } quando a foto foi reduzida no browser.
+const ficheiroComprimido = ref(null);
 
 const form = useForm({
     titulo: '',
@@ -170,6 +173,7 @@ function abrirCriar() {
     form.items = [];
     ficheiroPreview.value = null;
     ficheiroNome.value = '';
+    ficheiroComprimido.value = null;
     showModal.value = true;
 }
 
@@ -206,7 +210,7 @@ function fecharModal() {
     ficheiroNome.value = '';
 }
 
-function onFicheiroChange(e) {
+async function onFicheiroChange(e) {
     const file = e.target.files[0];
     if (!file) return;
     form.ficheiro = file;
@@ -222,7 +226,20 @@ function onFicheiroChange(e) {
         ficheiroPreview.value = null;
     }
 
+    // A leitura da fatura vai com o original: o reconhecimento precisa das
+    // letras pequenas e é aí que uma recompressão se paga cara.
     analisarFatura(file);
+
+    // O que fica guardado é a versão reduzida. Uma foto de telemóvel são 4 MB
+    // e nenhum ecrã a mostra com mais de 1200 px.
+    const comprimido = await comprimirImagem(file);
+
+    if (comprimido !== file) {
+        form.ficheiro = comprimido;
+        ficheiroComprimido.value = { antes: file.size, depois: comprimido.size };
+    } else {
+        ficheiroComprimido.value = null;
+    }
 }
 
 function submeter() {
@@ -1053,6 +1070,9 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                 <div v-else-if="ficheiroNome" class="mb-3 flex items-center gap-2 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
                                     <span class="text-xl">📄</span> {{ ficheiroNome }}
                                 </div>
+                                <p v-if="ficheiroComprimido" class="-mt-1 mb-3 text-xs text-emerald-700">
+                                    Foto reduzida de {{ emMb(ficheiroComprimido.antes) }} para {{ emMb(ficheiroComprimido.depois) }} antes de enviar.
+                                </p>
                                 <div class="flex gap-2">
                                     <label class="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-3 py-3 text-sm font-medium text-slate-600 transition hover:border-emerald-400 hover:text-emerald-700">
                                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>

@@ -88,6 +88,23 @@ class UnificarCampanhasTest extends TestCase
         $this->assertTrue((bool) $partilhado->fresh()->rateavel);
     }
 
+    public function test_apagar_so_tira_as_campanhas_que_a_aplicacao_inventou(): void
+    {
+        ['pereiras' => $pereiras, 'antiga' => $inventada] = $this->cenario();
+
+        $this->artisan('agri:unificar-campanhas', ['--confirmar' => true, '--apagar' => true])
+            ->assertSuccessful();
+
+        // A inventada (sem nome, agarrada a uma cultura, sem fim) desaparece
+        // mesmo — nem com withTrashed volta.
+        $this->assertDatabaseMissing('campanhas', ['id' => $inventada->id]);
+
+        // A "Pereiras 2026" foi criada de propósito: fica arquivada.
+        $this->assertSoftDeleted('campanhas', ['id' => $pereiras->id]);
+
+        $this->assertDatabaseHas('campanhas', ['nome' => '2025/2026']);
+    }
+
     public function test_custo_de_pecas_de_uma_maquina_nao_e_absorvido(): void
     {
         $this->cenario();

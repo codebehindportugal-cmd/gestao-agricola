@@ -9,6 +9,12 @@ REM    2. pergunta se e para aplicar - escrever SIM aplica
 REM
 REM  unificar-campanhas.bat aplicar  -> aplica sem perguntar.
 REM
+REM  Com --apagar, so as campanhas que a aplicacao inventou sozinha (sem nome
+REM  proprio, agarradas a uma cultura e sem data de fim) sao apagadas de vez.
+REM  As que foram criadas de proposito ficam arquivadas. E so se mexe no que
+REM  ficou mesmo vazio depois de tudo repontado. O plano diz, campanha a
+REM  campanha, qual e o destino de cada uma.
+REM
 REM  O comando corre tudo numa transaccao: se falhar, nada muda.
 REM  O deploy faz um backup da base de dados antes de migrar; se isto
 REM  for corrido muito depois do ultimo deploy, vale a pena fazer um.
@@ -33,7 +39,7 @@ if /I "%~1"=="aplicar" goto aplicar
 echo.
 echo ==^> PLANO ^(nada vai ser alterado^)
 echo.
-ssh -i "%SSHKEY%" -o StrictHostKeyChecking=no root@agro.codebehind.pt "cd %REMOTO% && php artisan agri:unificar-campanhas" > "_local\ultima-unificacao.txt" 2>&1
+ssh -i "%SSHKEY%" -o StrictHostKeyChecking=no root@agro.codebehind.pt "cd %REMOTO% && php artisan agri:unificar-campanhas --apagar" > "_local\ultima-unificacao.txt" 2>&1
 set CODIGO=%errorlevel%
 type "_local\ultima-unificacao.txt"
 
@@ -60,7 +66,7 @@ REM ---------- 2. Aplicar ----------
 echo.
 echo ==^> A APLICAR a campanha unica no servidor...
 echo.
-ssh -i "%SSHKEY%" -o StrictHostKeyChecking=no root@agro.codebehind.pt "cd %REMOTO% && php artisan agri:unificar-campanhas --confirmar" > "_local\ultima-unificacao.txt" 2>&1
+ssh -i "%SSHKEY%" -o StrictHostKeyChecking=no root@agro.codebehind.pt "cd %REMOTO% && php artisan agri:unificar-campanhas --confirmar --apagar" > "_local\ultima-unificacao.txt" 2>&1
 set CODIGO=%errorlevel%
 type "_local\ultima-unificacao.txt"
 

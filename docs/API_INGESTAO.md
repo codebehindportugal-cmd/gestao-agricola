@@ -585,3 +585,55 @@ Exemplo curl:
 curl -X GET "http://localhost/api/v1/tesouraria?campanha=Milho%202026&de=2026-01-01&ate=2026-12-31" \
   -H "Authorization: Bearer <token>"
 ```
+
+---
+
+## Consultas (18/09/2026)
+
+Todas GET, so' precisam de token valido. Filtros comuns: `de`, `ate` (datas), `pagina`, `por_pagina` (max 100). As referencias (`campanha`, `cultura`, `parcela`, `maquina`, `alfaia`, `produto`) aceitam id ou nome; um nome que nao exista da' 422 com candidatos, e nao uma lista vazia.
+
+| Endpoint | Para que serve | Filtros proprios |
+|---|---|---|
+| `GET /resumo` | A campanha em curso repartida por especie: tratamentos, custos, kg, vendas, margem | — |
+| `GET /campanhas/{id ou nome}/resumo` | O mesmo, para uma campanha a' escolha | — |
+| `GET /custos` | O que se gastou e em que | `tipo`, `rateavel`, `sem_campanha`, campanha/cultura/parcela/maquina/alfaia |
+| `GET /colheitas` | Quilos colhidos | campanha, cultura, parcela |
+| `GET /receitas` | Vendas e subsidios | `tipo`, `comprador`, campanha, cultura |
+| `GET /despesas` | Faturas de compra — serve para saber se uma fatura ja entrou | `numero`, `fornecedor`, `categoria`, campanha, maquina, alfaia |
+| `GET /stock` | O que ha em armazem | `produto`, `tipo_produto`, `so_com_stock` |
+| `GET /movimentos-stock` | Entradas e saidas | `produto`, `tipo` |
+| `GET /manutencoes` | Revisoes de maquinas e alfaias | `maquina`, `alfaia`, `tipo` |
+
+As listas devolvem `total`, `pagina`, `paginas`, `por_pagina` e `linhas`, mais a soma da coluna que interessa (`total_valor`, `total_kg`, `total_custo`) calculada sobre **todos** os registos filtrados e nao so' os da pagina.
+
+## Correccoes: alterar e apagar
+
+O `POST /faturas` e' idempotente pelo numero e nao corrige nada; e' para isso que estes existem. Tudo o que se apaga e' soft delete e tem restauro.
+
+| Endpoint | Nota |
+|---|---|
+| `PATCH /faturas/{id}` | Cabecalho (titulo, fornecedor, data, valor, categoria, campanha, maquina, alfaia, notas). As linhas nao — mexer nelas mexe no stock; para isso, apagar e reenviar. O Custo ligado a' fatura acompanha. |
+| `DELETE /faturas/{id}` | Reverte as entradas em stock, arquiva o Custo e a Despesa. O ficheiro da fatura fica. |
+| `POST /faturas/{id}/restaurar` | Repoe a despesa, o custo e as entradas em stock. |
+| `PATCH` / `DELETE` / `POST .../restaurar` em `custos`, `colheitas` e `receitas` | Mesmo desenho. Nas colheitas, apagar tira os quilos do custo/kg da campanha. |
+
+Enviar uma ligacao a `null` (`{"campanha": null}`) desliga-a; nao enviar o campo deixa-a como esta'.
+
+## Manutencoes
+
+`POST /manutencoes` com `maquina` e/ou `alfaia` (pelo menos uma), `data`, `tipo`, `descricao`, e opcionalmente `custo`, `duracao_minutos`, `proxima_manutencao`, `observacoes`. `PATCH`, `DELETE` e `restaurar` como acima. Nao ha idempotencia: reenviar cria outra revisao.
+
+## Campanhas
+
+- `POST /campanhas`: `nome`, `inicio`, opcionalmente `fim`, `ano`, `status`, `observacoes`, `parcelas[]` (ids ou nomes). Nome repetido devolve a que ja existe em vez de duplicar.
+- `PATCH /campanhas/{id}`: nome, datas, estado, parcelas.
+- `POST /campanhas/unificar`: corre o `agri:unificar-campanhas` sem SSH. Sem `"confirmar": true` devolve so' o plano. Aceita `nome`, `inicio`, `fim`, `campanhas` (ids separados por virgula), `apagar`, `manter_rateaveis`. A resposta traz o relatorio do comando em texto e a lista de campanhas que ficaram.
+
+## Cadastro e stock
+
+- `POST /stock/ajustes`: `produto`, `tipo` (`entrada`, `saida`, `inventario`), `quantidade`, e opcionalmente `unidade`, `custo_unitario`, `notas`. Em `inventario` a quantidade passa a ser a contada e o movimento registado e' a diferenca. Fica sempre movimento, mesmo a corrigir para baixo.
+- `POST` e `PATCH` em `funcionarios`, `equipas`, `fornecedores`, `armazens` e `produtos`. A criar, os campos obrigatorios sao-no; a alterar, so' se valida o que vier.
+
+## Abilities
+
+`custos:write` e' a chave geral e serve para tudo. Para tokens estreitos ha tambem `faturas:write`, `aplicacoes:write`, `trabalhos:write`, `colheitas:write`, `receitas:write`, `compromissos:write`, `manutencoes:write`, `campanhas:write`, `stock:write`, `cadastro:write` e `casa:write` (este so' para o Home Assistant). Emitir com `php artisan agri:emitir-token <email> --abilities=custos:write`.

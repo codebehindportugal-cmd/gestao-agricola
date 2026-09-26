@@ -10,6 +10,7 @@ use App\Models\Campanha;
 use App\Models\Custo;
 use App\Models\Despesa;
 use App\Models\Produto;
+use App\Services\CompressorImagens;
 use App\Services\MovimentoStockService;
 use App\Services\PaperInvoice\TamanhoEmbalagem;
 use App\Services\ResolvedorReferencias;
@@ -525,7 +526,9 @@ class FaturaController extends Controller
         }
 
         $despesa->update([
-            'ficheiro_path' => $request->file('ficheiro')->store('despesas', 'public'),
+            // Comprimida a caminho do disco: uma foto de telemovel sao 4 MB e
+            // o ecra mostra-a a 1200 px. Ver CompressorImagens.
+            'ficheiro_path' => app(CompressorImagens::class)->guardar($request->file('ficheiro'), 'despesas'),
         ]);
 
         return $this->ok([

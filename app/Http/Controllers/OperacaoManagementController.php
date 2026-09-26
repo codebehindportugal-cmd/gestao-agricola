@@ -16,7 +16,9 @@ use App\Models\Operacao;
 use App\Models\Parcela;
 use App\Models\Produto;
 use App\Models\User;
+use App\Services\CompressorImagens;
 use App\Services\CustoRecursosService;
+use App\Services\ResumoPorEspecieService;
 use App\Support\OperacaoDuration;
 use App\Support\StockConsumption;
 use Illuminate\Http\JsonResponse;
@@ -267,6 +269,9 @@ class OperacaoManagementController extends Controller
                     'status' => $campanha->status,
                 ]),
             'cadernoCampo' => $this->cadernoCampoResumoNormalizado(),
+            // Com uma campanha por epoca, o resumo util ja nao e por campanha:
+            // e por especie dentro dela (pereira, macieira, culturas anuais).
+            'resumoEspecies' => $this->resumoPorEspecie(),
             'exploracaoDados' => $this->exploracaoDados(),
         ]);
     }
@@ -521,7 +526,7 @@ Regras: dose, area_tratada, volume_calda devem ser números ou null; intervalo_s
             Storage::disk('public')->delete($operacao->image_path);
         }
 
-        $path = $request->file('image')->store("operacoes/{$operacao->id}", 'public');
+        $path = app(CompressorImagens::class)->guardar($request->file('image'), "operacoes/{$operacao->id}");
         $operacao->update(['image_path' => $path]);
 
         return response()->json([
@@ -1062,6 +1067,32 @@ Regras: dose, area_tratada, volume_calda devem ser números ou null; intervalo_s
             'plantas', 'planta' => 'planta',
             default => $normalized ?: 'outro',
         };
+    }
+
+    /**
+     * A campanha em curso, repartida por especie.
+     *
+     * Em curso = a que cobre hoje. Nao havendo nenhuma (fora de epoca), mostra
+     * a ultima, para o ecra nao ficar vazio em Outubro.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function resumoPorEspecie(): ?array
+    {
+        $hoje = now()->startOfDay();
+
+        $campanha = Campanha::query()
+            ->whereDate('data_inicio', '<=', $hoje)
+            ->where(fn ($query) => $query->whereNull('data_fim')->orWhereDate('data_fim', '>=', $hoje))
+            ->orderByDesc('data_inicio')
+            ->first()
+            ?? Campanha::query()->orderByDesc('ano')->orderByDesc('id')->first();
+
+        if ($campanha === null) {
+            return null;
+        }
+
+        return app(ResumoPorEspecieService::class)->paraCampanha($campanha);
     }
 
     private function cadernoCampoResumoNormalizado()

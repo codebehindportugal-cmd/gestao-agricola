@@ -9,12 +9,17 @@ use App\Http\Controllers\OperacaoController;
 use App\Http\Controllers\MaquinaController;
 use App\Http\Controllers\AlfaiaController;
 use App\Http\Controllers\Api\V1\AplicacaoController;
+use App\Http\Controllers\Api\V1\CadastroEscritaController;
+use App\Http\Controllers\Api\V1\CampanhaGestaoController;
 use App\Http\Controllers\Api\V1\CasaController;
 use App\Http\Controllers\Api\V1\CatalogoController;
 use App\Http\Controllers\Api\V1\ColheitaController;
 use App\Http\Controllers\Api\V1\CompromissoController;
+use App\Http\Controllers\Api\V1\ConsultaController;
+use App\Http\Controllers\Api\V1\CorrecaoController;
 use App\Http\Controllers\Api\V1\CustoController;
 use App\Http\Controllers\Api\V1\FaturaController;
+use App\Http\Controllers\Api\V1\ManutencaoController;
 use App\Http\Controllers\Api\V1\PingController;
 use App\Http\Controllers\Api\V1\ReceitaController;
 use App\Http\Controllers\Api\V1\TesourariaController;
@@ -62,6 +67,26 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->group(functio
 
     Route::get('compromissos', [CompromissoController::class, 'index']);
     Route::get('tesouraria', TesourariaController::class);
+
+    /*
+    |----------------------------------------------------------------------
+    | Consultas - as contas da exploracao
+    |----------------------------------------------------------------------
+    |
+    | A API sabia gravar e quase nao sabia contar. Isto e' o que permite
+    | responder pelo chat a "quanto custou a apanha das pereiras" ou "esta
+    | fatura ja entrou", sem abrir o site. Filtros comuns: de, ate, pagina,
+    | por_pagina. As referencias aceitam id ou nome.
+    */
+    Route::get('resumo', [ConsultaController::class, 'resumo']);
+    Route::get('campanhas/{referencia}/resumo', [ConsultaController::class, 'resumo']);
+    Route::get('custos', [ConsultaController::class, 'custos']);
+    Route::get('colheitas', [ConsultaController::class, 'colheitas']);
+    Route::get('receitas', [ConsultaController::class, 'receitas']);
+    Route::get('despesas', [ConsultaController::class, 'despesas']);
+    Route::get('stock', [ConsultaController::class, 'stock']);
+    Route::get('movimentos-stock', [ConsultaController::class, 'movimentosStock']);
+    Route::get('manutencoes', [ConsultaController::class, 'manutencoes']);
 
     /*
     |----------------------------------------------------------------------
@@ -119,6 +144,94 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->group(functio
 
     Route::post('receitas', [ReceitaController::class, 'store'])
         ->middleware(['abilities:receitas:write', 'api.write.role']);
+
+    /*
+    |----------------------------------------------------------------------
+    | Correccoes: alterar e apagar o que foi mal registado
+    |----------------------------------------------------------------------
+    |
+    | O POST das faturas e' idempotente pelo numero: reenviar nao corrige nada,
+    | e ate aqui a unica saida era ir ao ecra. Tudo o que se apaga por aqui e'
+    | soft delete e tem restauro; apagar uma fatura desfaz as entradas em stock
+    | e arquiva o custo que ela criou.
+    */
+    Route::patch('faturas/{despesa}', [CorrecaoController::class, 'atualizarFatura'])
+        ->middleware(['ability:faturas:write,custos:write', 'api.write.role']);
+    Route::delete('faturas/{despesa}', [CorrecaoController::class, 'apagarFatura'])
+        ->middleware(['ability:faturas:write,custos:write', 'api.write.role']);
+    Route::post('faturas/{id}/restaurar', [CorrecaoController::class, 'restaurarFatura'])
+        ->middleware(['ability:faturas:write,custos:write', 'api.write.role']);
+
+    Route::patch('custos/{custo}', [CorrecaoController::class, 'atualizarCusto'])
+        ->middleware(['abilities:custos:write', 'api.write.role']);
+    Route::delete('custos/{custo}', [CorrecaoController::class, 'apagarCusto'])
+        ->middleware(['abilities:custos:write', 'api.write.role']);
+    Route::post('custos/{id}/restaurar', [CorrecaoController::class, 'restaurarCusto'])
+        ->middleware(['abilities:custos:write', 'api.write.role']);
+
+    Route::patch('colheitas/{colheita}', [CorrecaoController::class, 'atualizarColheita'])
+        ->middleware(['ability:colheitas:write,custos:write', 'api.write.role']);
+    Route::delete('colheitas/{colheita}', [CorrecaoController::class, 'apagarColheita'])
+        ->middleware(['ability:colheitas:write,custos:write', 'api.write.role']);
+    Route::post('colheitas/{id}/restaurar', [CorrecaoController::class, 'restaurarColheita'])
+        ->middleware(['ability:colheitas:write,custos:write', 'api.write.role']);
+
+    Route::patch('receitas/{receita}', [CorrecaoController::class, 'atualizarReceita'])
+        ->middleware(['ability:receitas:write,custos:write', 'api.write.role']);
+    Route::delete('receitas/{receita}', [CorrecaoController::class, 'apagarReceita'])
+        ->middleware(['ability:receitas:write,custos:write', 'api.write.role']);
+    Route::post('receitas/{id}/restaurar', [CorrecaoController::class, 'restaurarReceita'])
+        ->middleware(['ability:receitas:write,custos:write', 'api.write.role']);
+
+    /*
+    |----------------------------------------------------------------------
+    | Manutencoes: revisoes de maquinas e alfaias
+    |----------------------------------------------------------------------
+    */
+    Route::post('manutencoes', [ManutencaoController::class, 'store'])
+        ->middleware(['ability:manutencoes:write,custos:write', 'api.write.role']);
+    Route::patch('manutencoes/{manutencao}', [ManutencaoController::class, 'update'])
+        ->middleware(['ability:manutencoes:write,custos:write', 'api.write.role']);
+    Route::delete('manutencoes/{manutencao}', [ManutencaoController::class, 'destroy'])
+        ->middleware(['ability:manutencoes:write,custos:write', 'api.write.role']);
+    Route::post('manutencoes/{id}/restaurar', [ManutencaoController::class, 'restore'])
+        ->middleware(['ability:manutencoes:write,custos:write', 'api.write.role']);
+
+    /*
+    |----------------------------------------------------------------------
+    | Campanhas: criar, fechar e unificar
+    |----------------------------------------------------------------------
+    |
+    | 'campanhas/unificar' vem antes de qualquer 'campanhas/{...}' com POST
+    | para nao ser apanhada como um id.
+    */
+    Route::post('campanhas/unificar', [CampanhaGestaoController::class, 'unificar'])
+        ->middleware(['ability:campanhas:write,custos:write', 'api.write.role']);
+    Route::post('campanhas', [CampanhaGestaoController::class, 'store'])
+        ->middleware(['ability:campanhas:write,custos:write', 'api.write.role']);
+    Route::patch('campanhas/{campanha}', [CampanhaGestaoController::class, 'update'])
+        ->middleware(['ability:campanhas:write,custos:write', 'api.write.role']);
+
+    /*
+    |----------------------------------------------------------------------
+    | Cadastro: stock, pessoas, fornecedores, armazens, produtos
+    |----------------------------------------------------------------------
+    */
+    Route::post('stock/ajustes', [CadastroEscritaController::class, 'ajustarStock'])
+        ->middleware(['ability:stock:write,custos:write', 'api.write.role']);
+
+    Route::middleware(['ability:cadastro:write,custos:write', 'api.write.role'])->group(function () {
+        Route::post('funcionarios', [CadastroEscritaController::class, 'guardarFuncionario']);
+        Route::patch('funcionarios/{funcionario}', [CadastroEscritaController::class, 'guardarFuncionario']);
+        Route::post('equipas', [CadastroEscritaController::class, 'guardarEquipa']);
+        Route::patch('equipas/{equipa}', [CadastroEscritaController::class, 'guardarEquipa']);
+        Route::post('fornecedores', [CadastroEscritaController::class, 'guardarFornecedor']);
+        Route::patch('fornecedores/{fornecedor}', [CadastroEscritaController::class, 'guardarFornecedor']);
+        Route::post('armazens', [CadastroEscritaController::class, 'guardarArmazem']);
+        Route::patch('armazens/{armazem}', [CadastroEscritaController::class, 'guardarArmazem']);
+        Route::post('produtos', [CadastroEscritaController::class, 'guardarProduto']);
+        Route::patch('produtos/{produto}', [CadastroEscritaController::class, 'guardarProduto']);
+    });
 
     // Casa (Home Assistant -> site). O sentido e' sempre este: o servidor nunca
     // inicia ligacoes para a rede de casa. O token do HA leva so 'casa:write',

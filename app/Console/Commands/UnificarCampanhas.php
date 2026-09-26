@@ -34,6 +34,7 @@ class UnificarCampanhas extends Command
         {--fim=2026-09-30 : Fim da época, AAAA-MM-DD}
         {--campanhas= : Ids a absorver, separados por vírgula (por omissão, todas as que tocam a época)}
         {--manter-rateaveis : Deixa os custos partilhados sem campanha, como estão}
+        {--apagar : Apaga de vez as campanhas que a aplicação inventou; as outras ficam arquivadas}
         {--confirmar : Aplica as alterações; sem esta opção apenas mostra o plano}';
 
     protected $description = 'Junta as campanhas da época numa só e repõe tudo o que lhes apontava.';
@@ -90,13 +91,18 @@ class UnificarCampanhas extends Command
 
         $this->line('<fg=cyan>Campanhas a absorver</>');
 
+        $this->line((bool) $this->option('apagar')
+            ? '  (as inventadas pela aplicação são apagadas; as outras ficam arquivadas)'
+            : '  (ficam todas arquivadas: somem do ecrã, o registo fica)');
+
         foreach ($absorvidas as $campanha) {
             $this->line(sprintf(
-                '  #%d %s (%s a %s)',
+                '  #%d %s (%s a %s) — %s',
                 $campanha->id,
                 $campanha->nome_completo,
                 $campanha->data_inicio?->toDateString() ?? '—',
-                $campanha->data_fim?->toDateString() ?? '—'
+                $campanha->data_fim?->toDateString() ?? '—',
+                $this->destinoDaCampanha($campanha)
             ));
         }
 
@@ -189,9 +195,16 @@ class UnificarCampanhas extends Command
                         ->update(['campanha_id' => $destino->id]);
                 }
 
-                // So se arquiva o que ficou mesmo vazio: uma campanha com
-                // registos ainda pendurados desaparecia do ecra e levava-os
-                // com ela.
+                // So se mexe no que ficou mesmo vazio: uma campanha com registos
+                // ainda pendurados desaparecia do ecra e levava-os com ela.
+                //
+                // Arquivar (soft delete) e o normal: some do ecra e o registo
+                // fica. Com --apagar, so as que a aplicacao inventou sozinha
+                // saem da base de dados — essas nunca foram nada e nao ha nada
+                // para guardar. As que foram criadas de proposito (as gerais do
+                // agri:migrar-campanhas) ficam arquivadas na mesma.
+                $podeApagar = (bool) $this->option('apagar');
+                $apagadas = [];
                 $arquivadas = [];
                 $ocupadas = [];
 
@@ -208,6 +221,13 @@ class UnificarCampanhas extends Command
                         continue;
                     }
 
+                    if ($podeApagar && $this->foiInventada($campanha)) {
+                        $campanha->forceDelete();
+                        $apagadas[] = $campanha->id;
+
+                        continue;
+                    }
+
                     $campanha->delete();
                     $arquivadas[] = $campanha->id;
                 }
@@ -215,6 +235,7 @@ class UnificarCampanhas extends Command
                 return [
                     'destino' => $destino,
                     'movidos' => $movidos,
+                    'apagadas' => $apagadas,
                     'arquivadas' => $arquivadas,
                     'ocupadas' => $ocupadas,
                     'orfaos' => $orfaos,
@@ -246,6 +267,10 @@ class UnificarCampanhas extends Command
             $this->line(sprintf('  %-24s %d', 'despesas sem campanha', $relatorio['orfaos']['despesas']));
         }
 
+        $this->line('  apagadas de vez (inventadas): '.($relatorio['apagadas'] === []
+            ? 'nenhuma'
+            : implode(', ', array_map(fn ($id) => "#{$id}", $relatorio['apagadas']))));
+
         $this->line('  arquivadas (soft delete): '.($relatorio['arquivadas'] === []
             ? 'nenhuma'
             : implode(', ', array_map(fn ($id) => "#{$id}", $relatorio['arquivadas']))));
@@ -259,6 +284,37 @@ class UnificarCampanhas extends Command
         $this->comment('Confirme o resultado em /campanhas e corra `php artisan optimize:clear`.');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Campanha que a aplicacao criou sozinha, sem ninguem a pedir.
+     *
+     * Ate 18/09/2026 o OperacaoManagementController criava uma campanha sempre
+     * que se gravava uma operacao numa cultura que ainda nao tivesse nenhuma.
+     * Ficavam com a marca de fabrica: sem nome proprio (o nome era derivado da
+     * cultura), agarradas a uma cultura, e sem data de fim. As campanhas
+     * criadas de proposito — as gerais do agri:migrar-campanhas — tem nome e
+     * nao tem cultura.
+     *
+     * Estas nunca foram nada, por isso podem ser apagadas em vez de
+     * arquivadas. Na duvida, o metodo diz que nao.
+     */
+    private function foiInventada(Campanha $campanha): bool
+    {
+        return blank($campanha->nome)
+            && $campanha->cultura_id !== null
+            && $campanha->data_fim === null;
+    }
+
+    private function destinoDaCampanha(Campanha $campanha): string
+    {
+        if (! (bool) $this->option('apagar')) {
+            return 'arquivada';
+        }
+
+        return $this->foiInventada($campanha)
+            ? '<fg=red>inventada pela aplicação: APAGADA</>'
+            : 'arquivada';
     }
 
     /**

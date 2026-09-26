@@ -4,9 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Receita extends Model
 {
+    // Uma venda apagada pela API tem de dar para repor: ver
+    // CorrecaoController e a migracao 2026_09_18_200000.
+    use SoftDeletes;
+
     protected $table = 'receitas';
 
     protected $fillable = [

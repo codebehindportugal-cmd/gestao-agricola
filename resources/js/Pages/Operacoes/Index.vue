@@ -28,6 +28,8 @@ const props = defineProps({
     equipas: { type: Array, default: () => [] },
     campanhas: { type: Array, default: () => [] },
     cadernoCampo: { type: Array, default: () => [] },
+    // { campanha: {...}, especies: [...], total: {...} } — null fora de época.
+    resumoEspecies: { type: Object, default: null },
     produtos: { type: Array, default: () => [] },
     exploracaoDados: { type: Object, default: () => ({}) },
 });
@@ -551,38 +553,105 @@ const formatNumber = (value) => {
                     </div>
                 </section>
 
-                <section v-if="cadernoCampo.length" class="rounded-[32px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                    <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <section v-if="resumoEspecies?.especies?.length" class="rounded-[32px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                         <div>
-                            <h2 class="text-xl font-black text-slate-900">Resumo por campanha</h2>
-                            <p class="mt-1 text-sm text-slate-500">Visão rápida dos tratamentos fitofarmacêuticos e do custo de produtos.</p>
+                            <h2 class="text-xl font-black text-slate-900">Resumo por espécie</h2>
+                            <p class="mt-1 text-sm text-slate-500">
+                                Campanha {{ resumoEspecies.campanha.nome }} — tratamentos, custos, quilos e margem de cada espécie.
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <Link
+                                :href="route('app.campanhas.caderno-campo', resumoEspecies.campanha.id)"
+                                class="inline-flex items-center rounded-full border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                            >
+                                Caderno
+                            </Link>
+                            <Link
+                                :href="route('app.campanhas.custos-pdf', resumoEspecies.campanha.id)"
+                                class="inline-flex items-center rounded-full border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+                            >
+                                Custos PDF
+                            </Link>
                         </div>
                     </div>
-                    <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        <article v-for="campanha in cadernoCampo" :key="campanha.id" class="rounded-3xl bg-emerald-50/70 p-4">
-                            <p class="text-sm font-semibold text-slate-900">{{ campanha.nome }}</p>
-                            <p class="mt-3 text-3xl font-black text-emerald-700">{{ campanha.tratamentos }}</p>
-                            <p class="text-xs uppercase tracking-[0.2em] text-emerald-700">tratamentos</p>
-                            <p class="mt-3 text-sm font-semibold text-slate-700">Custo total: {{ formatNumber(campanha.custo_total) }} €</p>
-                            <p class="mt-1 text-xs text-slate-500">Produtos: {{ formatNumber(campanha.custo_produtos) }} €</p>
-                            <p v-if="campanha.custo_por_unidade" class="mt-1 text-xs font-semibold text-emerald-700">
-                                {{ formatNumber(campanha.custo_por_unidade) }} €/unidade produzida
-                            </p>
-                            <div class="mt-4 flex flex-wrap gap-2">
-                                <Link
-                                    :href="route('app.campanhas.caderno-campo', campanha.id)"
-                                    class="inline-flex items-center rounded-full border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
-                                >
-                                    Caderno
-                                </Link>
-                                <Link
-                                    :href="route('app.campanhas.custos-pdf', campanha.id)"
-                                    class="inline-flex items-center rounded-full border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
-                                >
-                                    Custos PDF
-                                </Link>
+
+                    <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        <article
+                            v-for="linha in resumoEspecies.especies"
+                            :key="linha.especie"
+                            class="rounded-3xl p-4"
+                            :class="linha.especie === 'Sem espécie' ? 'bg-amber-50/70' : 'bg-emerald-50/70'"
+                        >
+                            <div class="flex items-baseline justify-between gap-2">
+                                <p class="text-sm font-semibold text-slate-900">{{ linha.especie }}</p>
+                                <p v-if="linha.area_ha" class="text-xs text-slate-500">{{ formatNumber(linha.area_ha) }} ha</p>
                             </div>
+
+                            <p class="mt-3 text-3xl font-black text-emerald-700">{{ linha.tratamentos }}</p>
+                            <p class="text-xs uppercase tracking-[0.2em] text-emerald-700">tratamentos</p>
+
+                            <dl class="mt-4 space-y-1 text-sm">
+                                <div class="flex justify-between gap-2">
+                                    <dt class="text-slate-500">Colhido</dt>
+                                    <dd class="font-semibold text-slate-800">{{ formatNumber(linha.kg) }} kg</dd>
+                                </div>
+                                <div class="flex justify-between gap-2">
+                                    <dt class="text-slate-500">Custo</dt>
+                                    <dd class="font-semibold text-slate-800">{{ formatNumber(linha.custo_total) }} €</dd>
+                                </div>
+                                <div v-if="linha.custo_kg" class="flex justify-between gap-2">
+                                    <dt class="text-slate-400">por quilo</dt>
+                                    <dd class="text-slate-500">{{ formatNumber(linha.custo_kg) }} €/kg</dd>
+                                </div>
+                                <div class="flex justify-between gap-2">
+                                    <dt class="text-slate-500">Vendas</dt>
+                                    <dd class="font-semibold text-slate-800">{{ formatNumber(linha.vendas) }} €</dd>
+                                </div>
+                                <div v-if="linha.preco_medio_kg" class="flex justify-between gap-2">
+                                    <dt class="text-slate-400">preço médio</dt>
+                                    <dd class="text-slate-500">{{ formatNumber(linha.preco_medio_kg) }} €/kg</dd>
+                                </div>
+                            </dl>
+
+                            <p
+                                class="mt-3 border-t border-white/80 pt-3 text-sm font-black"
+                                :class="linha.margem >= 0 ? 'text-emerald-800' : 'text-red-700'"
+                            >
+                                Margem: {{ formatNumber(linha.margem) }} €
+                            </p>
+
+                            <!-- O rateado e a parte dos gastos gerais (luz das regas, frio,
+                                 adubo para a exploracao toda) que toca a esta especie. -->
+                            <p v-if="linha.custo_rateado" class="mt-2 text-xs text-slate-500">
+                                Inclui {{ formatNumber(linha.custo_rateado) }} € de gastos gerais repartidos pelos quilos.
+                            </p>
                         </article>
+                    </div>
+
+                    <div class="mt-5 rounded-3xl bg-slate-900 p-4 text-white sm:flex sm:items-center sm:justify-between sm:gap-6">
+                        <p class="text-sm font-semibold">Total da campanha</p>
+                        <dl class="mt-3 grid grid-cols-2 gap-3 text-sm sm:mt-0 sm:flex sm:items-center sm:gap-6">
+                            <div>
+                                <dt class="text-xs uppercase tracking-[0.18em] text-slate-400">Colhido</dt>
+                                <dd class="font-black">{{ formatNumber(resumoEspecies.total.kg) }} kg</dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs uppercase tracking-[0.18em] text-slate-400">Custo</dt>
+                                <dd class="font-black">{{ formatNumber(resumoEspecies.total.custo_total) }} €</dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs uppercase tracking-[0.18em] text-slate-400">Vendas</dt>
+                                <dd class="font-black">{{ formatNumber(resumoEspecies.total.vendas) }} €</dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs uppercase tracking-[0.18em] text-slate-400">Margem</dt>
+                                <dd class="font-black" :class="resumoEspecies.total.margem >= 0 ? 'text-emerald-300' : 'text-red-300'">
+                                    {{ formatNumber(resumoEspecies.total.margem) }} €
+                                </dd>
+                            </div>
+                        </dl>
                     </div>
                 </section>
 

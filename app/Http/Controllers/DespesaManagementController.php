@@ -12,6 +12,7 @@ use App\Models\FaturaItem;
 use App\Models\Maquina;
 use App\Models\Produto;
 use App\Models\Receita;
+use App\Services\CompressorImagens;
 use App\Services\MovimentoStockService;
 use App\Services\PaperInvoice\ProdutosDaFatura;
 use App\Services\RateioCustosService;
@@ -134,7 +135,7 @@ class DespesaManagementController extends Controller
         unset($validated['ficheiro'], $validated['items']);
 
         if ($request->hasFile('ficheiro')) {
-            $validated['ficheiro_path'] = $request->file('ficheiro')->store('despesas', 'public');
+            $validated['ficheiro_path'] = app(CompressorImagens::class)->guardar($request->file('ficheiro'), 'despesas');
         }
 
         $valorCalculado = $this->calcularTotalItems($items);
@@ -247,7 +248,7 @@ class DespesaManagementController extends Controller
             if ($despesa->ficheiro_path && Storage::disk('public')->exists($despesa->ficheiro_path)) {
                 Storage::disk('public')->delete($despesa->ficheiro_path);
             }
-            $validated['ficheiro_path'] = $request->file('ficheiro')->store('despesas', 'public');
+            $validated['ficheiro_path'] = app(CompressorImagens::class)->guardar($request->file('ficheiro'), 'despesas');
         }
 
         $valorCalculado = $this->calcularTotalItems($items);

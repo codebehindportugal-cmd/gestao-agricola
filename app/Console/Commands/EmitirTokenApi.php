@@ -11,11 +11,28 @@ class EmitirTokenApi extends Command
 
     protected $description = 'Emite um token pessoal para a API de ingestao agricola.';
 
+    /**
+     * `custos:write` e a chave geral: todas as rotas de escrita a aceitam, para
+     * um token unico chegar para tudo. As outras servem para emitir tokens
+     * estreitos — o do Home Assistant so leva `casa:write` e por isso nao
+     * toca em faturas nem colheitas.
+     *
+     * Ate 18/09/2026 esta lista nao tinha `faturas:write` (que a documentacao
+     * ja mandava usar) nem nenhuma das novas: emitir um token so de faturas
+     * dava erro.
+     */
     private const ABILITIES_PERMITIDAS = [
         'custos:write',
         'aplicacoes:write',
         'colheitas:write',
         'receitas:write',
+        'faturas:write',
+        'trabalhos:write',
+        'compromissos:write',
+        'manutencoes:write',
+        'campanhas:write',
+        'stock:write',
+        'cadastro:write',
         // Home Assistant: so' escreve estados e eventos da casa.
         'casa:write',
     ];
