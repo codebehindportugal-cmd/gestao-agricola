@@ -366,6 +366,20 @@ function eliminarVenda(venda) {
     });
 }
 
+// ─── importar vendas do Moloni ───────────────────────────────────────────────
+const aImportarMoloni = ref(false);
+const mensagemMoloni = computed(() => page.props.flash?.success ?? null);
+
+function importarMoloni() {
+    if (aImportarMoloni.value) return;
+    aImportarMoloni.value = true;
+
+    router.post(route('app.despesas.vendas.moloni'), {}, {
+        preserveScroll: true,
+        onFinish: () => { aImportarMoloni.value = false; },
+    });
+}
+
 // ─── custos partilhados ──────────────────────────────────────────────────────
 const partilhadoForm = useForm({
     descricao: '',
@@ -728,7 +742,16 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                             <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Vendas do período</p>
                             <p class="mt-1 text-sm text-slate-500">{{ fmt(totalVendas) }} no mês selecionado</p>
                         </div>
+                        <button v-if="can.create" type="button" @click="importarMoloni" :disabled="aImportarMoloni"
+                                class="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-semibold text-sky-700 transition hover:bg-sky-100 disabled:cursor-wait disabled:opacity-60"
+                                title="Importa as faturas, faturas-recibo e faturas simplificadas da campanha. O que já entrou não se repete.">
+                            <svg class="h-4 w-4" :class="{ 'animate-spin': aImportarMoloni }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            {{ aImportarMoloni ? 'A importar...' : 'Importar do Moloni' }}
+                        </button>
                     </div>
+                    <p v-if="mensagemMoloni && mensagemMoloni.startsWith('Moloni')" class="border-b border-sky-100 bg-sky-50 px-5 py-3 text-xs text-sky-800">
+                        {{ mensagemMoloni }}
+                    </p>
                     <div v-if="vendas.length === 0" class="py-12 text-center">
                         <p class="text-sm font-medium text-slate-600">Sem vendas neste mês</p>
                         <p class="mt-1 text-xs text-slate-400">As vendas registadas entram no saldo da campanha.</p>

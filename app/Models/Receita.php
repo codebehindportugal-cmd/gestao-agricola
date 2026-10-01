@@ -27,6 +27,7 @@ class Receita extends Model
         'parcela_id',
         'colheita_id',
         'lote_id',
+        'especie',
         'comprador_nome',
         'documento',
         'referencia_externa',

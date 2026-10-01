@@ -65,6 +65,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/campanhas', [CampanhaController::class, 'index'])->name('app.campanhas.index');
     Route::get('/campanhas/{campanha}/caderno-campo', [CampanhaController::class, 'exportarCadernoCampo'])->name('app.campanhas.caderno-campo');
     Route::get('/campanhas/{campanha}/custos-pdf', [CampanhaController::class, 'exportarCustosPdf'])->name('app.campanhas.custos-pdf');
+    Route::get('/campanhas/{campanha}/relatorio', [CampanhaController::class, 'relatorio'])->name('app.campanhas.relatorio');
     Route::get('/campanhas/{campanha}/exportar', [CampanhaController::class, 'exportarCadernoCampo'])->name('app.campanhas.exportar');
     Route::get('/campanhas/{campanha}', [CampanhaController::class, 'show'])->name('app.campanhas.show');
     Route::post('/campanhas/{campanha}/custos', [CampanhaController::class, 'storeCusto'])->name('app.campanhas.custos.store');
@@ -102,6 +103,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/despesas/{despesa}', [DespesaManagementController::class, 'update'])->name('app.despesas.update');
     Route::delete('/despesas/{despesa}', [DespesaManagementController::class, 'destroy'])->name('app.despesas.destroy');
     Route::post('/despesas/vendas', [DespesaManagementController::class, 'storeReceita'])->name('app.despesas.vendas.store');
+    Route::post('/despesas/vendas/importar-moloni', \App\Http\Controllers\MoloniVendasController::class)->name('app.despesas.vendas.moloni');
     Route::delete('/despesas/vendas/{receita}', [DespesaManagementController::class, 'destroyReceita'])->name('app.despesas.vendas.destroy');
     Route::post('/despesas/extrair-fatura', FaturaExtracaoController::class)->name('app.despesas.extrair-fatura');
     Route::post('/despesas/partilhados', [DespesaManagementController::class, 'storePartilhado'])->name('app.despesas.partilhados.store');
@@ -163,6 +165,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    // Chave da API no perfil (29/09/2026).
+    Route::post('/profile/api-token', [\App\Http\Controllers\ApiTokenController::class, 'store'])->name('profile.api-token.store');
+    Route::delete('/profile/api-token', [\App\Http\Controllers\ApiTokenController::class, 'destroy'])->name('profile.api-token.destroy');
 });
 
 require __DIR__.'/auth.php';

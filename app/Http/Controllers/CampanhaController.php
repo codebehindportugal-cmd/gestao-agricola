@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use App\Services\RelatorioCampanhaService;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -79,6 +80,24 @@ class CampanhaController extends Controller
             'statusOptions' => ['planejada', 'em_curso', 'concluida', 'cancelada'],
             'anos' => Campanha::query()->distinct()->pluck('ano')->sort()->values(),
             'culturas' => Cultura::query()->orderBy('nome')->get(['id', 'nome']),
+        ]);
+    }
+
+    /**
+     * Relatorio da campanha inteira (1/10 a 30/9): custos por rubrica e por
+     * mes, vendas, margem e o resumo por especie.
+     */
+    public function relatorio(Request $request, Campanha $campanha, RelatorioCampanhaService $relatorio): Response
+    {
+        $this->authorize('view', $campanha);
+
+        return Inertia::render('Campanhas/Relatorio', [
+            'relatorio' => $relatorio->paraCampanha($campanha),
+            'campanhas' => Campanha::query()
+                ->orderByDesc('data_inicio')
+                ->get()
+                ->map(fn (Campanha $c) => ['id' => $c->id, 'nome' => $c->nome_completo])
+                ->values(),
         ]);
     }
 

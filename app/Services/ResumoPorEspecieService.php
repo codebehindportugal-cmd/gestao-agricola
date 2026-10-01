@@ -115,7 +115,11 @@ class ResumoPorEspecieService
 
         // --- Vendas -----------------------------------------------------------
         foreach ($campanha->receitas as $receita) {
-            $especie = $this->especieDe($receita->cultura_id, $receita->parcela_id, $especiePorCultura, $especiePorParcela);
+            // Sem cultura nem parcela, a especie gravada na venda (as vendas
+            // importadas do Moloni so sabem o artigo: "Pera Rocha").
+            $especie = ($receita->cultura_id === null && $receita->parcela_id === null && filled($receita->especie))
+                ? $this->especie($receita->especie)
+                : $this->especieDe($receita->cultura_id, $receita->parcela_id, $especiePorCultura, $especiePorParcela);
             $linha = &$this->linha($linhas, $especie);
             $linha['vendas'] += (float) $receita->valor;
             $linha['kg_vendidos'] += (float) ($receita->quantidade ?? 0);

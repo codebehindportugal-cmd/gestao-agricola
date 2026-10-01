@@ -183,6 +183,8 @@ class CorrecaoController extends Controller
                 'parcela' => ['sometimes', 'nullable'],
                 'maquina' => ['sometimes', 'nullable'],
                 'alfaia' => ['sometimes', 'nullable'],
+                // Passar o custo para outra operacao (ex.: juntar duas apanhas numa).
+                'operacao' => ['sometimes', 'nullable'],
                 'observacoes' => ['sometimes', 'nullable', 'string'],
             ]);
 
@@ -201,6 +203,7 @@ class CorrecaoController extends Controller
         return $this->ok(['custo' => $custo->fresh()->only([
             'id', 'descricao', 'tipo', 'valor', 'data_custo', 'campanha_id',
             'cultura_id', 'parcela_id', 'maquina_id', 'alfaia_id', 'rateavel', 'base_rateio',
+            'operacao_id',
         ])]);
     }
 

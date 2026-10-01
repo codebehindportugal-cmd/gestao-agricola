@@ -2,6 +2,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import DeleteUserForm from './Partials/DeleteUserForm.vue';
 import UpdatePasswordForm from './Partials/UpdatePasswordForm.vue';
+import ApiTokenForm from './Partials/ApiTokenForm.vue';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm.vue';
 import { Head } from '@inertiajs/vue3';
 
@@ -14,6 +15,9 @@ defineProps({
     },
     userRoles: {
         type: Array,
+    },
+    apiToken: {
+        type: Object,
     },
 });
 </script>
@@ -75,6 +79,13 @@ defineProps({
                     class="bg-white p-4 shadow sm:rounded-lg sm:p-8"
                 >
                     <UpdatePasswordForm class="max-w-xl" />
+                </div>
+
+                <div
+                    v-if="apiToken"
+                    class="bg-white p-4 shadow sm:rounded-lg sm:p-8"
+                >
+                    <ApiTokenForm :api-token="apiToken" class="max-w-xl" />
                 </div>
 
                 <div
