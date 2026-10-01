@@ -122,7 +122,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div class="overflow-hidden rounded-[28px] border border-slate-200 bg-slate-100" :class="heightClass">
+    <div class="overflow-hidden rounded-xl border border-slate-200 bg-slate-100" :class="heightClass">
         <div :ref="(el) => mapContainer = el" class="h-full w-full" />
     </div>
 </template>

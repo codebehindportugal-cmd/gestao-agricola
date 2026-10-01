@@ -161,21 +161,21 @@ onBeforeUnmount(() => {
 
     <main class="min-h-screen bg-slate-950 text-white">
         <div class="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-5 py-8">
-            <section class="rounded-[28px] border border-white/10 bg-white/10 p-6 shadow-2xl backdrop-blur">
-                <p class="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-300">Gestão agrícola</p>
-                <h1 class="mt-3 text-3xl font-black">Partilhar localização</h1>
+            <section class="rounded-xl border border-white/10 bg-white p-6 shadow-2xl">
+                <p class="text-xs font-semibold text-emerald-300">Gestão agrícola</p>
+                <h1 class="mt-3 text-3xl font-bold">Partilhar localização</h1>
                 <p class="mt-3 text-sm leading-6 text-slate-200">
                     {{ funcionario.nome }} · {{ funcionario.cargo || 'Trabalhador' }}
                 </p>
 
-                <div class="mt-6 rounded-3xl bg-slate-900/70 p-5">
+                <div class="mt-6 rounded-xl bg-slate-900/70 p-5">
                     <p class="text-sm font-semibold text-slate-300">Estado</p>
-                    <p class="mt-2 text-2xl font-black" :class="isSharing ? 'text-emerald-300' : 'text-white'">{{ statusLabel }}</p>
+                    <p class="mt-2 text-2xl font-bold" :class="isSharing ? 'text-emerald-300' : 'text-white'">{{ statusLabel }}</p>
                     <p class="mt-2 text-sm text-slate-300">Último envio: {{ formatDate(lastSharedAt) }}</p>
                     <p v-if="isSharing" class="mt-2 text-sm" :class="wakeLockActive ? 'text-emerald-200' : 'text-amber-200'">
                         {{ wakeLockActive ? 'Ecrã mantido ligado neste navegador.' : 'Mantenha o ecrã ligado para continuar a enviar.' }}
                     </p>
-                    <p v-if="errorMessage" class="mt-3 rounded-2xl border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-100">
+                    <p v-if="errorMessage" class="mt-3 rounded-lg border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-100">
                         {{ errorMessage }}
                     </p>
                 </div>
@@ -183,14 +183,14 @@ onBeforeUnmount(() => {
                 <div class="mt-6 grid gap-3">
                     <PrimaryButton
                         v-if="!isSharing"
-                        class="justify-center rounded-full bg-emerald-500 px-5 py-4 text-base normal-case tracking-normal text-white hover:bg-emerald-400 focus:bg-emerald-400"
+                        class="justify-center rounded-lg bg-emerald-500 px-5 py-4 text-base text-white hover:bg-emerald-400 focus:bg-emerald-400"
                         @click="startSharing"
                     >
                         Começar a partilhar
                     </PrimaryButton>
                     <SecondaryButton
                         v-else
-                        class="justify-center rounded-full border-white/20 bg-white px-5 py-4 text-base normal-case tracking-normal text-slate-900"
+                        class="justify-center rounded-lg border-white/20 bg-white px-5 py-4 text-base text-slate-900"
                         @click="stopSharing"
                     >
                         Parar partilha

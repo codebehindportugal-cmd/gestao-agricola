@@ -229,9 +229,9 @@ onUnmounted(() => {
             <div
                 class="grid gap-4"
                 :class="[
-                    calendario ? 'xl:grid-cols-[3fr,1fr]' : '',
-                    kiosk ? 'min-h-0 flex-1' : '',
-                ]"
+ calendario ? 'xl:grid-cols-[3fr,1fr]' : '',
+ kiosk ? 'min-h-0 flex-1' : '',
+ ]"
             >
                 <div :class="kiosk ? 'flex min-h-0 flex-col' : ''">
                     <!-- câmaras -->
@@ -254,7 +254,7 @@ onUnmounted(() => {
                                 loading="lazy"
                             />
                             <span
-                                class="pointer-events-none absolute bottom-2 left-2 rounded bg-black/70 px-2 py-0.5 text-xs uppercase tracking-wide"
+                                class="pointer-events-none absolute bottom-2 left-2 rounded bg-black/70 px-2 py-0.5 text-xs"
                             >
                                 {{ cam.rotulo }}
                             </span>
@@ -267,14 +267,14 @@ onUnmounted(() => {
 
                     <!-- sensores accionados agora -->
                     <div class="mt-5" :class="kiosk ? 'shrink-0' : ''">
-                        <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                        <h3 class="mb-2 text-xs font-semibold text-neutral-500">
                             Estado
                         </h3>
                         <div class="flex flex-wrap gap-2">
                             <span
                                 v-for="d in activos"
                                 :key="d.entity_id"
-                                class="rounded-full bg-red-500/20 px-3 py-1 text-sm text-red-300"
+                                class="rounded-md bg-red-500/20 px-3 py-1 text-sm text-red-300"
                             >
                                 {{ d.zona ? d.zona + ' · ' : '' }}{{ d.nome }}
                             </span>
@@ -286,7 +286,7 @@ onUnmounted(() => {
 
                     <!-- histórico -->
                     <div class="mt-5" :class="kiosk ? 'shrink-0' : ''">
-                        <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                        <h3 class="mb-2 text-xs font-semibold text-neutral-500">
                             Movimento
                         </h3>
                         <ul
@@ -323,7 +323,7 @@ onUnmounted(() => {
                     :class="kiosk ? 'min-h-0 overflow-y-auto pr-1' : ''"
                 >
                     <section v-if="calendario.atrasados.length">
-                        <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-red-400">
+                        <h3 class="mb-2 text-xs font-semibold text-red-400">
                             Atrasados
                         </h3>
                         <ul class="space-y-2">
@@ -354,7 +354,7 @@ onUnmounted(() => {
                     </section>
 
                     <section>
-                        <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                        <h3 class="mb-2 text-xs font-semibold text-neutral-500">
                             Hoje
                         </h3>
                         <ul class="space-y-2">
@@ -394,7 +394,7 @@ onUnmounted(() => {
                     </section>
 
                     <section v-if="calendario.proximos.length">
-                        <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                        <h3 class="mb-2 text-xs font-semibold text-neutral-500">
                             A seguir
                         </h3>
                         <ul class="divide-y divide-neutral-800 text-sm">

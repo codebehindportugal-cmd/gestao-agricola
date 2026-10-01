@@ -1,7 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import DashboardPolygonsMap from '@/Components/DashboardPolygonsMap.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -12,41 +12,60 @@ const props = defineProps({
     mapPolygons: { type: Array, default: () => [] },
     alertas: { type: Object, default: () => ({ intervalo_seguranca: [], manutencoes: [] }) },
     despesasMes: { type: Object, default: () => ({ total: 0, count: 0, variacao: null, por_categoria: {} }) },
+    resumoCampanha: { type: Object, default: null },
+    atencao: { type: Array, default: () => [] },
+    proximosPagamentos: { type: Array, default: () => [] },
 });
 
-const formatCurrency = (v) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(v || 0);
+const page = usePage();
+const primeiroNome = computed(() => (page.props.auth.user?.name ?? '').split(' ')[0]);
+
+const hoje = new Date();
+const dataTexto = hoje.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' });
+const dataHoje = dataTexto.charAt(0).toUpperCase() + dataTexto.slice(1);
+const saudacao = hoje.getHours() < 13 ? 'Bom dia' : hoje.getHours() < 20 ? 'Boa tarde' : 'Boa noite';
+
+const euros = (valor) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(Number(valor ?? 0));
+const numero = (valor, casas = 0) => new Intl.NumberFormat('pt-PT', { minimumFractionDigits: casas, maximumFractionDigits: casas }).format(Number(valor ?? 0));
 
 const despesasVariacao = computed(() => {
     const v = props.despesasMes.variacao;
     if (v === null || v === undefined) return null;
-    if (v > 0) return { cls: 'text-red-600', label: `+${v}%` };
-    if (v < 0) return { cls: 'text-emerald-600', label: `${v}%` };
-    return { cls: 'text-slate-500', label: '0%' };
+    if (v > 0) return { cls: 'text-red-700', label: `+${v}% que no mês anterior` };
+    if (v < 0) return { cls: 'text-verde-700', label: `${v}% que no mês anterior` };
+    return { cls: 'text-slate-600', label: 'igual ao mês anterior' };
 });
 
-const toneClasses = {
-    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    amber: 'border-amber-200 bg-amber-50 text-amber-700',
-    sky: 'border-sky-200 bg-sky-50 text-sky-700',
-};
-
-const totalAlertas = computed(() =>
-    (props.alertas.intervalo_seguranca?.length ?? 0) + (props.alertas.manutencoes?.length ?? 0)
+const totalPagamentos = computed(() =>
+    props.proximosPagamentos.reduce((soma, pagamento) => soma + Number(pagamento.valor ?? 0), 0),
 );
 
-const urgenciaIS = (dias) => {
-    if (dias === 0) return { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800', badge: 'bg-red-100 text-red-700', label: 'hoje' };
-    if (dias <= 3) return { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800', badge: 'bg-red-100 text-red-700', label: `${dias}d` };
-    if (dias <= 7) return { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', badge: 'bg-amber-100 text-amber-700', label: `${dias}d` };
-    return { bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-800', badge: 'bg-yellow-100 text-yellow-700', label: `${dias}d` };
-};
+const especies = computed(() => (props.resumoCampanha?.especies ?? []).filter((linha) => linha.kg > 0 || linha.custo_total > 0));
+const maiorCusto = computed(() => Math.max(1, ...especies.value.map((linha) => linha.custo_total)));
 
-const urgenciaManutencao = (dias) => {
-    if (dias < 0) return { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800', badge: 'bg-red-100 text-red-700', label: `${Math.abs(dias)}d atraso` };
-    if (dias === 0) return { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800', badge: 'bg-red-100 text-red-700', label: 'hoje' };
-    if (dias <= 7) return { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', badge: 'bg-amber-100 text-amber-700', label: `${dias}d` };
-    return { bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-800', badge: 'bg-yellow-100 text-yellow-700', label: `${dias}d` };
-};
+// Últimos registos agrupados por dia e tipo: uma pulverização é uma linha, não 24
+const ultimosRegistos = computed(() => {
+    const grupos = new Map();
+    for (const operacao of props.recentOperations) {
+        const chave = `${operacao.dia}|${operacao.tipo}`;
+        if (!grupos.has(chave)) {
+            grupos.set(chave, { chave, dia: operacao.dia, tipo: operacao.tipo, parcelas: [], estado: operacao.estado });
+        }
+        grupos.get(chave).parcelas.push(operacao.parcela);
+    }
+    return [...grupos.values()].slice(0, 5).map((grupo) => ({
+        ...grupo,
+        data: grupo.dia ? new Date(`${grupo.dia}T12:00:00`).toLocaleDateString('pt-PT', { day: 'numeric', month: 'short' }).replace('.', '') : '—',
+        onde: grupo.parcelas.length === 1 ? grupo.parcelas[0] : `${grupo.parcelas.length} parcelas`,
+    }));
+});
+
+const nomeTipo = (tipo) => (tipo ? tipo.charAt(0).toUpperCase() + tipo.slice(1) : 'Operação');
+
+const urgenciaIS = (dias) => (dias <= 3 ? 'bg-red-50 text-red-800' : dias <= 7 ? 'bg-ocre-100 text-ocre-700' : 'bg-slate-100 text-slate-700');
+const urgenciaManutencao = (dias) => (dias <= 0 ? 'bg-red-50 text-red-800' : dias <= 7 ? 'bg-ocre-100 text-ocre-700' : 'bg-slate-100 text-slate-700');
+
+const linkSeExiste = (nome, params = {}) => (route().has(nome) ? route(nome, params) : null);
 </script>
 
 <template>
@@ -54,252 +73,227 @@ const urgenciaManutencao = (dias) => {
 
     <AuthenticatedLayout>
         <template #header>
-            <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700">Hoje na exploração</p>
-                    <h1 class="mt-2 text-3xl font-black text-slate-900">Painel simples para operar, registar e controlar custos</h1>
-                    <p class="mt-2 max-w-3xl text-sm text-slate-600">
-                        O foco deve estar em registar o trabalho no campo, fechar o caderno de campo e perceber os custos por campanha.
-                    </p>
+                    <p class="text-sm font-semibold text-verde-700">{{ dataHoje }}</p>
+                    <h1 class="mt-1 text-[28px] font-bold leading-tight text-slate-900">{{ saudacao }}<template v-if="primeiroNome">, {{ primeiroNome }}</template></h1>
                 </div>
-
-                <div class="flex flex-wrap gap-3">
-                    <Link
-                        :href="route('app.operacoes.index')"
-                        class="inline-flex items-center rounded-full bg-emerald-700 px-5 py-3 text-sm font-medium text-white transition hover:bg-emerald-600"
-                    >
-                        Abrir caderno
-                    </Link>
-                    <Link
-                        :href="route('app.campanhas.index')"
-                        class="inline-flex items-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                    >
-                        Ver custos
-                    </Link>
-                </div>
+                <Link
+                    v-if="linkSeExiste('app.calendario.index')"
+                    :href="route('app.calendario.index')"
+                    class="inline-flex min-h-[44px] items-center gap-2 self-start rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-900 no-underline hover:bg-slate-50 md:self-auto"
+                >
+                    <svg class="h-5 w-5 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+                    Calendário
+                </Link>
             </div>
         </template>
 
-        <div class="bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_32%),linear-gradient(180deg,_#f8fafc_0%,_#eef6f1_100%)] py-10">
-            <div class="mx-auto flex max-w-7xl flex-col gap-8 px-4 sm:px-6 lg:px-8">
-                <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <article
-                        v-for="stat in stats"
-                        :key="stat.label"
-                        class="rounded-[28px] border border-white/80 bg-white/90 p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]"
+        <div class="py-6">
+            <div class="mx-auto flex max-w-7xl flex-col gap-5 px-4 sm:px-6 lg:px-8">
+                <!-- Atalhos para registar -->
+                <section aria-label="Registar" class="grid gap-3 sm:grid-cols-3">
+                    <Link
+                        :href="route('app.operacoes.index', { nova: 1 })"
+                        class="flex items-center gap-4 rounded-xl bg-verde-700 p-4 text-white no-underline transition hover:bg-verde-800"
                     >
-                        <p class="text-sm font-medium text-slate-500">{{ stat.label }}</p>
-                        <p class="mt-4 text-4xl font-black tracking-tight text-slate-900">{{ stat.value }}</p>
-                        <p class="mt-3 text-sm leading-6 text-slate-600">{{ stat.description }}</p>
-                    </article>
-                </section>
-
-                <!-- widget despesas do mês -->
-                <section v-if="despesasMes.count > 0 || despesasMes.total > 0"
-                         class="rounded-[28px] border border-orange-100 bg-white/90 p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.32em] text-orange-600">Despesas do mês</p>
-                            <p class="mt-1 text-3xl font-black text-slate-900">{{ formatCurrency(despesasMes.total) }}</p>
-                            <p class="mt-1 text-sm text-slate-500">{{ despesasMes.count }} despesa(s) registada(s)</p>
-                        </div>
-                        <div class="flex flex-col items-end gap-2">
-                            <span v-if="despesasVariacao" class="text-sm font-semibold" :class="despesasVariacao.cls">
-                                {{ despesasVariacao.label }} vs mês ant.
-                            </span>
-                            <Link :href="route('app.despesas.index')"
-                                  class="rounded-full bg-orange-50 px-4 py-2 text-xs font-semibold text-orange-700 transition hover:bg-orange-100">
-                                Ver despesas
-                            </Link>
-                        </div>
-                    </div>
-                    <div v-if="Object.keys(despesasMes.por_categoria).length" class="mt-4 flex flex-wrap gap-2">
-                        <span v-for="(val, cat) in despesasMes.por_categoria" :key="cat"
-                              class="rounded-full bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-700">
-                            {{ cat.replace('_', ' ') }}: {{ formatCurrency(val) }}
+                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white/15">
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
                         </span>
+                        <span class="flex flex-col">
+                            <span class="text-base font-semibold">Registar operação</span>
+                            <span class="text-sm text-verde-100">Tratamento, poda, rega, colheita…</span>
+                        </span>
+                    </Link>
+                    <Link
+                        v-if="linkSeExiste('app.despesas.index')"
+                        :href="route('app.despesas.index', { nova: 1 })"
+                        class="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 text-slate-900 no-underline transition hover:border-slate-300 hover:bg-slate-50"
+                    >
+                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-verde-700">
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h3l2-3h6l2 3h3v13H4z" /><circle cx="12" cy="13" r="3.5" /></svg>
+                        </span>
+                        <span class="flex flex-col">
+                            <span class="text-base font-semibold">Registar fatura</span>
+                            <span class="text-sm text-slate-600">Fotografa o papel e confirma as linhas</span>
+                        </span>
+                    </Link>
+                    <a
+                        v-if="linkSeExiste('app.despesas.index')"
+                        :href="`${route('app.despesas.index')}#registar-venda`"
+                        class="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 text-slate-900 no-underline transition hover:border-slate-300 hover:bg-slate-50"
+                    >
+                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-verde-700">
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10h18l-2 10H5z" /><path d="m8 10 4-6 4 6" /></svg>
+                        </span>
+                        <span class="flex flex-col">
+                            <span class="text-base font-semibold">Registar venda</span>
+                            <span class="text-sm text-slate-600">Quilos, preço e comprador</span>
+                        </span>
+                    </a>
+                </section>
+
+                <!-- Campanha -->
+                <section v-if="resumoCampanha" class="cartao" :aria-label="resumoCampanha.nome">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 sm:px-5">
+                        <h2 class="text-[17px] font-semibold">
+                            {{ resumoCampanha.nome }}
+                            <span v-if="resumoCampanha.terminou" class="ml-2 align-middle text-sm font-normal text-slate-600">terminou a {{ resumoCampanha.fim }}</span>
+                        </h2>
+                        <Link :href="route('app.campanhas.index')" class="inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold no-underline">
+                            Custos da campanha
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+                        </Link>
+                    </div>
+                    <div class="grid grid-cols-2 lg:grid-cols-4">
+                        <div class="flex flex-col gap-1 p-4 sm:p-5">
+                            <span class="text-sm text-slate-600">Colhido</span>
+                            <span class="numero text-xl font-bold sm:text-2xl">{{ numero(resumoCampanha.kg) }} kg</span>
+                        </div>
+                        <div class="flex flex-col gap-1 border-l border-slate-200 p-4 sm:p-5">
+                            <span class="text-sm text-slate-600">Vendido</span>
+                            <span class="numero text-xl font-bold sm:text-2xl">{{ numero(resumoCampanha.kg_vendidos) }} kg</span>
+                            <span class="numero text-sm text-slate-600">
+                                {{ euros(resumoCampanha.vendas) }}<template v-if="resumoCampanha.preco_medio_kg"> · {{ numero(resumoCampanha.preco_medio_kg, 2) }} €/kg</template>
+                            </span>
+                        </div>
+                        <div class="flex flex-col gap-1 border-t border-slate-200 p-4 sm:p-5 lg:border-l lg:border-t-0">
+                            <span class="text-sm text-slate-600">Custo total</span>
+                            <span class="numero text-xl font-bold sm:text-2xl">{{ euros(resumoCampanha.custo_total) }}</span>
+                            <span v-if="resumoCampanha.custo_kg" class="numero text-sm text-slate-600">{{ numero(resumoCampanha.custo_kg, 2) }} € por kg colhido</span>
+                        </div>
+                        <div class="flex flex-col gap-1 border-l border-t border-slate-200 p-4 sm:p-5 lg:border-t-0">
+                            <span class="text-sm text-slate-600">Resultado até agora</span>
+                            <span class="numero text-xl font-bold sm:text-2xl" :class="resumoCampanha.margem < 0 ? 'text-red-800' : 'text-verde-700'">{{ euros(resumoCampanha.margem) }}</span>
+                            <span class="text-sm text-slate-600">vendas menos custos</span>
+                        </div>
+                    </div>
+                    <div v-if="especies.length" class="flex flex-col gap-3 border-t border-slate-100 px-4 py-4 sm:px-5">
+                        <span class="rotulo">Custo por espécie</span>
+                        <div v-for="linha in especies" :key="linha.especie" class="grid grid-cols-[110px_minmax(0,1fr)_auto] items-center gap-3 text-sm sm:grid-cols-[140px_minmax(0,1fr)_200px]">
+                            <span class="truncate text-slate-800">{{ linha.especie }}</span>
+                            <span class="block h-2.5 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
+                                <span class="block h-full rounded-full bg-verde-600" :style="{ width: `${Math.max(2, (linha.custo_total / maiorCusto) * 100)}%` }" />
+                            </span>
+                            <span class="numero text-right">
+                                <b class="font-semibold">{{ euros(linha.custo_total) }}</b>
+                                <span v-if="linha.custo_kg" class="hidden text-slate-600 sm:inline"> · {{ numero(linha.custo_kg, 2) }} €/kg</span>
+                            </span>
+                        </div>
                     </div>
                 </section>
 
-                <section v-if="totalAlertas > 0" class="grid gap-5 lg:grid-cols-2">
-                    <article v-if="alertas.intervalo_seguranca?.length" class="rounded-[32px] border border-amber-200 bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                        <div class="flex items-start justify-between gap-4">
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-[0.32em] text-amber-600">Intervalos de segurança</p>
-                                <h2 class="mt-2 text-xl font-black text-slate-900">Parcelas em período de IS</h2>
-                                <p class="mt-1 text-sm text-slate-500">Não colher antes do término do intervalo de segurança.</p>
-                            </div>
-                            <span class="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-sm font-bold text-amber-700">
-                                {{ alertas.intervalo_seguranca.length }}
-                            </span>
-                        </div>
+                <div class="grid items-start gap-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+                    <div class="flex flex-col gap-5">
+                        <!-- Precisa de atenção -->
+                        <section v-if="atencao.length || alertas.intervalo_seguranca?.length || alertas.manutencoes?.length" class="cartao">
+                            <h2 class="px-4 py-3 text-[17px] font-semibold sm:px-5">Precisa de atenção</h2>
+                            <ul>
+                                <li v-for="item in atencao" :key="item.titulo" class="grid grid-cols-[36px_minmax(0,1fr)] gap-x-3 gap-y-1 border-t border-slate-100 px-4 py-3 sm:grid-cols-[36px_minmax(0,1fr)_auto] sm:items-center sm:px-5">
+                                    <span class="row-span-2 flex h-9 w-9 items-center justify-center rounded-lg sm:row-span-1" :class="item.tom === 'aviso' ? 'bg-ocre-100 text-ocre-700' : 'bg-verde-100 text-verde-700'">
+                                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 20h20z" /><path d="M12 10v4M12 17h.01" /></svg>
+                                    </span>
+                                    <span class="flex min-w-0 flex-col gap-0.5">
+                                        <span class="font-semibold text-slate-900">{{ item.titulo }}</span>
+                                        <span class="text-sm text-slate-600">{{ item.texto }}</span>
+                                    </span>
+                                    <Link :href="item.href" class="inline-flex min-h-[40px] items-center gap-1 whitespace-nowrap text-sm font-semibold no-underline">
+                                        {{ item.acao }}
+                                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+                                    </Link>
+                                </li>
+                                <li v-for="alerta in alertas.intervalo_seguranca" :key="`is-${alerta.operacao_id}-${alerta.produto_nome}`" class="flex items-start justify-between gap-3 border-t border-slate-100 px-4 py-3 sm:px-5">
+                                    <span class="flex min-w-0 flex-col gap-0.5">
+                                        <span class="font-semibold">Não colher em {{ alerta.parcela_nome }} antes de {{ alerta.fim_intervalo }}</span>
+                                        <span class="text-sm text-slate-600">{{ alerta.produto_nome }} aplicado a {{ alerta.data_aplicacao }}<template v-if="alerta.cultura_nome"> · {{ alerta.cultura_nome }}</template></span>
+                                    </span>
+                                    <span class="etiqueta shrink-0" :class="urgenciaIS(alerta.dias_restantes)">{{ alerta.dias_restantes === 0 ? 'hoje' : `${alerta.dias_restantes} dias` }}</span>
+                                </li>
+                                <li v-for="(manutencao, index) in alertas.manutencoes" :key="`mant-${index}`" class="flex items-start justify-between gap-3 border-t border-slate-100 px-4 py-3 sm:px-5">
+                                    <span class="flex min-w-0 flex-col gap-0.5">
+                                        <span class="font-semibold">{{ manutencao.maquina_nome }}: {{ manutencao.tipo }}</span>
+                                        <span class="text-sm text-slate-600">{{ manutencao.dias_ate_manutencao < 0 ? 'Devia ter sido feita a' : 'Prevista para' }} {{ manutencao.proxima_manutencao }}</span>
+                                    </span>
+                                    <span class="etiqueta shrink-0" :class="urgenciaManutencao(manutencao.dias_ate_manutencao)">
+                                        {{ manutencao.dias_ate_manutencao < 0 ? `${Math.abs(manutencao.dias_ate_manutencao)} dias atrasada` : manutencao.dias_ate_manutencao === 0 ? 'hoje' : `${manutencao.dias_ate_manutencao} dias` }}
+                                    </span>
+                                </li>
+                            </ul>
+                        </section>
+                        <section v-else class="cartao px-5 py-6 text-sm text-slate-600">
+                            Nada pendente. Os avisos de intervalos de segurança, revisões e dados em falta aparecem aqui.
+                        </section>
 
-                        <div class="mt-4 space-y-3">
-                            <div
-                                v-for="alerta in alertas.intervalo_seguranca"
-                                :key="`is-${alerta.operacao_id}-${alerta.produto_nome}`"
-                                class="flex items-start gap-3 rounded-2xl border p-4"
-                                :class="[urgenciaIS(alerta.dias_restantes).bg, urgenciaIS(alerta.dias_restantes).border]"
-                            >
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <p class="text-sm font-bold" :class="urgenciaIS(alerta.dias_restantes).text">
-                                            {{ alerta.parcela_nome }}
-                                        </p>
-                                        <span v-if="alerta.cultura_nome" class="text-xs text-slate-500">— {{ alerta.cultura_nome }}</span>
-                                    </div>
-                                    <p class="mt-1 text-xs text-slate-600">
-                                        {{ alerta.produto_nome }} · aplicado {{ alerta.data_aplicacao }}
-                                    </p>
-                                    <p class="mt-1 text-xs font-medium text-slate-700">
-                                        Pode colher a partir de <span class="font-bold">{{ alerta.fim_intervalo }}</span>
-                                    </p>
+                        <!-- Mapa -->
+                        <section v-if="mapPolygons.length" class="cartao overflow-hidden">
+                            <div class="flex items-center justify-between px-4 py-3 sm:px-5">
+                                <h2 class="text-[17px] font-semibold">Mapa da exploração</h2>
+                                <Link :href="route('app.parcelas.index')" class="inline-flex min-h-[44px] items-center text-sm font-semibold no-underline">Parcelas</Link>
+                            </div>
+                            <DashboardPolygonsMap :polygons="mapPolygons" height-class="h-[320px] lg:h-[380px]" />
+                        </section>
+                    </div>
+
+                    <div class="flex flex-col gap-5">
+                        <!-- Pagamentos -->
+                        <section class="cartao">
+                            <div class="flex items-center justify-between gap-2 px-4 py-3 sm:px-5">
+                                <h2 class="text-[17px] font-semibold">Próximos pagamentos</h2>
+                                <span v-if="totalPagamentos" class="numero text-sm text-slate-600">{{ euros(totalPagamentos) }}</span>
+                            </div>
+                            <ul v-if="proximosPagamentos.length">
+                                <li v-for="pagamento in proximosPagamentos" :key="pagamento.id" class="grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-3 border-t border-slate-100 px-4 py-3 sm:px-5">
+                                    <span class="flex flex-col items-center leading-none">
+                                        <b class="text-lg font-bold">{{ pagamento.dia }}</b>
+                                        <span class="mt-1 text-[11px] font-semibold uppercase text-slate-500">{{ pagamento.mes }}</span>
+                                    </span>
+                                    <span class="flex min-w-0 flex-col gap-0.5">
+                                        <span class="flex flex-wrap items-center gap-2">
+                                            <span class="truncate font-semibold">{{ pagamento.titulo }}</span>
+                                            <span v-if="pagamento.dias < 0" class="etiqueta bg-red-50 text-red-800">em atraso</span>
+                                            <span v-else-if="pagamento.dias <= 14" class="etiqueta bg-ocre-100 text-ocre-700">{{ pagamento.dias === 0 ? 'hoje' : `em ${pagamento.dias} dias` }}</span>
+                                        </span>
+                                        <span class="truncate text-sm text-slate-600">{{ pagamento.detalhe }}</span>
+                                    </span>
+                                    <span class="numero font-semibold">{{ pagamento.valor !== null ? euros(pagamento.valor) : '—' }}</span>
+                                </li>
+                            </ul>
+                            <p v-else class="border-t border-slate-100 px-4 py-4 text-sm text-slate-600 sm:px-5">Nada a pagar nas próximas semanas.</p>
+                        </section>
+
+                        <!-- Despesas do mês -->
+                        <section v-if="despesasMes.count > 0 || despesasMes.total > 0" class="cartao px-4 py-4 sm:px-5">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="flex flex-col gap-1">
+                                    <span class="text-sm text-slate-600">Despesas deste mês</span>
+                                    <span class="numero text-xl font-bold sm:text-2xl">{{ euros(despesasMes.total) }}</span>
+                                    <span class="text-sm text-slate-600">
+                                        {{ despesasMes.count }} {{ despesasMes.count === 1 ? 'fatura' : 'faturas' }}<template v-if="despesasVariacao"> · <span :class="despesasVariacao.cls">{{ despesasVariacao.label }}</span></template>
+                                    </span>
                                 </div>
-                                <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-bold" :class="urgenciaIS(alerta.dias_restantes).badge">
-                                    {{ urgenciaIS(alerta.dias_restantes).label }}
-                                </span>
+                                <Link :href="route('app.despesas.index')" class="inline-flex min-h-[44px] items-center text-sm font-semibold no-underline">Despesas</Link>
                             </div>
-                        </div>
-                    </article>
+                        </section>
 
-                    <article v-if="alertas.manutencoes?.length" class="rounded-[32px] border border-red-200 bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                        <div class="flex items-start justify-between gap-4">
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-[0.32em] text-red-600">Revisões de máquinas</p>
-                                <h2 class="mt-2 text-xl font-black text-slate-900">Manutenções a agendar</h2>
-                                <p class="mt-1 text-sm text-slate-500">Próximas 30 dias ou já em atraso.</p>
+                        <!-- Últimos registos -->
+                        <section class="cartao">
+                            <div class="flex items-center justify-between px-4 py-3 sm:px-5">
+                                <h2 class="text-[17px] font-semibold">Últimos registos</h2>
+                                <Link :href="route('app.operacoes.index')" class="inline-flex min-h-[44px] items-center text-sm font-semibold no-underline">Caderno de campo</Link>
                             </div>
-                            <span class="shrink-0 rounded-full bg-red-100 px-3 py-1 text-sm font-bold text-red-700">
-                                {{ alertas.manutencoes.length }}
-                            </span>
-                        </div>
-
-                        <div class="mt-4 space-y-3">
-                            <div
-                                v-for="(manutencao, index) in alertas.manutencoes"
-                                :key="`mant-${index}`"
-                                class="flex items-start gap-3 rounded-2xl border p-4"
-                                :class="[urgenciaManutencao(manutencao.dias_ate_manutencao).bg, urgenciaManutencao(manutencao.dias_ate_manutencao).border]"
-                            >
-                                <div class="flex-1 min-w-0">
-                                    <p class="text-sm font-bold" :class="urgenciaManutencao(manutencao.dias_ate_manutencao).text">
-                                        {{ manutencao.maquina_nome }}
-                                    </p>
-                                    <p class="mt-1 text-xs text-slate-600 capitalize">{{ manutencao.tipo }}</p>
-                                    <p class="mt-1 text-xs font-medium text-slate-700">
-                                        {{ manutencao.dias_ate_manutencao < 0 ? 'Deveria ter sido feita a' : 'Prevista para' }}
-                                        <span class="font-bold">{{ manutencao.proxima_manutencao }}</span>
-                                    </p>
-                                </div>
-                                <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-bold" :class="urgenciaManutencao(manutencao.dias_ate_manutencao).badge">
-                                    {{ urgenciaManutencao(manutencao.dias_ate_manutencao).label }}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div class="mt-4">
-                            <Link
-                                :href="route('app.maquinaria.index')"
-                                class="text-sm font-semibold text-red-700 hover:text-red-600"
-                            >
-                                Ver maquinaria →
-                            </Link>
-                        </div>
-                    </article>
-                </section>
-
-                <section class="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
-                    <article class="rounded-[32px] border border-slate-200 bg-white p-8 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                        <div class="flex items-center justify-between gap-4">
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-[0.32em] text-slate-500">Atividade recente</p>
-                                <h2 class="mt-3 text-2xl font-black text-slate-900">Últimas operações registadas</h2>
-                            </div>
-                            <Link :href="route('app.operacoes.index')" class="text-sm font-semibold text-emerald-700">
-                                Ver tudo
-                            </Link>
-                        </div>
-
-                        <div v-if="recentOperations.length" class="mt-6 overflow-hidden rounded-3xl border border-slate-100">
-                            <div
-                                v-for="operation in recentOperations"
-                                :key="operation.id"
-                                class="grid gap-3 border-b border-slate-100 px-5 py-4 last:border-b-0 md:grid-cols-[1.2fr_1fr_1fr_auto]"
-                            >
-                                <div>
-                                    <p class="text-base font-bold capitalize text-slate-900">{{ operation.tipo }}</p>
-                                    <p class="mt-1 text-sm text-slate-500">{{ operation.inicio || 'Sem data definida' }}</p>
-                                </div>
-                                <p class="text-sm text-slate-600">{{ operation.parcela }}</p>
-                                <p class="text-sm text-slate-600">{{ operation.maquina }}</p>
-                                <span class="justify-self-start rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold capitalize text-emerald-700">
-                                    {{ operation.estado || 'sem estado' }}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div
-                            v-else
-                            class="mt-6 rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-sm leading-7 text-slate-600"
-                        >
-                            Ainda não existem operações recentes. O próximo passo é começar a registar o trabalho diário no módulo Caderno.
-                        </div>
-                    </article>
-
-                    <article class="rounded-[32px] bg-slate-950 p-8 text-white shadow-[0_24px_80px_-40px_rgba(15,23,42,0.85)]">
-                        <p class="text-xs font-semibold uppercase tracking-[0.32em] text-emerald-300">Prioridades</p>
-                        <div class="mt-6 space-y-4">
-                            <div
-                                v-for="card in statusCards"
-                                :key="card.label"
-                                class="rounded-3xl border px-5 py-4"
-                                :class="toneClasses[card.tone]"
-                            >
-                                <p class="text-sm font-semibold">{{ card.label }}</p>
-                                <p class="mt-3 text-3xl font-black">{{ card.value }}</p>
-                                <p class="mt-2 text-xs font-medium opacity-80">Total registado: {{ card.total }}</p>
-                            </div>
-                        </div>
-                    </article>
-                </section>
-
-                <section class="grid gap-5 lg:grid-cols-[1fr_1fr]">
-                    <article class="rounded-[32px] border border-white/80 bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                        <div class="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-[0.32em] text-emerald-700">Mapa da exploração</p>
-                                <h2 class="mt-3 text-2xl font-black text-slate-900">Terrenos e parcelas desenhados</h2>
-                                <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                                    Vista rápida da estrutura da exploração para localizar parcelas e confirmar limites.
-                                </p>
-                            </div>
-                            <div class="flex flex-wrap gap-2 text-xs font-semibold">
-                                <span class="rounded-full bg-emerald-50 px-3 py-2 text-emerald-700">Terrenos</span>
-                                <span class="rounded-full bg-sky-50 px-3 py-2 text-sky-700">Parcelas</span>
-                                <span class="rounded-full bg-slate-100 px-3 py-2 text-slate-600">{{ mapPolygons.length }} polígonos</span>
-                            </div>
-                        </div>
-
-                        <DashboardPolygonsMap v-if="mapPolygons.length" :polygons="mapPolygons" height-class="h-[420px] lg:h-[520px]" />
-
-                        <div
-                            v-else
-                            class="rounded-[28px] border border-dashed border-slate-300 bg-slate-50 px-6 py-14 text-center text-sm leading-7 text-slate-600"
-                        >
-                            Ainda não existem polígonos guardados. Desenha um terreno ou uma parcela para aparecer aqui.
-                        </div>
-                    </article>
-
-                    <article class="rounded-[32px] border border-emerald-100 bg-white p-8 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                        <p class="text-xs font-semibold uppercase tracking-[0.32em] text-emerald-700">Fluxo recomendado</p>
-                        <div class="mt-6 space-y-5">
-                            <div v-for="area in focusAreas" :key="area.title" class="rounded-3xl bg-slate-50 p-5">
-                                <h3 class="text-lg font-bold text-slate-900">{{ area.title }}</h3>
-                                <p class="mt-2 text-sm leading-6 text-slate-600">{{ area.description }}</p>
-                            </div>
-                        </div>
-                    </article>
-                </section>
+                            <ul v-if="ultimosRegistos.length">
+                                <li v-for="registo in ultimosRegistos" :key="registo.chave" class="grid grid-cols-[64px_minmax(0,1fr)] gap-3 border-t border-slate-100 px-4 py-3 text-sm sm:px-5">
+                                    <span class="numero text-slate-600">{{ registo.data }}</span>
+                                    <span class="flex min-w-0 flex-col gap-0.5">
+                                        <span class="font-semibold">{{ nomeTipo(registo.tipo) }}</span>
+                                        <span class="truncate text-slate-600">{{ registo.onde }}</span>
+                                    </span>
+                                </li>
+                            </ul>
+                            <p v-else class="border-t border-slate-100 px-4 py-4 text-sm text-slate-600 sm:px-5">Ainda não há operações registadas.</p>
+                        </section>
+                    </div>
+                </div>
             </div>
         </div>
     </AuthenticatedLayout>

@@ -10,7 +10,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 const props = defineProps({
     operacoes: { type: Object, required: true },
@@ -32,6 +32,7 @@ const props = defineProps({
     resumoEspecies: { type: Object, default: null },
     produtos: { type: Array, default: () => [] },
     exploracaoDados: { type: Object, default: () => ({}) },
+    contagemTipos: { type: Object, default: () => ({}) },
 });
 
 const page = usePage();
@@ -414,17 +415,17 @@ const deleteOperacao = (operacao) => {
 };
 
 const estadoBadgeClass = (estado) => ({
-    planejada: 'bg-sky-50 text-sky-700',
-    em_curso: 'bg-amber-50 text-amber-700',
-    concluida: 'bg-emerald-50 text-emerald-700',
+    planejada: 'bg-sky-50 text-sky-800',
+    em_curso: 'bg-ocre-100 text-ocre-700',
+    concluida: 'bg-verde-100 text-verde-800',
     cancelada: 'bg-slate-100 text-slate-600',
 }[estado] ?? 'bg-slate-100 text-slate-600');
 
 const estadoLabel = (estado) => ({
-    planejada: 'planeada',
-    em_curso: 'em curso',
-    concluida: 'concluída',
-    cancelada: 'cancelada',
+    planejada: 'Planeada',
+    em_curso: 'Em curso',
+    concluida: 'Concluída',
+    cancelada: 'Cancelada',
 }[estado] ?? estado);
 
 const productFieldSummary = (operacao) => {
@@ -444,6 +445,159 @@ const formatNumber = (value) => {
     }).format(Number(value ?? 0));
 };
 
+// ─── Caderno agrupado por dia ────────────────────────────────────────────────
+// Uma pulverização são 20+ operações (uma por parcela) com a mesma data:
+// mostram-se juntas numa "passagem", com os totais por produto em cima.
+const tiposCor = {
+    'tratamento fitossanitário': 'bg-verde-600',
+    'fertilização': 'bg-ocre-500',
+    colheita: 'bg-red-700',
+    'mobilização do solo': 'bg-slate-500',
+    poda: 'bg-sky-700',
+    rega: 'bg-sky-500',
+    manutenção: 'bg-slate-400',
+};
+const corTipo = (tipo) => tiposCor[tipo] ?? 'bg-slate-400';
+const nomeTipo = (tipo) => (tipo ? tipo.charAt(0).toUpperCase() + tipo.slice(1) : 'Sem tipo');
+
+const especieClasse = (especie) => ({
+    Pereira: 'bg-verde-100 text-verde-800',
+    Macieira: 'bg-red-50 text-red-800',
+}[especie] ?? 'bg-slate-100 text-slate-700');
+
+// Só o dia mais recente da página abre; os outros mostram o resumo e abrem com um toque.
+const diasAbertos = ref(new Set());
+const alternarDia = (dia) => {
+    const novo = new Set(diasAbertos.value);
+    novo.has(dia) ? novo.delete(dia) : novo.add(dia);
+    diasAbertos.value = novo;
+};
+const diaAberto = (dia) => diasAbertos.value.has(dia);
+watch(() => props.operacoes.data, () => {
+    const primeiro = passagens.value[0]?.chave;
+    diasAbertos.value = new Set(primeiro ? [primeiro] : []);
+});
+
+const dataLonga = (dia) => {
+    if (!dia) return { semana: '', numero: '–', mes: '' };
+    const data = new Date(`${dia}T12:00:00`);
+    return {
+        semana: data.toLocaleDateString('pt-PT', { weekday: 'short' }).replace('.', '').slice(0, 3),
+        numero: data.getDate(),
+        mes: data.toLocaleDateString('pt-PT', { month: 'short' }).replace('.', ''),
+        ano: data.getFullYear(),
+    };
+};
+
+const custoOperacao = (operacao) => {
+    const produtos = (operacao.produtos ?? []).reduce((soma, produto) => soma + Number(produto.custo_total ?? 0), 0);
+    return produtos + Number(operacao.custo_real ?? 0);
+};
+
+const passagens = computed(() => {
+    const porDia = new Map();
+
+    for (const operacao of props.operacoes.data ?? []) {
+        const dia = operacao.dia ?? 'sem-data';
+        // Tratamento e adubo foliar vão na mesma passagem do pulverizador; o resto fica à parte
+        const familia = ['tratamento fitossanitário', 'fertilização'].includes(operacao.tipo) ? 'pulverizacao' : operacao.tipo;
+        const chave = `${dia}|${familia}`;
+        if (!porDia.has(chave)) {
+            porDia.set(chave, { chave, dia, operacoes: [] });
+        }
+        porDia.get(chave).operacoes.push(operacao);
+    }
+
+    return [...porDia.values()].map((grupo) => {
+        const parcelas = new Map();
+        const produtos = new Map();
+        const tipos = new Map();
+        let horas = 0;
+        let custo = 0;
+        let maiorIS = null;
+
+        for (const operacao of grupo.operacoes) {
+            tipos.set(operacao.tipo, (tipos.get(operacao.tipo) ?? 0) + 1);
+            horas += Number(operacao.duracao_horas ?? 0);
+            custo += custoOperacao(operacao);
+
+            const chave = operacao.parcela_id ?? `op-${operacao.id}`;
+            if (!parcelas.has(chave)) {
+                parcelas.set(chave, {
+                    chave,
+                    nome: operacao.parcela_nome ?? 'Sem parcela',
+                    terreno: operacao.terreno_nome,
+                    especie: operacao.especie,
+                    area: operacao.parcela_area,
+                    horas: 0,
+                    custo: 0,
+                    produtos: [],
+                    operacoes: [],
+                });
+            }
+            const linha = parcelas.get(chave);
+            linha.horas += Number(operacao.duracao_horas ?? 0);
+            linha.custo += custoOperacao(operacao);
+            linha.operacoes.push(operacao);
+            linha.produtos.push(...(operacao.produtos ?? []));
+
+            for (const produto of operacao.produtos ?? []) {
+                const total = produtos.get(produto.nome) ?? { nome: produto.nome, quantidade: 0, unidade: produto.unidade_medida };
+                total.quantidade += Number(produto.quantidade ?? 0);
+                produtos.set(produto.nome, total);
+
+                const is = Number(produto.intervalo_seguranca_dias ?? 0);
+                if (is > 1 && (!maiorIS || is > maiorIS.dias)) {
+                    maiorIS = { dias: is, produto: produto.nome };
+                }
+            }
+        }
+
+        const linhas = [...parcelas.values()].sort((a, b) => Number(b.area ?? 0) - Number(a.area ?? 0));
+        const area = linhas.reduce((soma, linha) => soma + Number(linha.area ?? 0), 0);
+        const primeira = grupo.operacoes[0];
+        const titulo = tipos.size === 1 && linhas.length === 1
+            ? `${nomeTipo(primeira.tipo)} · ${primeira.parcela_nome ?? 'sem parcela'}`
+            : tipos.has('tratamento fitossanitário') || tipos.has('fertilização')
+                ? `Pulverização · ${linhas.length} ${linhas.length === 1 ? 'parcela' : 'parcelas'}`
+                : `${nomeTipo(primeira.tipo)} · ${linhas.length} ${linhas.length === 1 ? 'parcela' : 'parcelas'}`;
+
+        return {
+            chave: grupo.chave,
+            dia: grupo.dia,
+            data: dataLonga(grupo.dia === 'sem-data' ? null : grupo.dia),
+            titulo,
+            tipos: [...tipos.entries()].map(([tipo, total]) => ({ tipo, total })),
+            linhas,
+            area,
+            horas,
+            custo,
+            maiorIS,
+            meios: [primeira.maquina_nome, primeira.alfaia_nome].filter(Boolean).join(' + '),
+            aplicador: primeira.aplicador_nome || primeira.operador_nome,
+            produtos: [...produtos.values()].sort((a, b) => b.quantidade - a.quantidade),
+            estados: [...new Set(grupo.operacoes.map((operacao) => operacao.estado))],
+        };
+    });
+});
+
+diasAbertos.value = new Set(passagens.value[0]?.chave ? [passagens.value[0].chave] : []);
+
+const contagemTiposLista = computed(() => {
+    const contagem = props.contagemTipos ?? {};
+    return Object.entries(contagem)
+        .map(([tipo, total]) => ({ tipo, total: Number(total) }))
+        .sort((a, b) => b.total - a.total);
+});
+
+const euros = (valor) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(Number(valor ?? 0));
+
+onMounted(() => {
+    if (new URLSearchParams(window.location.search).get('nova') === '1' && props.can.create) {
+        openCreateModal();
+    }
+});
+
 </script>
 
 <template>
@@ -451,332 +605,283 @@ const formatNumber = (value) => {
 
     <AuthenticatedLayout>
         <template #header>
-            <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700">Caderno de campo</p>
-                    <h1 class="mt-2 text-3xl font-black text-slate-900">Operações</h1>
-                    <p class="mt-2 max-w-3xl text-sm text-slate-600">
-                        Regista o trabalho no campo, os produtos aplicados, os responsáveis e os custos da operação.
-                    </p>
+                    <p class="text-sm font-semibold text-verde-700">Campo</p>
+                    <h1 class="mt-1 text-[28px] font-bold leading-tight text-slate-900">Caderno de campo</h1>
                 </div>
 
-                <div class="flex flex-wrap gap-3">
-                    <PrimaryButton
-                        v-if="can.create"
-                        class="justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600"
-                        @click="openCreateModal"
-                    >
+                <div class="flex flex-wrap gap-2">
+                    <SecondaryButton v-if="can.create" @click="openExploracaoModal">Dados da exploração</SecondaryButton>
+                    <SecondaryButton v-if="can.create" @click="openProductModal()">Novo produto</SecondaryButton>
+                    <PrimaryButton v-if="can.create" @click="openCreateModal">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
                         Nova operação
                     </PrimaryButton>
-                    <SecondaryButton
-                        v-if="can.create"
-                        class="justify-center rounded-full px-5 py-3 text-sm normal-case tracking-normal"
-                        @click="openProductModal()"
-                    >
-                        Novo produto
-                    </SecondaryButton>
-                    <SecondaryButton
-                        v-if="can.create"
-                        class="justify-center rounded-full px-5 py-3 text-sm normal-case tracking-normal"
-                        @click="openExploracaoModal"
-                    >
-                        Dados exploração
-                    </SecondaryButton>
                 </div>
             </div>
         </template>
 
-        <div class="bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.16),_transparent_28%),linear-gradient(180deg,_#f8fafc_0%,_#eef6f1_100%)] py-10">
-            <div class="mx-auto flex max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
-                <div v-if="flashSuccess" class="rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-800">
+        <div class="py-6">
+            <div class="mx-auto flex max-w-7xl flex-col gap-5 px-4 sm:px-6 lg:px-8">
+                <div v-if="flashSuccess" class="rounded-xl border border-verde-200 bg-verde-50 px-5 py-4 text-sm font-medium text-verde-800" role="status">
                     {{ flashSuccess }}
                 </div>
 
-                <section class="grid gap-4 md:grid-cols-4">
-                    <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                        <p class="text-sm font-medium text-slate-500">Operações registadas</p>
-                        <p class="mt-3 text-4xl font-black text-slate-900">{{ summary.total }}</p>
-                    </article>
-                    <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                        <p class="text-sm font-medium text-slate-500">Planeadas</p>
-                        <p class="mt-3 text-4xl font-black text-sky-700">{{ summary.planeadas }}</p>
-                    </article>
-                    <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                        <p class="text-sm font-medium text-slate-500">Em curso</p>
-                        <p class="mt-3 text-4xl font-black text-amber-700">{{ summary.em_curso }}</p>
-                    </article>
-                    <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                        <p class="text-sm font-medium text-slate-500">Concluídas</p>
-                        <p class="mt-3 text-4xl font-black text-emerald-700">{{ summary.concluidas }}</p>
-                    </article>
+                <section aria-label="Resumo" class="cartao grid grid-cols-2 md:grid-cols-4">
+                    <div class="flex flex-col gap-1 p-4 sm:p-5">
+                        <span class="text-sm text-slate-600">Operações</span>
+                        <span class="numero text-xl font-bold sm:text-2xl">{{ formatNumber(summary.total) }}</span>
+                    </div>
+                    <div class="flex flex-col gap-1 border-l border-slate-200 p-4 sm:p-5">
+                        <span class="text-sm text-slate-600">Concluídas</span>
+                        <span class="numero text-xl font-bold sm:text-2xl">{{ formatNumber(summary.concluidas) }}</span>
+                    </div>
+                    <div class="flex flex-col gap-1 border-t border-slate-200 p-4 sm:p-5 md:border-l md:border-t-0">
+                        <span class="text-sm text-slate-600">Em curso</span>
+                        <span class="numero text-xl font-bold sm:text-2xl">{{ formatNumber(summary.em_curso) }}</span>
+                    </div>
+                    <div class="flex flex-col gap-1 border-l border-t border-slate-200 p-4 sm:p-5 md:border-t-0">
+                        <span class="text-sm text-slate-600">Planeadas</span>
+                        <span class="numero text-xl font-bold sm:text-2xl">{{ formatNumber(summary.planeadas) }}</span>
+                    </div>
                 </section>
 
-                <section class="rounded-[32px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                    <div class="grid gap-4 md:grid-cols-[1fr_0.8fr_0.8fr_0.8fr_0.8fr_auto]">
-                        <div>
-                            <InputLabel value="Pesquisar" />
-                            <TextInput v-model="filterState.search" class="mt-2 block w-full rounded-2xl border-slate-200" placeholder="Tipo, estado ou observações" />
-                        </div>
-                        <div>
-                            <InputLabel value="Estado" />
-                            <select v-model="filterState.estado" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                <section aria-label="Filtros" class="cartao flex flex-col gap-4 p-4 sm:p-5">
+                    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <label class="relative flex w-full items-center lg:max-w-md">
+                            <span class="sr-only">Pesquisar</span>
+                            <svg class="pointer-events-none absolute left-3 h-5 w-5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+                            <TextInput v-model="filterState.search" type="search" class="block w-full pl-10" placeholder="Produto, tipo ou observação" />
+                        </label>
+                        <button
+                            v-if="filterState.search || filterState.estado || filterState.parcela_id || filterState.cultura_id || filterState.tipo"
+                            type="button"
+                            class="min-h-[44px] self-start rounded-lg px-3 text-sm font-semibold text-verde-700 hover:bg-verde-50 lg:self-auto"
+                            @click="filterState.search = ''; filterState.estado = ''; filterState.parcela_id = ''; filterState.cultura_id = ''; filterState.tipo = ''"
+                        >
+                            Limpar filtros
+                        </button>
+                    </div>
+
+                    <div class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="group" aria-label="Tipo de operação">
+                        <button
+                            type="button"
+                            :aria-pressed="!filterState.tipo"
+                            class="inline-flex min-h-[40px] shrink-0 items-center gap-2 rounded-lg border px-3 text-sm transition"
+                            :class="!filterState.tipo ? 'border-verde-700 bg-verde-700 font-semibold text-white' : 'border-slate-300 bg-white font-medium text-slate-800 hover:bg-slate-50'"
+                            @click="filterState.tipo = ''"
+                        >
+                            Todas
+                            <span class="numero" :class="!filterState.tipo ? 'text-verde-100' : 'text-slate-500'">{{ formatNumber(summary.total) }}</span>
+                        </button>
+                        <button
+                            v-for="item in contagemTiposLista"
+                            :key="item.tipo"
+                            type="button"
+                            :aria-pressed="filterState.tipo === item.tipo"
+                            class="inline-flex min-h-[40px] shrink-0 items-center gap-2 rounded-lg border px-3 text-sm transition"
+                            :class="filterState.tipo === item.tipo ? 'border-verde-700 bg-verde-700 font-semibold text-white' : 'border-slate-300 bg-white font-medium text-slate-800 hover:bg-slate-50'"
+                            @click="filterState.tipo = filterState.tipo === item.tipo ? '' : item.tipo"
+                        >
+                            <span class="h-2 w-2 rounded-full" :class="corTipo(item.tipo)" aria-hidden="true" />
+                            {{ nomeTipo(item.tipo) }}
+                            <span class="numero" :class="filterState.tipo === item.tipo ? 'text-verde-100' : 'text-slate-500'">{{ formatNumber(item.total) }}</span>
+                        </button>
+                    </div>
+
+                    <div class="grid gap-3 sm:grid-cols-3">
+                        <label class="flex flex-col gap-1.5 text-xs font-semibold text-slate-600">
+                            Parcela
+                            <select v-model="filterState.parcela_id" class="min-h-[44px] rounded-lg border-slate-300 text-sm font-normal text-slate-900 focus:border-verde-600 focus:ring-verde-600">
+                                <option value="">Todas as parcelas</option>
+                                <option v-for="parcela in filteredParcelas" :key="parcela.id" :value="String(parcela.id)">{{ parcela.nome }}</option>
+                            </select>
+                        </label>
+                        <label class="flex flex-col gap-1.5 text-xs font-semibold text-slate-600">
+                            Cultura
+                            <select v-model="filterState.cultura_id" class="min-h-[44px] rounded-lg border-slate-300 text-sm font-normal text-slate-900 focus:border-verde-600 focus:ring-verde-600">
+                                <option value="">Todas as culturas</option>
+                                <option v-for="cultura in culturaFilterOptions" :key="cultura.id" :value="String(cultura.id)">{{ cultura.nome }}</option>
+                            </select>
+                        </label>
+                        <label class="flex flex-col gap-1.5 text-xs font-semibold text-slate-600">
+                            Estado
+                            <select v-model="filterState.estado" class="min-h-[44px] rounded-lg border-slate-300 text-sm font-normal text-slate-900 focus:border-verde-600 focus:ring-verde-600">
                                 <option value="">Todos</option>
                                 <option v-for="estado in estadoOptions" :key="estado" :value="estado">{{ estadoLabel(estado) }}</option>
                             </select>
-                        </div>
-                        <div>
-                            <InputLabel value="Cultura" />
-                            <select v-model="filterState.cultura_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
-                                <option value="">Todas</option>
-                                <option v-for="cultura in culturaFilterOptions" :key="cultura.id" :value="String(cultura.id)">{{ cultura.nome }}</option>
-                            </select>
-                        </div>
-                        <div>
-                            <InputLabel value="Parcela" />
-                            <select v-model="filterState.parcela_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
-                                <option value="">Todas</option>
-                                <option v-for="parcela in filteredParcelas" :key="parcela.id" :value="String(parcela.id)">{{ parcela.nome }}</option>
-                            </select>
-                        </div>
-                        <div>
-                            <InputLabel value="Tipo" />
-                            <select v-model="filterState.tipo" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
-                                <option value="">Todos</option>
-                                <option v-for="tipo in tipoOptions" :key="tipo" :value="tipo">{{ tipo }}</option>
-                            </select>
-                        </div>
-                        <div class="flex items-end">
-                            <SecondaryButton class="w-full justify-center rounded-full px-5 py-3 text-sm normal-case tracking-normal" @click="filterState.search = ''; filterState.estado = ''; filterState.parcela_id = ''; filterState.cultura_id = ''; filterState.tipo = ''">
-                                Limpar
-                            </SecondaryButton>
-                        </div>
+                        </label>
                     </div>
                 </section>
 
-                <section v-if="resumoEspecies?.especies?.length" class="rounded-[32px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                        <div>
-                            <h2 class="text-xl font-black text-slate-900">Resumo por espécie</h2>
-                            <p class="mt-1 text-sm text-slate-500">
-                                Campanha {{ resumoEspecies.campanha.nome }} — tratamentos, custos, quilos e margem de cada espécie.
-                            </p>
-                        </div>
-                        <div class="flex flex-wrap gap-2">
-                            <Link
-                                :href="route('app.campanhas.caderno-campo', resumoEspecies.campanha.id)"
-                                class="inline-flex items-center rounded-full border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
-                            >
-                                Caderno
-                            </Link>
-                            <Link
-                                :href="route('app.campanhas.custos-pdf', resumoEspecies.campanha.id)"
-                                class="inline-flex items-center rounded-full border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
-                            >
-                                Custos PDF
-                            </Link>
-                        </div>
-                    </div>
-
-                    <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        <article
-                            v-for="linha in resumoEspecies.especies"
-                            :key="linha.especie"
-                            class="rounded-3xl p-4"
-                            :class="linha.especie === 'Sem espécie' ? 'bg-amber-50/70' : 'bg-emerald-50/70'"
-                        >
-                            <div class="flex items-baseline justify-between gap-2">
-                                <p class="text-sm font-semibold text-slate-900">{{ linha.especie }}</p>
-                                <p v-if="linha.area_ha" class="text-xs text-slate-500">{{ formatNumber(linha.area_ha) }} ha</p>
-                            </div>
-
-                            <p class="mt-3 text-3xl font-black text-emerald-700">{{ linha.tratamentos }}</p>
-                            <p class="text-xs uppercase tracking-[0.2em] text-emerald-700">tratamentos</p>
-
-                            <dl class="mt-4 space-y-1 text-sm">
-                                <div class="flex justify-between gap-2">
-                                    <dt class="text-slate-500">Colhido</dt>
-                                    <dd class="font-semibold text-slate-800">{{ formatNumber(linha.kg) }} kg</dd>
-                                </div>
-                                <div class="flex justify-between gap-2">
-                                    <dt class="text-slate-500">Custo</dt>
-                                    <dd class="font-semibold text-slate-800">{{ formatNumber(linha.custo_total) }} €</dd>
-                                </div>
-                                <div v-if="linha.custo_kg" class="flex justify-between gap-2">
-                                    <dt class="text-slate-400">por quilo</dt>
-                                    <dd class="text-slate-500">{{ formatNumber(linha.custo_kg) }} €/kg</dd>
-                                </div>
-                                <div class="flex justify-between gap-2">
-                                    <dt class="text-slate-500">Vendas</dt>
-                                    <dd class="font-semibold text-slate-800">{{ formatNumber(linha.vendas) }} €</dd>
-                                </div>
-                                <div v-if="linha.preco_medio_kg" class="flex justify-between gap-2">
-                                    <dt class="text-slate-400">preço médio</dt>
-                                    <dd class="text-slate-500">{{ formatNumber(linha.preco_medio_kg) }} €/kg</dd>
-                                </div>
-                            </dl>
-
-                            <p
-                                class="mt-3 border-t border-white/80 pt-3 text-sm font-black"
-                                :class="linha.margem >= 0 ? 'text-emerald-800' : 'text-red-700'"
-                            >
-                                Margem: {{ formatNumber(linha.margem) }} €
-                            </p>
-
-                            <!-- O rateado e a parte dos gastos gerais (luz das regas, frio,
-                                 adubo para a exploracao toda) que toca a esta especie. -->
-                            <p v-if="linha.custo_rateado" class="mt-2 text-xs text-slate-500">
-                                Inclui {{ formatNumber(linha.custo_rateado) }} € de gastos gerais repartidos pelos quilos.
-                            </p>
-                        </article>
-                    </div>
-
-                    <div class="mt-5 rounded-3xl bg-slate-900 p-4 text-white sm:flex sm:items-center sm:justify-between sm:gap-6">
-                        <p class="text-sm font-semibold">Total da campanha</p>
-                        <dl class="mt-3 grid grid-cols-2 gap-3 text-sm sm:mt-0 sm:flex sm:items-center sm:gap-6">
-                            <div>
-                                <dt class="text-xs uppercase tracking-[0.18em] text-slate-400">Colhido</dt>
-                                <dd class="font-black">{{ formatNumber(resumoEspecies.total.kg) }} kg</dd>
-                            </div>
-                            <div>
-                                <dt class="text-xs uppercase tracking-[0.18em] text-slate-400">Custo</dt>
-                                <dd class="font-black">{{ formatNumber(resumoEspecies.total.custo_total) }} €</dd>
-                            </div>
-                            <div>
-                                <dt class="text-xs uppercase tracking-[0.18em] text-slate-400">Vendas</dt>
-                                <dd class="font-black">{{ formatNumber(resumoEspecies.total.vendas) }} €</dd>
-                            </div>
-                            <div>
-                                <dt class="text-xs uppercase tracking-[0.18em] text-slate-400">Margem</dt>
-                                <dd class="font-black" :class="resumoEspecies.total.margem >= 0 ? 'text-emerald-300' : 'text-red-300'">
-                                    {{ formatNumber(resumoEspecies.total.margem) }} €
-                                </dd>
-                            </div>
-                        </dl>
-                    </div>
-                </section>
-
-                <section class="grid gap-5 lg:grid-cols-2">
-                    <article
-                        v-for="operacao in operacoes.data"
-                        :key="operacao.id"
-                        class="rounded-[32px] border border-white/80 bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]"
+                <section
+                    v-for="passagem in passagens"
+                    :key="passagem.chave"
+                    class="cartao overflow-hidden"
+                    :aria-label="`${passagem.titulo}, ${passagem.data.numero} ${passagem.data.mes}`"
+                >
+                    <button
+                        type="button"
+                        class="grid w-full grid-cols-[40px_minmax(0,1fr)_20px] items-start gap-3 p-4 text-left hover:bg-slate-50 sm:grid-cols-[60px_minmax(0,1fr)_auto] sm:gap-4 sm:p-5"
+                        :aria-expanded="diaAberto(passagem.chave)"
+                        @click="alternarDia(passagem.chave)"
                     >
-                        <div class="flex items-start justify-between gap-4">
-                            <div>
-                                <div class="flex flex-wrap items-center gap-3">
-                                    <h2 class="text-2xl font-black capitalize text-slate-900">{{ operacao.tipo }}</h2>
-                                    <span class="rounded-full px-3 py-1 text-xs font-semibold" :class="estadoBadgeClass(operacao.estado)">
-                                        {{ estadoLabel(operacao.estado) }}
+                        <span class="flex flex-col items-center leading-none">
+                            <span class="text-xs font-semibold uppercase text-slate-500">{{ passagem.data.semana }}</span>
+                            <span class="mt-1 text-[26px] font-bold text-slate-900">{{ passagem.data.numero }}</span>
+                            <span class="mt-1 text-xs font-semibold uppercase text-slate-500">{{ passagem.data.mes }}</span>
+                        </span>
+                        <span class="flex min-w-0 flex-col gap-2">
+                            <span class="flex flex-wrap items-center gap-x-4 gap-y-1">
+                                <span class="text-base font-semibold text-slate-900 sm:text-lg">{{ passagem.titulo }}</span>
+                                <span v-for="item in passagem.tipos" :key="item.tipo" class="inline-flex items-center gap-1.5 text-sm text-slate-700">
+                                    <span class="h-2 w-2 rounded-full" :class="corTipo(item.tipo)" aria-hidden="true" />{{ nomeTipo(item.tipo) }}
+                                </span>
+                                <span v-for="estado in passagem.estados" :key="estado" class="etiqueta" :class="estadoBadgeClass(estado)">{{ estadoLabel(estado) }}</span>
+                            </span>
+                            <span class="numero text-base font-bold text-slate-900 sm:hidden">{{ euros(passagem.custo) }}</span>
+                            <span class="text-sm text-slate-600">
+                                <template v-if="passagem.area">{{ formatNumber(passagem.area) }} ha · </template>
+                                <template v-if="passagem.horas">{{ formatNumber(passagem.horas) }} h · </template>
+                                <template v-if="passagem.meios">{{ passagem.meios }}</template>
+                                <template v-if="passagem.aplicador"> · {{ passagem.aplicador }}</template>
+                            </span>
+                            <span v-if="passagem.produtos.length" class="flex flex-wrap gap-1.5">
+                                <span v-for="produto in passagem.produtos.slice(0, 8)" :key="produto.nome" class="inline-flex items-baseline gap-1.5 whitespace-nowrap rounded-md bg-slate-100 px-2 py-1 text-[13px]">
+                                    <b class="font-semibold text-slate-900">{{ produto.nome }}</b>
+                                    <span class="numero text-slate-700">{{ formatNumber(produto.quantidade) }} {{ produto.unidade }}</span>
+                                </span>
+                                <span v-if="passagem.produtos.length > 8" class="px-1 py-1 text-[13px] text-slate-600">+{{ passagem.produtos.length - 8 }}</span>
+                            </span>
+                        </span>
+                        <span class="flex flex-col items-end gap-2">
+                            <span class="numero hidden whitespace-nowrap text-lg font-bold text-slate-900 sm:inline">{{ euros(passagem.custo) }}</span>
+                            <svg class="h-5 w-5 text-slate-500 transition" :class="diaAberto(passagem.chave) ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+                        </span>
+                    </button>
+
+                    <div v-show="diaAberto(passagem.chave)" class="border-t border-slate-200">
+                        <!-- Tabela (computador) -->
+                        <div class="hidden md:block" role="table" :aria-label="`Parcelas de ${passagem.data.numero} ${passagem.data.mes}`">
+                            <div role="row" class="grid grid-cols-[minmax(170px,1.2fr)_100px_70px_minmax(0,3fr)_60px_96px_88px] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-2.5 text-xs font-semibold text-slate-600">
+                                <span role="columnheader">Parcela</span>
+                                <span role="columnheader">Cultura</span>
+                                <span role="columnheader" class="text-right">Área</span>
+                                <span role="columnheader">Produtos · quantidade · dose</span>
+                                <span role="columnheader" class="text-right">Horas</span>
+                                <span role="columnheader" class="text-right">Custo</span>
+                                <span role="columnheader"><span class="sr-only">Ações</span></span>
+                            </div>
+                            <div
+                                v-for="linha in passagem.linhas"
+                                :key="linha.chave"
+                                role="row"
+                                class="grid grid-cols-[minmax(170px,1.2fr)_100px_70px_minmax(0,3fr)_60px_96px_88px] items-center gap-4 border-b border-slate-100 px-5 py-2.5 text-sm last:border-b-0"
+                            >
+                                <span role="cell" class="flex min-w-0 flex-col">
+                                    <span class="truncate font-semibold text-slate-900">{{ linha.nome }}</span>
+                                    <span v-if="linha.terreno && linha.terreno !== linha.nome" class="truncate text-xs text-slate-500">{{ linha.terreno }}</span>
+                                </span>
+                                <span role="cell"><span v-if="linha.especie" class="etiqueta" :class="especieClasse(linha.especie)">{{ linha.especie }}</span></span>
+                                <span role="cell" class="numero text-right">{{ linha.area ? `${formatNumber(linha.area)} ha` : '—' }}</span>
+                                <span role="cell" class="flex min-w-0 flex-wrap gap-x-4 gap-y-1">
+                                    <span v-for="produto in linha.produtos" :key="`${linha.chave}-${produto.produto_id}`" class="inline-flex items-baseline gap-1.5 whitespace-nowrap text-[13px]">
+                                        <b class="font-semibold text-slate-900">{{ produto.nome }}</b>
+                                        <span class="numero">{{ formatNumber(produto.quantidade) }} {{ produto.unidade_medida }}</span>
+                                        <span v-if="produto.dose" class="numero text-slate-500">{{ formatNumber(produto.dose) }} {{ produto.dose_unidade }}</span>
                                     </span>
-                                    <span v-if="productFieldSummary(operacao)" class="text-xs text-slate-500">
-                                        {{ productFieldSummary(operacao) }}
+                                    <span v-if="!linha.produtos.length" class="text-[13px] text-slate-500">
+                                        {{ linha.operacoes.map((operacao) => operacao.observacoes).filter(Boolean)[0] || 'Sem produtos' }}
+                                    </span>
+                                </span>
+                                <span role="cell" class="numero text-right text-slate-700">{{ linha.horas ? formatNumber(linha.horas) : '—' }}</span>
+                                <span role="cell" class="numero text-right font-semibold">{{ euros(linha.custo) }}</span>
+                                <span role="cell" class="flex justify-end gap-1">
+                                    <template v-for="operacao in linha.operacoes" :key="operacao.id">
+                                        <button
+                                            v-if="operacao.can_update"
+                                            type="button"
+                                            class="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                                            :aria-label="`Editar ${operacao.tipo} em ${linha.nome}`"
+                                            :title="`Editar ${operacao.tipo}`"
+                                            @click="openEditModal(operacao)"
+                                        >
+                                            <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="m13.5 6.5 4 4" /></svg>
+                                        </button>
+                                        <button
+                                            v-if="operacao.can_delete"
+                                            type="button"
+                                            class="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-red-50 hover:text-red-700"
+                                            :aria-label="`Remover ${operacao.tipo} em ${linha.nome}`"
+                                            :title="`Remover ${operacao.tipo}`"
+                                            @click="deleteOperacao(operacao)"
+                                        >
+                                            <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>
+                                        </button>
+                                    </template>
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Lista (telemóvel) -->
+                        <ul class="divide-y divide-slate-100 md:hidden">
+                            <li v-for="linha in passagem.linhas" :key="`m-${linha.chave}`" class="flex flex-col gap-2 px-4 py-3">
+                                <div class="flex items-start justify-between gap-3">
+                                    <span class="flex min-w-0 flex-col">
+                                        <span class="font-semibold text-slate-900">{{ linha.nome }}</span>
+                                        <span class="text-xs text-slate-600">
+                                            <template v-if="linha.especie">{{ linha.especie }} · </template>
+                                            <template v-if="linha.area">{{ formatNumber(linha.area) }} ha</template>
+                                        </span>
+                                    </span>
+                                    <span class="numero whitespace-nowrap text-sm font-semibold">{{ euros(linha.custo) }}</span>
+                                </div>
+                                <div v-if="linha.produtos.length" class="flex flex-wrap gap-x-3 gap-y-1">
+                                    <span v-for="produto in linha.produtos" :key="`mp-${linha.chave}-${produto.produto_id}`" class="text-[13px]">
+                                        <b class="font-semibold">{{ produto.nome }}</b>
+                                        <span class="numero text-slate-700"> {{ formatNumber(produto.quantidade) }} {{ produto.unidade_medida }}</span>
                                     </span>
                                 </div>
-                                <p class="mt-2 text-sm text-slate-500">
-                                    {{ operacao.terreno_nome || 'Sem terreno' }} · {{ operacao.parcela_nome || 'Sem parcela' }}
-                                </p>
-                            </div>
-                            <p class="text-right text-sm font-medium text-slate-500">
-                                {{ operacao.updated_at || 'Sem atualização' }}
-                            </p>
-                        </div>
-
-                        <div class="mt-6 grid gap-4 sm:grid-cols-2">
-                            <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Início</p>
-                                <p class="mt-2 text-sm text-slate-700">{{ operacao.data_hora_inicio?.replace('T', ' ') || 'Sem data' }}</p>
-                            </div>
-                            <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Fim</p>
-                                <p class="mt-2 text-sm text-slate-700">{{ operacao.data_hora_fim?.replace('T', ' ') || 'Por definir' }}</p>
-                            </div>
-                            <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Responsável</p>
-                                <p class="mt-2 text-sm text-slate-700">{{ operacao.operador_nome || 'Sem operador' }}</p>
-                            </div>
-                            <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Equipa</p>
-                                <p class="mt-2 text-sm text-slate-700">{{ operacao.equipa_nome || 'Sem equipa' }}</p>
-                            </div>
-                            <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Máquina</p>
-                                <p class="mt-2 text-sm text-slate-700">{{ operacao.maquina_nome || 'Sem máquina' }}</p>
-                            </div>
-                            <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Duração</p>
-                                <p class="mt-2 text-sm text-slate-700">{{ operacao.duracao_horas ? `${formatNumber(operacao.duracao_horas)} h` : 'Sem duração' }}</p>
-                            </div>
-                            <div v-if="operacao.tipo === 'colheita'" class="rounded-3xl bg-emerald-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-emerald-700">Kg apanhados</p>
-                                <p class="mt-2 text-sm font-semibold text-slate-800">{{ formatNumber(operacao.colheita_quantidade_total) }} kg</p>
-                                <p v-if="operacao.colheita_quantidade_perdas" class="mt-1 text-xs text-slate-500">Perdas: {{ formatNumber(operacao.colheita_quantidade_perdas) }} kg</p>
-                            </div>
-                            <div class="rounded-3xl bg-amber-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-amber-600">Combustível</p>
-                                <p class="mt-2 text-sm text-slate-700">{{ operacao.combustivel_gasto_l ? `${formatNumber(operacao.combustivel_gasto_l)} L` : 'Sem cálculo' }}</p>
-                                <p v-if="operacao.distancia_km" class="mt-1 text-xs text-slate-500">{{ formatNumber(operacao.distancia_km) }} km</p>
-                            </div>
-                        </div>
-
-                        <div v-if="operacao.produtos?.length" class="mt-5 rounded-3xl border border-emerald-100 bg-emerald-50/70 p-4">
-                            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-emerald-700">Produtos aplicados</p>
-                            <div class="mt-3 space-y-2">
-                                <div v-for="produto in operacao.produtos" :key="produto.produto_id" class="flex flex-col gap-1 rounded-2xl bg-white/80 p-3 text-sm text-slate-700 sm:flex-row sm:items-center sm:justify-between">
-                                    <span class="font-semibold">{{ produto.nome }}</span>
-                                    <span>
-                                        {{ formatNumber(produto.quantidade) }} {{ produto.unidade_medida }}
-                                        <span v-if="produto.custo_total"> · {{ formatNumber(produto.custo_total) }} €</span>
-                                    </span>
+                                <div class="flex gap-2">
+                                    <template v-for="operacao in linha.operacoes" :key="`mo-${operacao.id}`">
+                                        <button v-if="operacao.can_update" type="button" class="min-h-[40px] rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-800" @click="openEditModal(operacao)">
+                                            Editar<span v-if="linha.operacoes.length > 1"> {{ operacao.tipo }}</span>
+                                        </button>
+                                    </template>
                                 </div>
-                            </div>
-                        </div>
+                            </li>
+                        </ul>
 
-                        <div class="mt-5 rounded-3xl bg-amber-50/50 p-4">
-                            <p class="text-sm leading-7 text-slate-600">
-                                {{ operacao.observacoes || 'Sem observações para esta operação.' }}
-                            </p>
+                        <div class="flex flex-col gap-1 border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                            <span class="font-semibold">Total do dia: <span class="numero">{{ euros(passagem.custo) }}</span></span>
+                            <span v-if="passagem.maiorIS" class="text-slate-600">
+                                Intervalo de segurança mais longo: {{ passagem.maiorIS.produto }}, {{ passagem.maiorIS.dias }} dias
+                            </span>
                         </div>
-
-                        <div class="mt-6 flex flex-wrap gap-3">
-                            <Link
-                                :href="route('app.parcelas.index', { search: operacao.parcela_nome || undefined })"
-                                class="inline-flex items-center rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                            >
-                                Ver parcela
-                            </Link>
-                            <PrimaryButton
-                                v-if="operacao.can_update"
-                                class="rounded-full bg-slate-900 px-4 py-2 text-sm normal-case tracking-normal hover:bg-slate-800 focus:bg-slate-800"
-                                @click="openEditModal(operacao)"
-                            >
-                                Editar
-                            </PrimaryButton>
-                            <DangerButton
-                                v-if="operacao.can_delete"
-                                class="rounded-full px-4 py-2 text-sm normal-case tracking-normal"
-                                @click="deleteOperacao(operacao)"
-                            >
-                                Remover
-                            </DangerButton>
-                        </div>
-                    </article>
+                    </div>
                 </section>
 
-                <section v-if="!operacoes.data.length" class="rounded-[32px] border border-dashed border-slate-300 bg-white/70 px-6 py-12 text-center text-sm leading-7 text-slate-600">
-                    Nenhuma operação encontrada com os filtros atuais.
+                <section v-if="!passagens.length" class="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-600">
+                    Nenhuma operação encontrada com estes filtros.
                 </section>
 
-                <Pagination v-if="operacoes.links?.length > 3" :links="operacoes.links" />
+                <div v-if="operacoes.links?.length > 3" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <span class="text-sm text-slate-600">
+                        Dias {{ operacoes.from }}–{{ operacoes.to }} de {{ operacoes.total }}
+                    </span>
+                    <Pagination :links="operacoes.links" />
+                </div>
             </div>
         </div>
 
         <Modal :show="createModalOpen" max-width="2xl" @close="closeCreateModal">
             <div class="p-6 sm:p-8">
-                <h2 class="text-2xl font-black text-slate-900">Nova operação</h2>
+                <h2 class="text-2xl font-bold text-slate-900">Nova operação</h2>
                 <p class="mt-2 text-sm text-slate-500">Regista uma atividade agrícola com recursos, produtos e custos associados.</p>
 
                 <div class="mt-6 space-y-5">
-                    <div v-if="createErrorMessages.length" class="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    <div v-if="createErrorMessages.length" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                         <p class="font-semibold">Não foi possível guardar a operação. Revê estes pontos:</p>
                         <ul class="mt-2 list-disc space-y-1 pl-5">
                             <li v-for="message in createErrorMessages" :key="message">{{ message }}</li>
@@ -809,11 +914,11 @@ const formatNumber = (value) => {
 
         <Modal :show="!!editingOperacao" max-width="2xl" @close="closeEditModal">
             <div class="p-6 sm:p-8">
-                <h2 class="text-2xl font-black text-slate-900">Editar operação</h2>
+                <h2 class="text-2xl font-bold text-slate-900">Editar operação</h2>
                 <p class="mt-2 text-sm text-slate-500">Atualiza os dados operacionais desta atividade.</p>
 
                 <div class="mt-6 space-y-5">
-                    <div v-if="editErrorMessages.length" class="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    <div v-if="editErrorMessages.length" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                         <p class="font-semibold">Não foi possível atualizar a operação. Revê estes pontos:</p>
                         <ul class="mt-2 list-disc space-y-1 pl-5">
                             <li v-for="message in editErrorMessages" :key="message">{{ message }}</li>
@@ -839,7 +944,7 @@ const formatNumber = (value) => {
                         :colheitas-count="editingOperacao?.colheitas_count ?? 0"
                         :image-path="editingOperacao?.image_path"
                         submit-label="Atualizar operação"
-                        submit-button-class="bg-slate-900 hover:bg-slate-800 focus:bg-slate-800"
+                        submit-button-class="bg-slate-900 hover:bg-slate-800 focus:bg-slate-800 text-white font-semibold inline-flex items-center"
                         @submit="submitEdit"
                         @cancel="closeEditModal"
                         @open-product-modal="openProductModal"
@@ -851,10 +956,10 @@ const formatNumber = (value) => {
 
         <Modal :show="exploracaoModalOpen" max-width="lg" @close="closeExploracaoModal">
             <div class="p-6 sm:p-8">
-                <h2 class="text-2xl font-black text-slate-900">Dados da exploração</h2>
+                <h2 class="text-2xl font-bold text-slate-900">Dados da exploração</h2>
 
                 <form class="mt-6 grid gap-4" @submit.prevent="submitExploracao">
-                    <div v-if="exploracaoErrorMessages.length" class="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    <div v-if="exploracaoErrorMessages.length" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                         <ul class="list-disc space-y-1 pl-5">
                             <li v-for="message in exploracaoErrorMessages" :key="message">{{ message }}</li>
                         </ul>
@@ -862,22 +967,22 @@ const formatNumber = (value) => {
 
                     <div>
                         <InputLabel value="Produtor / dono da exploração" />
-                        <TextInput v-model="exploracaoForm.produtor_nome" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="exploracaoForm.produtor_nome" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="exploracaoForm.errors.produtor_nome" />
                     </div>
                     <div>
                         <InputLabel value="Concelho" />
-                        <TextInput v-model="exploracaoForm.concelho" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="exploracaoForm.concelho" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="exploracaoForm.errors.concelho" />
                     </div>
                     <div>
                         <InputLabel value="Freguesia" />
-                        <TextInput v-model="exploracaoForm.freguesia" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="exploracaoForm.freguesia" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="exploracaoForm.errors.freguesia" />
                     </div>
                     <div class="flex justify-end gap-3">
-                        <SecondaryButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="closeExploracaoModal">Cancelar</SecondaryButton>
-                        <PrimaryButton class="rounded-full bg-emerald-700 px-4 py-2 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600" :disabled="exploracaoForm.processing">
+                        <SecondaryButton type="button" class="rounded-lg px-4 py-2 text-sm " @click="closeExploracaoModal">Cancelar</SecondaryButton>
+                        <PrimaryButton class="rounded-lg bg-emerald-700 px-4 py-2 text-sm hover:bg-verde-800 focus:bg-verde-800 text-white font-semibold inline-flex items-center" :disabled="exploracaoForm.processing">
                             Guardar
                         </PrimaryButton>
                     </div>
@@ -887,11 +992,11 @@ const formatNumber = (value) => {
 
         <Modal :show="productModalOpen" max-width="2xl" @close="closeProductModal">
             <div class="p-6 sm:p-8">
-                <h2 class="text-2xl font-black text-slate-900">Novo produto</h2>
+                <h2 class="text-2xl font-bold text-slate-900">Novo produto</h2>
                 <p class="mt-2 text-sm text-slate-500">Cria produtos para usar nas operações, como fitofármacos, fertilizantes e sementes.</p>
 
                 <form class="mt-6 grid gap-4 sm:grid-cols-2" @submit.prevent="submitProduct">
-                    <div v-if="productErrorMessages.length" class="sm:col-span-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    <div v-if="productErrorMessages.length" class="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                         <p class="font-semibold">Não foi possível guardar o produto. Revê estes pontos:</p>
                         <ul class="mt-2 list-disc space-y-1 pl-5">
                             <li v-for="message in productErrorMessages" :key="message">{{ message }}</li>
@@ -900,13 +1005,13 @@ const formatNumber = (value) => {
 
                     <div>
                         <InputLabel value="Nome" />
-                        <TextInput v-model="productForm.nome" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="productForm.nome" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="productForm.errors.nome" />
                     </div>
 
                     <div>
                         <InputLabel value="Tipo" />
-                        <select v-model="productForm.tipo" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                        <select v-model="productForm.tipo" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500">
                             <option value="fitofarmaco">Fitofármaco</option>
                             <option value="fertilizante">Fertilizante</option>
                             <option value="semente">Semente</option>
@@ -919,51 +1024,51 @@ const formatNumber = (value) => {
 
                     <div>
                         <InputLabel value="Unidade" />
-                        <TextInput v-model="productForm.unidade_medida" class="mt-2 block w-full rounded-2xl" placeholder="kg, L, un" />
+                        <TextInput v-model="productForm.unidade_medida" class="mt-2 block w-full rounded-lg" placeholder="kg, L, un" />
                         <InputError class="mt-2" :message="productForm.errors.unidade_medida" />
                     </div>
 
                     <div>
                         <InputLabel value="Custo unitário" />
-                        <TextInput v-model="productForm.custo_unitario" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="productForm.custo_unitario" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="productForm.errors.custo_unitario" />
                     </div>
 
                     <div class="sm:col-span-2">
                         <InputLabel value="Código interno" />
-                        <TextInput v-model="productForm.codigo_interno" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="productForm.codigo_interno" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="productForm.errors.codigo_interno" />
                     </div>
 
                     <div class="sm:col-span-2">
                         <InputLabel value="N.º AV/APV/ACP/AE" />
-                        <TextInput v-model="productForm.numero_autorizacao_dgav" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="productForm.numero_autorizacao_dgav" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="productForm.errors.numero_autorizacao_dgav" />
                     </div>
 
                     <div v-if="productForm.tipo === 'fitofarmaco'" class="sm:col-span-2">
                         <InputLabel value="Estabelecimento de venda" />
-                        <TextInput v-model="productForm.estabelecimento_venda_nome" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="productForm.estabelecimento_venda_nome" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="productForm.errors.estabelecimento_venda_nome" />
                     </div>
 
                     <div v-if="productForm.tipo === 'fitofarmaco'" class="sm:col-span-2">
                         <InputLabel value="N.º autorização do estabelecimento" />
-                        <TextInput v-model="productForm.estabelecimento_venda_autorizacao" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="productForm.estabelecimento_venda_autorizacao" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="productForm.errors.estabelecimento_venda_autorizacao" />
                     </div>
 
                     <div class="sm:col-span-2">
                         <InputLabel value="Descrição" />
-                        <textarea v-model="productForm.descricao" rows="3" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500" />
+                        <textarea v-model="productForm.descricao" rows="3" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500" />
                         <InputError class="mt-2" :message="productForm.errors.descricao" />
                     </div>
 
                     <div class="sm:col-span-2 flex justify-end gap-3">
-                        <SecondaryButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="closeProductModal">
+                        <SecondaryButton type="button" class="rounded-lg px-4 py-2 text-sm " @click="closeProductModal">
                             Cancelar
                         </SecondaryButton>
-                        <PrimaryButton class="rounded-full bg-emerald-700 px-4 py-2 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600" :disabled="productForm.processing">
+                        <PrimaryButton class="rounded-lg bg-emerald-700 px-4 py-2 text-sm hover:bg-verde-800 focus:bg-verde-800 text-white font-semibold inline-flex items-center" :disabled="productForm.processing">
                             Guardar produto
                         </PrimaryButton>
                     </div>

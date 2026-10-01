@@ -44,10 +44,10 @@ class OperacaoManagementController extends Controller
         $filters = $request->only(['search', 'estado', 'parcela_id', 'cultura_id', 'tipo']);
         $user = $request->user();
 
-        $operacoes = Operacao::query()
+        $base = Operacao::query()
             ->with([
                 'parcela.terreno:id,nome',
-                'cultura:id,nome,variedade',
+                'cultura:id,nome,variedade,tipo',
                 'campanha:id,cultura_id,ano,data_inicio,data_fim,status',
                 'colheitas:id,operacao_id,quantidade_total,quantidade_perdas,qualidade',
                 'maquina:id,nome,tipo,consumo_combustivel',
@@ -85,11 +85,145 @@ class OperacaoManagementController extends Controller
                     }
                 });
             })
-            ->when($filters['tipo'] ?? null, fn ($query, $tipo) => $query->where('tipo', $tipo))
-            ->orderByDesc('data_hora_inicio')
-            ->paginate(9)
-            ->withQueryString()
-            ->through(fn (Operacao $operacao) => [
+            ->when($filters['tipo'] ?? null, fn ($query, $tipo) => $query->where('tipo', $tipo));
+
+        // O caderno mostra-se por dia de trabalho (uma passagem do pulverizador
+        // sao 24 operacoes, uma por parcela). Pagina-se pelos dias, nao pelas
+        // operacoes, para uma passagem nunca ficar partida entre duas paginas.
+        $dias = (clone $base)
+            ->reorder()
+            ->setEagerLoads([])
+            ->selectRaw('DATE(data_hora_inicio) as dia')
+            ->groupBy('dia')
+            ->orderByDesc('dia')
+            ->paginate(6)
+            ->withQueryString();
+
+        $diasDaPagina = collect($dias->items())->pluck('dia');
+
+        $linhas = $diasDaPagina->isEmpty()
+            ? collect()
+            : (clone $base)
+                ->where(function ($query) use ($diasDaPagina) {
+                    $comData = $diasDaPagina->filter()->values();
+                    if ($comData->isNotEmpty()) {
+                        $query->whereIn(DB::raw('DATE(data_hora_inicio)'), $comData->all());
+                    }
+                    if ($diasDaPagina->contains(null)) {
+                        $query->orWhereNull('data_hora_inicio');
+                    }
+                })
+                ->orderByDesc('data_hora_inicio')
+                ->orderBy('parcela_id')
+                ->get()
+                ->map(fn (Operacao $operacao) => $this->linhaOperacao($operacao, $user));
+
+        $operacoes = [
+            ...$dias->toArray(),
+            'data' => $linhas->values()->all(),
+        ];
+
+        return Inertia::render('Operacoes/Index', [
+            'operacoes' => $operacoes,
+            'filters' => $filters,
+            'contagemTipos' => Operacao::query()
+                ->selectRaw('tipo, count(*) as total')
+                ->groupBy('tipo')
+                ->pluck('total', 'tipo'),
+            'summary' => [
+                'total' => Operacao::query()->count(),
+                'planeadas' => Operacao::query()->where('estado', 'planejada')->count(),
+                'em_curso' => Operacao::query()->where('estado', 'em_curso')->count(),
+                'concluidas' => Operacao::query()->where('estado', 'concluida')->count(),
+            ],
+            'can' => [
+                'create' => $user->can('create', Operacao::class),
+            ],
+            'estadoOptions' => ['planejada', 'em_curso', 'concluida', 'cancelada'],
+            'tipoOptions' => $this->tipoOptions(),
+            'parcelas' => Parcela::query()
+                ->with('terreno:id,nome')
+                ->orderBy('nome')
+                ->get(['id', 'terreno_id', 'nome', 'area_total', 'area_util'])
+                ->map(fn (Parcela $parcela) => [
+                    'id' => $parcela->id,
+                    'nome' => $parcela->nome,
+                    'terreno_nome' => $parcela->terreno?->nome,
+                    'area_total' => $parcela->area_total,
+                    'area_util' => $parcela->area_util,
+                ]),
+            'culturas' => Cultura::query()
+                ->orderBy('nome')
+                ->get(['id', 'parcela_id', 'nome', 'variedade', 'estado'])
+                ->map(fn (Cultura $cultura) => [
+                    'id' => $cultura->id,
+                    'parcela_id' => $cultura->parcela_id,
+                    'nome' => $cultura->nome,
+                    'variedade' => $cultura->variedade,
+                    'estado' => $cultura->estado,
+                    'label' => $this->culturaLabel($cultura),
+                ]),
+            'maquinas' => Maquina::query()
+                ->orderBy('nome')
+                ->get(['id', 'nome', 'tipo', 'consumo_combustivel', 'custo_hora', 'custo_km']),
+            'alfaias' => Alfaia::query()
+                ->orderBy('nome')
+                ->get(['id', 'nome', 'custo_hora']),
+            'operadores' => User::query()
+                ->orderBy('name')
+                ->get(['id', 'name']),
+            'funcionarios' => Funcionario::query()
+                ->where('status', 'ativo')
+                ->orderBy('nome')
+                ->get(['id', 'nome', 'cargo', 'aplicador_numero_autorizacao'])
+                ->map(fn (Funcionario $funcionario) => [
+                    'id' => $funcionario->id,
+                    'nome' => $funcionario->nome,
+                    'cargo' => $funcionario->cargo,
+                    'aplicador_numero_autorizacao' => $funcionario->aplicador_numero_autorizacao,
+                ]),
+            'produtos' => Produto::query()
+                ->orderBy('nome')
+                ->get(['id', 'nome', 'tipo', 'unidade_medida', 'custo_unitario', 'numero_autorizacao_dgav', 'estabelecimento_venda_nome', 'estabelecimento_venda_autorizacao'])
+                ->map(fn (Produto $produto) => [
+                    'id' => $produto->id,
+                    'nome' => $produto->nome,
+                    'tipo' => $produto->tipo,
+                    'unidade_medida' => $produto->unidade_medida,
+                    'custo_unitario' => $produto->custo_unitario,
+                    'numero_autorizacao_dgav' => $produto->numero_autorizacao_dgav,
+                    'estabelecimento_venda_nome' => $produto->estabelecimento_venda_nome,
+                    'estabelecimento_venda_autorizacao' => $produto->estabelecimento_venda_autorizacao,
+                ]),
+            'equipas' => Equipa::query()
+                ->where('status', 'ativa')
+                ->orderBy('nome')
+                ->get(['id', 'nome']),
+            'campanhas' => Campanha::query()
+                ->with('cultura:id,nome,variedade')
+                ->orderByDesc('ano')
+                ->get(['id', 'nome', 'cultura_id', 'ano', 'data_inicio', 'data_fim', 'status'])
+                ->map(fn (Campanha $campanha) => [
+                    'id' => $campanha->id,
+                    'cultura_id' => $campanha->cultura_id,
+                    'nome' => $campanha->nome_completo,
+                    'ano' => $campanha->ano,
+                    'status' => $campanha->status,
+                ]),
+            'cadernoCampo' => $this->cadernoCampoResumoNormalizado(),
+            // Com uma campanha por epoca, o resumo util ja nao e por campanha:
+            // e por especie dentro dela (pereira, macieira, culturas anuais).
+            'resumoEspecies' => $this->resumoPorEspecie(),
+            'exploracaoDados' => $this->exploracaoDados(),
+        ]);
+    }
+
+    private function linhaOperacao(Operacao $operacao, $user): array
+    {
+        return [
+                'dia' => optional($operacao->data_hora_inicio)?->format('Y-m-d'),
+                'parcela_area' => $operacao->parcela?->area_util ?: $operacao->parcela?->area_total,
+                'especie' => $operacao->cultura?->tipo,
                 'id' => $operacao->id,
                 'parcela_id' => $operacao->parcela_id,
                 'cultura_id' => $operacao->cultura_id,
@@ -183,97 +317,7 @@ class OperacaoManagementController extends Controller
                 'can_update' => $user->can('update', $operacao),
                 'can_delete' => $user->can('delete', $operacao),
                 'updated_at' => optional($operacao->updated_at)?->format('d/m/Y H:i'),
-            ]);
-
-        return Inertia::render('Operacoes/Index', [
-            'operacoes' => $operacoes,
-            'filters' => $filters,
-            'summary' => [
-                'total' => Operacao::query()->count(),
-                'planeadas' => Operacao::query()->where('estado', 'planejada')->count(),
-                'em_curso' => Operacao::query()->where('estado', 'em_curso')->count(),
-                'concluidas' => Operacao::query()->where('estado', 'concluida')->count(),
-            ],
-            'can' => [
-                'create' => $user->can('create', Operacao::class),
-            ],
-            'estadoOptions' => ['planejada', 'em_curso', 'concluida', 'cancelada'],
-            'tipoOptions' => $this->tipoOptions(),
-            'parcelas' => Parcela::query()
-                ->with('terreno:id,nome')
-                ->orderBy('nome')
-                ->get(['id', 'terreno_id', 'nome', 'area_total', 'area_util'])
-                ->map(fn (Parcela $parcela) => [
-                    'id' => $parcela->id,
-                    'nome' => $parcela->nome,
-                    'terreno_nome' => $parcela->terreno?->nome,
-                    'area_total' => $parcela->area_total,
-                    'area_util' => $parcela->area_util,
-                ]),
-            'culturas' => Cultura::query()
-                ->orderBy('nome')
-                ->get(['id', 'parcela_id', 'nome', 'variedade', 'estado'])
-                ->map(fn (Cultura $cultura) => [
-                    'id' => $cultura->id,
-                    'parcela_id' => $cultura->parcela_id,
-                    'nome' => $cultura->nome,
-                    'variedade' => $cultura->variedade,
-                    'estado' => $cultura->estado,
-                    'label' => $this->culturaLabel($cultura),
-                ]),
-            'maquinas' => Maquina::query()
-                ->orderBy('nome')
-                ->get(['id', 'nome', 'tipo', 'consumo_combustivel', 'custo_hora', 'custo_km']),
-            'alfaias' => Alfaia::query()
-                ->orderBy('nome')
-                ->get(['id', 'nome', 'custo_hora']),
-            'operadores' => User::query()
-                ->orderBy('name')
-                ->get(['id', 'name']),
-            'funcionarios' => Funcionario::query()
-                ->where('status', 'ativo')
-                ->orderBy('nome')
-                ->get(['id', 'nome', 'cargo', 'aplicador_numero_autorizacao'])
-                ->map(fn (Funcionario $funcionario) => [
-                    'id' => $funcionario->id,
-                    'nome' => $funcionario->nome,
-                    'cargo' => $funcionario->cargo,
-                    'aplicador_numero_autorizacao' => $funcionario->aplicador_numero_autorizacao,
-                ]),
-            'produtos' => Produto::query()
-                ->orderBy('nome')
-                ->get(['id', 'nome', 'tipo', 'unidade_medida', 'custo_unitario', 'numero_autorizacao_dgav', 'estabelecimento_venda_nome', 'estabelecimento_venda_autorizacao'])
-                ->map(fn (Produto $produto) => [
-                    'id' => $produto->id,
-                    'nome' => $produto->nome,
-                    'tipo' => $produto->tipo,
-                    'unidade_medida' => $produto->unidade_medida,
-                    'custo_unitario' => $produto->custo_unitario,
-                    'numero_autorizacao_dgav' => $produto->numero_autorizacao_dgav,
-                    'estabelecimento_venda_nome' => $produto->estabelecimento_venda_nome,
-                    'estabelecimento_venda_autorizacao' => $produto->estabelecimento_venda_autorizacao,
-                ]),
-            'equipas' => Equipa::query()
-                ->where('status', 'ativa')
-                ->orderBy('nome')
-                ->get(['id', 'nome']),
-            'campanhas' => Campanha::query()
-                ->with('cultura:id,nome,variedade')
-                ->orderByDesc('ano')
-                ->get(['id', 'nome', 'cultura_id', 'ano', 'data_inicio', 'data_fim', 'status'])
-                ->map(fn (Campanha $campanha) => [
-                    'id' => $campanha->id,
-                    'cultura_id' => $campanha->cultura_id,
-                    'nome' => $campanha->nome_completo,
-                    'ano' => $campanha->ano,
-                    'status' => $campanha->status,
-                ]),
-            'cadernoCampo' => $this->cadernoCampoResumoNormalizado(),
-            // Com uma campanha por epoca, o resumo util ja nao e por campanha:
-            // e por especie dentro dela (pereira, macieira, culturas anuais).
-            'resumoEspecies' => $this->resumoPorEspecie(),
-            'exploracaoDados' => $this->exploracaoDados(),
-        ]);
+        ];
     }
 
     public function store(StoreOperacaoRequest $request): RedirectResponse

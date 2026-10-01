@@ -3,7 +3,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import Pagination from '@/Components/Pagination.vue';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import { comprimirImagem, emMb } from '@/composables/useCompressaoImagem';
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useQRScanner } from '@/composables/useQRScanner.js';
 
 const { scanAndParseAT } = useQRScanner();
@@ -176,6 +176,13 @@ function abrirCriar() {
     ficheiroComprimido.value = null;
     showModal.value = true;
 }
+
+// Atalho do painel "Hoje": /despesas?nova=1 abre logo o registo da fatura
+onMounted(() => {
+    if (new URLSearchParams(window.location.search).get('nova') === '1') {
+        abrirCriar();
+    }
+});
 
 function abrirEditar(despesa) {
     editingDespesa.value = despesa;
@@ -565,8 +572,8 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
         <template #header>
             <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700">Despesas e faturas</p>
-                    <h1 class="mt-2 text-3xl font-black text-slate-900">Controlo de despesas e documentos</h1>
+                    <p class="text-sm font-semibold text-verde-700">Despesas e faturas</p>
+                    <h1 class="mt-1 text-[28px] font-bold leading-tight text-slate-900">Controlo de despesas e documentos</h1>
                     <p class="mt-2 max-w-2xl text-sm text-slate-600">
                         {{ activeCampaign ? `Campanha: ${activeCampaign.nome}.` : 'Sem campanha ativa.' }}
                         Registe faturas, vendas e acompanhe o saldo do mês.
@@ -574,17 +581,17 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <a :href="exportPdfUrl" target="_blank"
-                       class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700">
+                       class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                         PDF
                     </a>
                     <a :href="exportCsvUrl"
-                       class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700">
+                       class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                         CSV
                     </a>
                     <button v-if="can.create" @click="abrirCriar"
-                            class="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-600">
+                            class="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-600">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                         Nova fatura
                     </button>
@@ -599,39 +606,39 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                 <button @click="mudarMes(-1)" class="rounded-full p-2 text-slate-500 transition hover:bg-slate-100">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                 </button>
-                <h2 class="text-lg font-bold capitalize text-slate-900">{{ nomeMesAtual }}</h2>
+                <h2 class="text-lg font-bold text-slate-900">{{ nomeMesAtual.charAt(0).toUpperCase() + nomeMesAtual.slice(1) }}</h2>
                 <button @click="mudarMes(1)" class="rounded-full p-2 text-slate-500 transition hover:bg-slate-100">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                 </button>
             </div>
             <!-- resumo do mês -->
             <div class="mb-6 grid gap-3 sm:grid-cols-3">
-                <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-emerald-700">Vendas do mês</p>
-                    <p class="mt-1 text-2xl font-black text-emerald-900">{{ fmt(totalVendas) }}</p>
+                <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-5">
+                    <p class="text-sm font-semibold text-verde-700">Vendas do mês</p>
+                    <p class="mt-1 text-2xl font-bold text-emerald-900">{{ fmt(totalVendas) }}</p>
                     <p class="mt-1 text-xs text-emerald-700">
                         {{ resumoVendas.count ?? 0 }} venda(s)
                         <span v-if="quilosVendidos > 0"> · {{ quilosVendidos }} kg · {{ fmt(precoMedioVenda) }}/kg</span>
                     </p>
                 </div>
-                <div class="rounded-2xl border border-red-100 bg-red-50 p-5">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-red-700">Despesas do mês</p>
-                    <p class="mt-1 text-2xl font-black text-red-900">{{ fmt(totalDespesas) }}</p>
+                <div class="rounded-lg border border-red-100 bg-red-50 p-5">
+                    <p class="text-xs font-semibold text-red-700">Despesas do mês</p>
+                    <p class="mt-1 text-2xl font-bold text-red-900">{{ fmt(totalDespesas) }}</p>
                     <p class="mt-1 text-xs text-red-700">{{ resumoMes.count ?? 0 }} fatura(s)</p>
                     <p v-if="variacaoLabel" class="mt-1 text-xs font-medium" :class="variacaoLabel.cls">
                         {{ variacaoLabel.label }} vs mês anterior
                     </p>
                 </div>
-                <div class="rounded-2xl border p-5" :class="saldoMes >= 0 ? 'border-sky-200 bg-sky-50' : 'border-amber-200 bg-amber-50'">
-                    <p class="text-xs font-semibold uppercase tracking-wider" :class="saldoMes >= 0 ? 'text-sky-700' : 'text-amber-700'">Saldo da campanha</p>
-                    <p class="mt-1 text-2xl font-black" :class="saldoMes >= 0 ? 'text-sky-900' : 'text-amber-900'">{{ fmt(saldoMes) }}</p>
+                <div class="rounded-lg border p-5" :class="saldoMes >= 0 ? 'border-sky-200 bg-sky-50' : 'border-amber-200 bg-amber-50'">
+                    <p class="text-xs font-semibold" :class="saldoMes >= 0 ? 'text-sky-700' : 'text-amber-700'">Saldo da campanha</p>
+                    <p class="mt-1 text-2xl font-bold" :class="saldoMes >= 0 ? 'text-sky-900' : 'text-amber-900'">{{ fmt(saldoMes) }}</p>
                     <p class="mt-1 text-xs" :class="saldoMes >= 0 ? 'text-sky-700' : 'text-amber-700'">{{ activeCampaign?.nome ?? 'Campanha não definida' }}</p>
                 </div>
             </div>
 
             <div v-if="Object.keys(resumoMes.por_categoria ?? {}).length" class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <template v-for="(val, cat) in resumoMes.por_categoria" :key="cat">
-                    <div v-if="val > 0" class="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div v-if="val > 0" class="rounded-lg border border-slate-200 bg-white p-4">
                         <p class="text-xs text-slate-500">{{ categoriaIcone(cat) }} {{ categoriaLabel(cat) }}</p>
                         <p class="mt-1 text-lg font-bold text-slate-900">{{ fmt(val) }}</p>
                         <p class="text-xs text-slate-400">
@@ -644,55 +651,55 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
             <!-- filtros -->
             <div class="mb-4 flex flex-wrap gap-3">
                 <input v-model="searchQuery" type="text" placeholder="Pesquisar título, fornecedor, produto..."
-                       class="h-10 rounded-full border border-slate-200 bg-white px-4 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
+                       class="h-10 rounded-lg border border-slate-200 bg-white px-4 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
                 <select v-model="categoriaFiltro"
-                        class="h-10 rounded-full border border-slate-200 bg-white px-4 text-sm outline-none focus:border-emerald-400">
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-4 text-sm outline-none focus:border-emerald-400">
                     <option value="">Todas as categorias</option>
                     <option v-for="cat in categorias" :key="cat" :value="cat">{{ categoriaLabel(cat) }}</option>
                 </select>
             </div>
 
             <div class="mb-6 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-                <form v-if="can.create" @submit.prevent="submeterVenda" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <form v-if="can.create" id="registar-venda" @submit.prevent="submeterVenda" class="scroll-mt-20 rounded-lg border border-slate-200 bg-white p-5">
                     <div class="mb-4 flex items-center justify-between gap-3">
                         <div>
-                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Vendas</p>
+                            <p class="text-xs font-semibold text-slate-500">Vendas</p>
                             <h3 class="mt-1 text-base font-bold text-slate-900">Registar entrada</h3>
                         </div>
-                        <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                        <span class="rounded-md bg-emerald-50 px-3 py-1 text-sm font-semibold text-verde-700">
                             {{ activeCampaign?.nome ?? 'Sem campanha' }}
                         </span>
                     </div>
 
                     <div class="grid gap-3 sm:grid-cols-2">
                         <div class="sm:col-span-2">
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Descrição *</label>
+                            <label class="mb-1 block text-xs font-semibold text-slate-500">Descrição *</label>
                             <input v-model="vendaForm.descricao" type="text" required
                                    class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                                    placeholder="Ex: Venda tomate mercado" />
                             <p v-if="vendaForm.errors.descricao" class="mt-1 text-xs text-red-600">{{ vendaForm.errors.descricao }}</p>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Tipo *</label>
+                            <label class="mb-1 block text-xs font-semibold text-slate-500">Tipo *</label>
                             <select v-model="vendaForm.tipo" required
                                     class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400">
                                 <option v-for="tipo in tiposVenda" :key="tipo" :value="tipo">{{ vendaTipoLabel(tipo) }}</option>
                             </select>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Quantidade (kg)</label>
+                            <label class="mb-1 block text-xs font-semibold text-slate-500">Quantidade (kg)</label>
                             <input v-model="vendaForm.quantidade" type="number" min="0" step="0.001" placeholder="Ex: 1250"
                                    class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
                             <p v-if="vendaForm.errors.quantidade" class="mt-1 text-xs text-red-600">{{ vendaForm.errors.quantidade }}</p>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Preço €/kg</label>
+                            <label class="mb-1 block text-xs font-semibold text-slate-500">Preço €/kg</label>
                             <input v-model="vendaForm.preco_unitario" type="number" min="0" step="0.0001" placeholder="Ex: 0,42"
                                    class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
                             <p v-if="vendaForm.errors.preco_unitario" class="mt-1 text-xs text-red-600">{{ vendaForm.errors.preco_unitario }}</p>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Valor *</label>
+                            <label class="mb-1 block text-xs font-semibold text-slate-500">Valor *</label>
                             <input v-model="vendaForm.valor" type="number" min="0.01" step="0.01" required
                                    class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
                             <p v-if="valorCalculadoVenda !== null" class="mt-1 text-xs text-emerald-700">
@@ -701,7 +708,7 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                             <p v-if="vendaForm.errors.valor" class="mt-1 text-xs text-red-600">{{ vendaForm.errors.valor }}</p>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Lote</label>
+                            <label class="mb-1 block text-xs font-semibold text-slate-500">Lote</label>
                             <select v-model="vendaForm.lote_id"
                                     class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400">
                                 <option value="">Sem lote</option>
@@ -712,18 +719,18 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                             <p class="mt-1 text-xs text-slate-400">A venda de um lote entra na campanha da colheita.</p>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Data *</label>
+                            <label class="mb-1 block text-xs font-semibold text-slate-500">Data *</label>
                             <input v-model="vendaForm.data_venda" type="date" required
                                    class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
                             <p v-if="vendaForm.errors.data" class="mt-1 text-xs text-red-600">{{ vendaForm.errors.data }}</p>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Comprador</label>
+                            <label class="mb-1 block text-xs font-semibold text-slate-500">Comprador</label>
                             <input v-model="vendaForm.comprador_nome" type="text"
                                    class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
                         </div>
                         <div class="sm:col-span-2">
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Documento</label>
+                            <label class="mb-1 block text-xs font-semibold text-slate-500">Documento</label>
                             <input v-model="vendaForm.documento" type="text"
                                    class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                                    placeholder="Fatura, recibo ou referência" />
@@ -731,19 +738,19 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                     </div>
 
                     <button type="submit" :disabled="vendaForm.processing"
-                            class="mt-4 w-full rounded-full bg-emerald-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-60">
+                            class="mt-4 w-full rounded-lg bg-emerald-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-60">
                         {{ vendaForm.processing ? 'A guardar...' : 'Registar venda' }}
                     </button>
                 </form>
 
-                <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div class="overflow-hidden rounded-lg border border-slate-200 bg-white">
                     <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                         <div>
-                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Vendas do período</p>
+                            <p class="text-xs font-semibold text-slate-500">Vendas do período</p>
                             <p class="mt-1 text-sm text-slate-500">{{ fmt(totalVendas) }} no mês selecionado</p>
                         </div>
                         <button v-if="can.create" type="button" @click="importarMoloni" :disabled="aImportarMoloni"
-                                class="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-semibold text-sky-700 transition hover:bg-sky-100 disabled:cursor-wait disabled:opacity-60"
+                                class="inline-flex items-center gap-2 rounded-md border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-semibold text-sky-700 transition hover:bg-sky-100 disabled:cursor-wait disabled:opacity-60"
                                 title="Importa as faturas, faturas-recibo e faturas simplificadas da campanha. O que já entrou não se repete.">
                             <svg class="h-4 w-4" :class="{ 'animate-spin': aImportarMoloni }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                             {{ aImportarMoloni ? 'A importar...' : 'Importar do Moloni' }}
@@ -761,7 +768,7 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                             <div class="min-w-0">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <p class="truncate font-semibold text-slate-900">{{ venda.descricao }}</p>
-                                    <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                    <span class="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
                                         {{ vendaTipoLabel(venda.tipo) }}
                                     </span>
                                 </div>
@@ -777,9 +784,9 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                 </div>
                             </div>
                             <div class="flex flex-shrink-0 flex-col items-end gap-2">
-                                <p class="text-base font-black text-emerald-700">{{ fmt(venda.valor) }}</p>
+                                <p class="text-base font-bold text-emerald-700">{{ fmt(venda.valor) }}</p>
                                 <button v-if="can.delete" type="button" @click="eliminarVenda(venda)"
-                                        class="rounded-full px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50">
+                                        class="rounded-md px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50">
                                     Eliminar
                                 </button>
                             </div>
@@ -790,9 +797,9 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
 
             <!-- custos partilhados -->
             <div class="mb-6 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-                <form v-if="can.create" @submit.prevent="submeterPartilhado" class="rounded-2xl border border-amber-200 bg-amber-50/40 p-5 shadow-sm">
+                <form v-if="can.create" @submit.prevent="submeterPartilhado" class="rounded-lg border border-amber-200 bg-amber-50/40 p-5">
                     <div class="mb-4">
-                        <p class="text-xs font-semibold uppercase tracking-wider text-amber-700">Custos partilhados</p>
+                        <p class="text-xs font-semibold text-amber-700">Custos partilhados</p>
                         <h3 class="mt-1 text-base font-bold text-slate-900">Luz das regas, frio, IMI, seguros</h3>
                         <p class="mt-1 text-xs text-slate-500">
                             Gastos que servem várias campanhas ao mesmo tempo. Entram repartidos por todas as campanhas do período.
@@ -801,40 +808,40 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
 
                     <div class="grid gap-3 sm:grid-cols-2">
                         <div class="sm:col-span-2">
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Descrição *</label>
+                            <label class="mb-1 block text-xs font-semibold text-slate-500">Descrição *</label>
                             <input v-model="partilhadoForm.descricao" type="text" required
                                    class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
                                    placeholder="Ex: Eletricidade da rega — Julho" />
                             <p v-if="partilhadoForm.errors.descricao" class="mt-1 text-xs text-red-600">{{ partilhadoForm.errors.descricao }}</p>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Tipo *</label>
+                            <label class="mb-1 block text-xs font-semibold text-slate-500">Tipo *</label>
                             <select v-model="partilhadoForm.tipo" required
                                     class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-amber-400">
                                 <option v-for="tipo in tiposCustoPartilhado" :key="tipo" :value="tipo">{{ tipoCustoLabel(tipo) }}</option>
                             </select>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Valor *</label>
+                            <label class="mb-1 block text-xs font-semibold text-slate-500">Valor *</label>
                             <input v-model="partilhadoForm.valor" type="number" min="0.01" step="0.01" required
                                    class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
                             <p v-if="partilhadoForm.errors.valor" class="mt-1 text-xs text-red-600">{{ partilhadoForm.errors.valor }}</p>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Data *</label>
+                            <label class="mb-1 block text-xs font-semibold text-slate-500">Data *</label>
                             <input v-model="partilhadoForm.data_custo" type="date" required
                                    class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
                             <p v-if="partilhadoForm.errors.data_custo" class="mt-1 text-xs text-red-600">{{ partilhadoForm.errors.data_custo }}</p>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Repartir *</label>
+                            <label class="mb-1 block text-xs font-semibold text-slate-500">Repartir *</label>
                             <select v-model="partilhadoForm.base_rateio" required
                                     class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-amber-400">
                                 <option v-for="base in basesRateio" :key="base" :value="base">{{ baseRateioLabel(base) }}</option>
                             </select>
                         </div>
                         <div class="sm:col-span-2">
-                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Notas</label>
+                            <label class="mb-1 block text-xs font-semibold text-slate-500">Notas</label>
                             <input v-model="partilhadoForm.observacoes" type="text"
                                    class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
                                    placeholder="Contador, período faturado, contrato" />
@@ -842,15 +849,15 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                     </div>
 
                     <button type="submit" :disabled="partilhadoForm.processing"
-                            class="mt-4 w-full rounded-full bg-amber-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-500 disabled:opacity-60">
+                            class="mt-4 w-full rounded-lg bg-amber-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-500 disabled:opacity-60">
                         {{ partilhadoForm.processing ? 'A guardar...' : 'Registar custo partilhado' }}
                     </button>
                 </form>
 
-                <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div class="overflow-hidden rounded-lg border border-slate-200 bg-white">
                     <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                         <div>
-                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Partilhados do período</p>
+                            <p class="text-xs font-semibold text-slate-500">Partilhados do período</p>
                             <p class="mt-1 text-sm text-slate-500">{{ fmt(totalPartilhados) }} no mês selecionado</p>
                         </div>
                     </div>
@@ -864,7 +871,7 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                 <div class="min-w-0">
                                     <div class="flex flex-wrap items-center gap-2">
                                         <p class="truncate font-semibold text-slate-900">{{ custo.descricao }}</p>
-                                        <span class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                        <span class="rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
                                             {{ tipoCustoLabel(custo.tipo) }}
                                         </span>
                                     </div>
@@ -874,9 +881,9 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                     </div>
                                 </div>
                                 <div class="flex flex-shrink-0 flex-col items-end gap-2">
-                                    <p class="text-base font-black text-amber-700">{{ fmt(custo.valor) }}</p>
+                                    <p class="text-base font-bold text-amber-700">{{ fmt(custo.valor) }}</p>
                                     <button v-if="can.delete" type="button" @click="eliminarPartilhado(custo)"
-                                            class="rounded-full px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50">
+                                            class="rounded-md px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50">
                                         Eliminar
                                     </button>
                                 </div>
@@ -897,7 +904,7 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
             </div>
 
             <!-- lista -->
-            <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="overflow-hidden rounded-lg border border-slate-200 bg-white">
                 <div v-if="despesas.data.length === 0" class="py-16 text-center">
                     <p class="text-3xl">🧾</p>
                     <p class="mt-3 text-sm font-medium text-slate-600">Sem despesas neste mês</p>
@@ -911,12 +918,12 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                             <div class="flex-shrink-0">
                                 <template v-if="d.ficheiro_url && !isPdf(d.ficheiro_path)">
                                     <img :src="d.ficheiro_url" :alt="d.titulo"
-                                         class="h-12 w-12 cursor-pointer rounded-xl object-cover shadow-sm ring-1 ring-slate-200"
+                                         class="h-12 w-12 cursor-pointer rounded-xl object-cover ring-1 ring-slate-200"
                                          @click="lightboxUrl = d.ficheiro_url" />
                                 </template>
                                 <template v-else-if="d.ficheiro_url && isPdf(d.ficheiro_path)">
                                     <a :href="d.ficheiro_url" target="_blank"
-                                       class="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-xl shadow-sm ring-1 ring-slate-200">📄</a>
+                                       class="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-xl ring-1 ring-slate-200">📄</a>
                                 </template>
                                 <template v-else>
                                     <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-xl">
@@ -929,11 +936,11 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-baseline gap-2">
                                     <p class="min-w-0 max-w-full truncate font-semibold text-slate-900">{{ d.titulo }}</p>
-                                    <span class="rounded-full px-2 py-0.5 text-xs font-medium" :class="categoriaBadge(d.categoria)">
+                                    <span class="rounded-md px-2 py-0.5 text-xs font-medium" :class="categoriaBadge(d.categoria)">
                                         {{ categoriaLabel(d.categoria) }}
                                     </span>
                                     <span v-if="d.tem_items"
-                                          class="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                                          class="rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
                                         {{ d.items.length }} linha{{ d.items.length !== 1 ? 's' : '' }}
                                     </span>
                                 </div>
@@ -948,7 +955,7 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                           title="Gasto geral da exploração: é repartido pelas campanhas do período, pelos quilos colhidos.">
                                         Geral (repartido)
                                     </span>
-                                    <span v-if="d.equipamento" class="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
+                                    <span v-if="d.equipamento" class="rounded-md bg-amber-50 px-2 py-0.5 text-amber-700">
                                         {{ d.equipamento }}
                                     </span>
                                 </div>
@@ -962,14 +969,14 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
 
                             <!-- total + acções -->
                             <div class="flex flex-shrink-0 flex-col items-end gap-2">
-                                <p class="text-lg font-black text-slate-900">{{ fmt(d.total_fatura) }}</p>
+                                <p class="text-lg font-bold text-slate-900">{{ fmt(d.total_fatura) }}</p>
                                 <div class="flex gap-1">
                                     <button @click="abrirEditar(d)"
-                                            class="rounded-full px-3 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100">
+                                            class="rounded-md px-3 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100">
                                         Editar
                                     </button>
                                     <button v-if="can.delete" @click="confirmarEliminar(d)"
-                                            class="rounded-full px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50">
+                                            class="rounded-md px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50">
                                         Eliminar
                                     </button>
                                 </div>
@@ -1019,19 +1026,19 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
 
             <!-- análise mensal -->
             <div v-if="analytics.tem_items" class="mt-10">
-                <h3 class="mb-4 text-sm font-bold uppercase tracking-wider text-slate-500">Análise do mês</h3>
+                <h3 class="mb-4 text-sm font-bold text-slate-500">Análise do mês</h3>
                 <div class="grid gap-4 sm:grid-cols-3">
                     <!-- IVA -->
-                    <div class="rounded-2xl border border-slate-200 bg-white p-5">
-                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">IVA total do mês</p>
-                        <p class="mt-2 text-2xl font-black text-slate-900">{{ fmt(analytics.iva_total) }}</p>
+                    <div class="rounded-lg border border-slate-200 bg-white p-5">
+                        <p class="text-xs font-semibold text-slate-500">IVA total do mês</p>
+                        <p class="mt-2 text-2xl font-bold text-slate-900">{{ fmt(analytics.iva_total) }}</p>
                         <p class="mt-1 text-xs text-slate-400">Subtotal s/ IVA: {{ fmt(analytics.subtotal) }}</p>
                         <p class="mt-0.5 text-xs text-slate-400">Total c/ IVA: {{ fmt(analytics.subtotal + analytics.iva_total) }}</p>
                     </div>
 
                     <!-- por fornecedor -->
-                    <div class="rounded-2xl border border-slate-200 bg-white p-5">
-                        <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Por fornecedor</p>
+                    <div class="rounded-lg border border-slate-200 bg-white p-5">
+                        <p class="mb-3 text-xs font-semibold text-slate-500">Por fornecedor</p>
                         <ul class="space-y-2">
                             <li v-for="f in analytics.por_fornecedor.slice(0, 5)" :key="f.fornecedor"
                                 class="flex items-center justify-between gap-2">
@@ -1042,14 +1049,14 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                     </div>
 
                     <!-- produtos mais comprados -->
-                    <div class="rounded-2xl border border-slate-200 bg-white p-5">
-                        <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Produtos mais comprados</p>
+                    <div class="rounded-lg border border-slate-200 bg-white p-5">
+                        <p class="mb-3 text-xs font-semibold text-slate-500">Produtos mais comprados</p>
                         <ul class="space-y-2">
                             <li v-for="p in analytics.top_descricoes.slice(0, 5)" :key="p.descricao"
                                 class="flex items-center justify-between gap-2">
                                 <span class="truncate text-xs text-slate-600">{{ p.descricao }}</span>
                                 <div class="flex flex-shrink-0 items-center gap-2">
-                                    <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">×{{ p.count }}</span>
+                                    <span class="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">×{{ p.count }}</span>
                                     <span class="text-xs font-semibold text-slate-900">{{ fmt(p.total) }}</span>
                                 </div>
                             </li>
@@ -1063,9 +1070,9 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
     <!-- ── Modal criar / editar ───────────────────────────────────────────── -->
     <Teleport to="body">
         <div v-if="showModal" class="fixed inset-0 z-[2000] flex items-end justify-center sm:items-center">
-            <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @click="fecharModal" />
+            <div class="absolute inset-0 bg-slate-900/50" @click="fecharModal" />
 
-            <div class="relative flex max-h-[96dvh] w-full flex-col rounded-t-3xl bg-white shadow-2xl sm:max-w-2xl sm:rounded-3xl">
+            <div class="relative flex max-h-[96dvh] w-full flex-col rounded-t-3xl bg-white shadow-2xl sm:max-w-2xl sm:rounded-xl">
                 <!-- header modal -->
                 <div class="flex flex-shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4">
                     <h3 class="text-lg font-bold text-slate-900">
@@ -1081,7 +1088,7 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                     <form @submit.prevent="submeter">
                         <!-- ── SECÇÃO: Cabeçalho ──────────────────────────── -->
                         <div class="space-y-4 px-6 py-5">
-                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Cabeçalho da fatura</p>
+                            <p class="text-xs font-semibold text-slate-400">Cabeçalho da fatura</p>
 
                             <!-- foto -->
                             <div>
@@ -1131,7 +1138,7 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                     <template v-if="leitura.categoria"> · {{ categoriaLabel(leitura.categoria) }}</template>
                                 </p>
 
-                                <div v-if="leitura.linhas.length" class="mt-2 max-h-40 overflow-y-auto rounded-lg bg-white/70 p-2">
+                                <div v-if="leitura.linhas.length" class="mt-2 max-h-40 overflow-y-auto rounded-lg bg-white p-2">
                                     <p class="mb-1 text-xs font-semibold text-blue-800">
                                         {{ leitura.linhas.length }} linha(s) — soma {{ fmt(somaLinhasLidas) }}
                                     </p>
@@ -1157,11 +1164,11 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
 
                                 <div class="mt-2 flex gap-2">
                                     <button type="button" @click="preencherDaLeitura"
-                                            class="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-500">
+                                            class="rounded-md bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-500">
                                         Preencher fatura
                                     </button>
                                     <button type="button" @click="leitura = null"
-                                            class="rounded-full border border-blue-200 px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100">
+                                            class="rounded-md border border-blue-200 px-3 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100">
                                         Ignorar
                                     </button>
                                 </div>
@@ -1172,7 +1179,7 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
 
                             <!-- título -->
                             <div>
-                                <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Título *</label>
+                                <label class="mb-1 block text-xs font-semibold text-slate-500">Título *</label>
                                 <input v-model="form.titulo" type="text" required
                                        class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                                        placeholder="Ex: Gasóleo Julho" />
@@ -1182,13 +1189,13 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                             <!-- nº fatura + fornecedor -->
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Nº Fatura</label>
+                                    <label class="mb-1 block text-xs font-semibold text-slate-500">Nº Fatura</label>
                                     <input v-model="form.numero_fatura" type="text"
                                            class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                                            placeholder="FT2024/001" />
                                 </div>
                                 <div>
-                                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Fornecedor</label>
+                                    <label class="mb-1 block text-xs font-semibold text-slate-500">Fornecedor</label>
                                     <input v-model="form.fornecedor" type="text"
                                            class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                                            placeholder="Nome" />
@@ -1198,13 +1205,13 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                             <!-- data + categoria -->
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Data *</label>
+                                    <label class="mb-1 block text-xs font-semibold text-slate-500">Data *</label>
                                     <input v-model="form.data_despesa" type="date" required
                                            class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" />
                                     <p v-if="form.errors.data" class="mt-1 text-xs text-red-600">{{ form.errors.data }}</p>
                                 </div>
                                 <div>
-                                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Categoria *</label>
+                                    <label class="mb-1 block text-xs font-semibold text-slate-500">Categoria *</label>
                                     <select v-model="form.categoria" required
                                             class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400">
                                         <option v-for="cat in categorias" :key="cat" :value="cat">{{ categoriaLabel(cat) }}</option>
@@ -1215,7 +1222,7 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                             <!-- equipamento: máquina e/ou alfaia -->
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Máquina</label>
+                                    <label class="mb-1 block text-xs font-semibold text-slate-500">Máquina</label>
                                     <select v-model="form.maquina_id"
                                             class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400">
                                         <option value="">Nenhuma</option>
@@ -1224,7 +1231,7 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                     <p v-if="form.errors.maquina_id" class="mt-1 text-xs text-red-600">{{ form.errors.maquina_id }}</p>
                                 </div>
                                 <div>
-                                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Alfaia</label>
+                                    <label class="mb-1 block text-xs font-semibold text-slate-500">Alfaia</label>
                                     <select v-model="form.alfaia_id"
                                             class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400">
                                         <option value="">Nenhuma</option>
@@ -1241,7 +1248,7 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
 
                             <!-- notas -->
                             <div>
-                                <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Notas</label>
+                                <label class="mb-1 block text-xs font-semibold text-slate-500">Notas</label>
                                 <textarea v-model="form.notas" rows="2"
                                           class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                                           placeholder="Observações adicionais..." />
@@ -1251,9 +1258,9 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                         <!-- ── SECÇÃO: Linhas de produto ──────────────────── -->
                         <div class="border-t border-slate-100 px-6 py-5">
                             <div class="mb-3 flex items-center justify-between">
-                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Linhas da fatura</p>
+                                <p class="text-xs font-semibold text-slate-400">Linhas da fatura</p>
                                 <button type="button" @click="adicionarItem"
-                                        class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100">
+                                        class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100">
                                     <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
                                     Adicionar linha
                                 </button>
@@ -1299,23 +1306,23 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                          duas colunas abaixo do sm. -->
                                     <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
                                         <div>
-                                            <label class="mb-1 block text-[10px] font-semibold uppercase text-slate-400">Qtd</label>
+                                            <label class="mb-1 block text-xs font-semibold uppercase text-slate-400">Qtd</label>
                                             <input v-model="item.quantidade" type="number" step="0.001" min="0.001" required
                                                    class="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-right outline-none focus:border-emerald-400" />
                                         </div>
                                         <div>
-                                            <label class="mb-1 block text-[10px] font-semibold uppercase text-slate-400">Preço unit. €</label>
+                                            <label class="mb-1 block text-xs font-semibold uppercase text-slate-400">Preço unit. €</label>
                                             <input v-model="item.preco_unitario" type="number" step="0.01" min="0" required
                                                    class="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-right outline-none focus:border-emerald-400" />
                                         </div>
                                         <div>
-                                            <label class="mb-1 block text-[10px] font-semibold uppercase text-slate-400">Desc. %</label>
+                                            <label class="mb-1 block text-xs font-semibold uppercase text-slate-400">Desc. %</label>
                                             <input v-model="item.desconto_percentagem" type="number" step="0.01" min="0" max="100"
                                                    class="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-right outline-none focus:border-emerald-400"
                                                    placeholder="0" />
                                         </div>
                                         <div>
-                                            <label class="mb-1 block text-[10px] font-semibold uppercase text-slate-400">IVA %</label>
+                                            <label class="mb-1 block text-xs font-semibold uppercase text-slate-400">IVA %</label>
                                             <select v-model="item.iva_percentagem"
                                                     class="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-none focus:border-emerald-400">
                                                 <option v-for="taxa in taxasIva" :key="taxa" :value="taxa">{{ taxa }}%</option>
@@ -1330,11 +1337,11 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                                 base {{ fmt(itemBase(item)) }} + IVA {{ fmt(itemBase(item) * (parseFloat(item.iva_percentagem) || 0) / 100) }}
                                             </span>
                                             <span v-if="parseFloat(item.desconto_percentagem) > 0"
-                                                  class="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700">
+                                                  class="rounded-md bg-amber-100 px-2 py-0.5 font-medium text-amber-700">
                                                 −{{ fmt(itemDesconto(item)) }} · {{ fmt(itemPrecoLiquido(item)) }}/un
                                             </span>
                                             <span v-if="item.produto_id"
-                                                  class="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">
+                                                  class="rounded-md bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">
                                                 📦 +{{ entradaStock(item) }} ao stock
                                             </span>
                                         </div>
@@ -1359,13 +1366,13 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
                                 </div>
                                 <div class="flex justify-between mt-2 border-t border-emerald-200 pt-2">
                                     <span class="font-bold text-slate-900">Total c/ IVA</span>
-                                    <span class="text-lg font-black text-emerald-700">{{ fmt(totalComIvaForm) }}</span>
+                                    <span class="text-lg font-bold text-emerald-700">{{ fmt(totalComIvaForm) }}</span>
                                 </div>
                             </div>
 
                             <!-- valor manual (sem linhas) -->
                             <div v-else class="mt-3">
-                                <label class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Valor total *</label>
+                                <label class="mb-1 block text-xs font-semibold text-slate-500">Valor total *</label>
                                 <div class="relative">
                                     <span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">€</span>
                                     <input v-model="form.valor" type="number" step="0.01" min="0.01"
@@ -1397,8 +1404,8 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
     <!-- ── Confirmação eliminar ──────────────────────────────────────────── -->
     <Teleport to="body">
         <div v-if="showDeleteConfirm" class="fixed inset-0 z-[2100] flex items-center justify-center px-4">
-            <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @click="showDeleteConfirm = false" />
-            <div class="relative w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
+            <div class="absolute inset-0 bg-slate-900/50" @click="showDeleteConfirm = false" />
+            <div class="relative w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl">
                 <h3 class="text-lg font-bold text-slate-900">Eliminar fatura?</h3>
                 <p class="mt-2 text-sm text-slate-600">
                     Vai eliminar <strong>{{ deletingDespesa?.titulo }}</strong> e todas as suas linhas.
@@ -1424,8 +1431,8 @@ const isPdfPreview = (url) => url && !url.match(/\.(jpe?g|png|webp|gif)$/i);
              class="fixed inset-0 z-[3000] flex items-center justify-center bg-slate-900/85 p-4"
              @click="lightboxUrl = null">
             <img :src="lightboxUrl" alt="Fatura"
-                 class="max-h-full max-w-full rounded-2xl shadow-2xl" @click.stop />
-            <button class="absolute right-4 top-4 rounded-full bg-white/20 p-2 text-white hover:bg-white/30"
+                 class="max-h-full max-w-full rounded-lg shadow-2xl" @click.stop />
+            <button class="absolute right-4 top-4 rounded-full bg-white p-2 text-white hover:bg-white"
                     @click="lightboxUrl = null">
                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>

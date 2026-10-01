@@ -1,3 +1,37 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+    html {
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+        font-feature-settings: 'tnum' 0;
+    }
+
+    :focus-visible {
+        outline: 2px solid #2F6B4F;
+        outline-offset: 2px;
+    }
+}
+
+@layer components {
+    /* Superficie base de todo o site: cartao branco com borda fina */
+    .cartao {
+        @apply rounded-xl border border-slate-200 bg-white;
+    }
+
+    .rotulo {
+        @apply text-xs font-semibold text-slate-600;
+    }
+
+    .numero {
+        font-variant-numeric: tabular-nums;
+    }
+
+    .etiqueta {
+        @apply inline-flex h-6 items-center rounded-md px-2 text-xs font-semibold;
+    }
+}

@@ -38,7 +38,7 @@
                                             <span
                                                 v-for="permission in role.permissions"
                                                 :key="permission.id"
-                                                class="inline-block bg-gray-200 rounded-full px-2 py-1 text-xs font-semibold text-gray-700 mr-1"
+                                                class="inline-block bg-gray-200 rounded-md px-2 py-1 text-xs font-semibold text-gray-700 mr-1"
                                             >
                                                 {{ permission.name }}
                                             </span>

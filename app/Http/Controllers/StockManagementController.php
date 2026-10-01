@@ -38,7 +38,7 @@ class StockManagementController extends Controller
                 );
             })
             ->orderBy('nome')
-            ->paginate(12)
+            ->paginate(40)
             ->withQueryString()
             ->through(function (Produto $produto) {
                 $stockAtual = (float) ($produto->stock_atual ?? 0);

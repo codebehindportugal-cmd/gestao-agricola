@@ -1,77 +1,114 @@
 <script setup>
-import { computed, ref } from 'vue';
-import ApplicationLogo from '@/Components/ApplicationLogo.vue';
-import NavLink from '@/Components/NavLink.vue';
-import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
+import { computed, ref, watch } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 
 const page = usePage();
-const showingNavigationDropdown = ref(false);
-const showingResourcesDropdown = ref(false);
-const showingAdminDropdown = ref(false);
-const showingUserDropdown = ref(false);
+const menuAberto = ref(false);
+const menuUtilizador = ref(false);
 
-const closeDesktopMenus = () => {
-    showingResourcesDropdown.value = false;
-    showingAdminDropdown.value = false;
-    showingUserDropdown.value = false;
+// Icones de traco, 24x24. Só caminhos (path) para se desenharem com um v-for.
+const icones = {
+    hoje: ['M3 11.5 12 4l9 7.5', 'M5 10v10h14V10'],
+    caderno: ['M6 3h11a2 2 0 0 1 2 2v16H8a2 2 0 0 1-2-2z', 'M6 17a2 2 0 0 1 2-2h11', 'M10 7h6M10 10h4'],
+    calendario: ['M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z', 'M3 10h18M8 3v4M16 3v4'],
+    parcelas: ['m3 7 6-3 6 3 6-3v13l-6 3-6-3-6 3z', 'M9 4v13M15 7v13'],
+    terrenos: ['M3 20h18', 'm5 20 5-9 4 6 2-3 3 6'],
+    culturas: ['M12 21V11', 'M12 11c0-4 3-7 7-7 0 4-3 7-7 7z', 'M12 14c0-3-2.5-5.5-6-5.5 0 3 2.5 5.5 6 5.5z'],
+    stock: ['M3 8 12 3l9 5v8l-9 5-9-5z', 'm3 8 9 5 9-5M12 13v8'],
+    maquinaria: ['M7 14a3 3 0 1 1 0 6 3 3 0 0 1 0-6z', 'M18 16a2 2 0 1 1 0 4 2 2 0 0 1 0-4z', 'M4 14V8h6l2 6h6v4M10 8V5h3'],
+    pessoas: ['M9 4.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7z', 'M2.5 20a6.5 6.5 0 0 1 13 0', 'M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6'],
+    local: ['M12 21s7-6.2 7-11.5a7 7 0 1 0-14 0C5 14.8 12 21 12 21z', 'M12 7a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z'],
+    custos: ['M4 19V9M10 19V5M16 19v-7M22 19H2'],
+    despesas: ['M6 3h12v18l-3-2-3 2-3-2-3 2z', 'M9 8h6M9 12h6'],
+    casa: ['M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z', 'M8 21h8M12 17v4'],
+    admin: ['M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z', 'm9 12 2 2 4-4'],
+    mais: ['M4 6h16M4 12h16M4 18h16'],
+    fechar: ['M6 6l12 12M18 6 6 18'],
+    seta: ['m6 9 6 6 6-6'],
 };
 
-const toggleResourcesDropdown = () => {
-    const next = !showingResourcesDropdown.value;
-    closeDesktopMenus();
-    showingResourcesDropdown.value = next;
-};
+const grupos = computed(() => {
+    const lista = [
+        {
+            titulo: null,
+            links: [{ label: 'Hoje', routeName: 'dashboard', active: 'dashboard', icone: 'hoje' }],
+        },
+        {
+            titulo: 'Campo',
+            links: [
+                { label: 'Caderno de campo', routeName: 'app.operacoes.index', active: 'app.operacoes.*', icone: 'caderno' },
+                { label: 'Calendário', routeName: 'app.calendario.index', active: 'app.calendario.*', icone: 'calendario' },
+                { label: 'Parcelas', routeName: 'app.parcelas.index', active: 'app.parcelas.*', icone: 'parcelas' },
+                { label: 'Culturas', routeName: 'app.culturas.index', active: 'app.culturas.*', icone: 'culturas' },
+                { label: 'Terrenos', routeName: 'app.terrenos.index', active: 'app.terrenos.*', icone: 'terrenos' },
+            ],
+        },
+        {
+            titulo: 'Recursos',
+            links: [
+                { label: 'Stock', routeName: 'app.stock.index', active: 'app.stock.*', icone: 'stock' },
+                { label: 'Maquinaria', routeName: 'app.maquinaria.index', active: ['app.maquinaria.*', 'app.maquinas.*', 'app.alfaias.*'], icone: 'maquinaria' },
+                { label: 'Mão de obra', routeName: 'app.mao-obra.index', active: ['app.mao-obra.index', 'app.funcionarios.*', 'app.equipas.*'], icone: 'pessoas' },
+                { label: 'Localização', routeName: 'app.mao-obra.localizacoes', active: 'app.mao-obra.localizacoes', icone: 'local' },
+            ],
+        },
+        {
+            titulo: 'Dinheiro',
+            links: [
+                { label: 'Custos da campanha', routeName: 'app.campanhas.index', active: 'app.campanhas.*', icone: 'custos' },
+                { label: 'Despesas', routeName: 'app.despesas.index', active: 'app.despesas.*', icone: 'despesas' },
+            ],
+        },
+        {
+            titulo: 'Outros',
+            links: [{ label: 'Casa', routeName: 'app.casa.index', active: 'app.casa.*', icone: 'casa' }],
+        },
+    ];
 
-const toggleAdminDropdown = () => {
-    const next = !showingAdminDropdown.value;
-    closeDesktopMenus();
-    showingAdminDropdown.value = next;
-};
+    if (podeGerirUtilizadores.value) {
+        lista.push({
+            titulo: 'Administração',
+            links: [
+                { label: 'Utilizadores', routeName: 'users.index', active: 'users.*', icone: 'pessoas' },
+                { label: 'Perfis', routeName: 'roles.index', active: 'roles.*', icone: 'admin' },
+                { label: 'Permissões', routeName: 'permissions.index', active: 'permissions.*', icone: 'admin' },
+            ],
+        });
+    }
 
-const toggleUserDropdown = () => {
-    const next = !showingUserDropdown.value;
-    closeDesktopMenus();
-    showingUserDropdown.value = next;
-};
+    // Ignora ligações cuja rota não existe neste ambiente
+    return lista
+        .map((grupo) => ({ ...grupo, links: grupo.links.filter((link) => route().has(link.routeName)) }))
+        .filter((grupo) => grupo.links.length);
+});
 
-const primaryLinks = [
-    { label: 'Hoje', routeName: 'dashboard', active: 'dashboard' },
-    { label: 'Caderno', routeName: 'app.operacoes.index', active: 'app.operacoes.*' },
-    { label: 'Terrenos', routeName: 'app.terrenos.index', active: 'app.terrenos.*' },
-    { label: 'Parcelas', routeName: 'app.parcelas.index', active: 'app.parcelas.*' },
-    { label: 'Custos', routeName: 'app.campanhas.index', active: 'app.campanhas.*' },
-    { label: 'Calendário', routeName: 'app.calendario.index', active: 'app.calendario.*' },
+const separadores = [
+    { label: 'Hoje', routeName: 'dashboard', active: 'dashboard', icone: 'hoje' },
+    { label: 'Caderno', routeName: 'app.operacoes.index', active: 'app.operacoes.*', icone: 'caderno' },
+    { label: 'Stock', routeName: 'app.stock.index', active: 'app.stock.*', icone: 'stock' },
+    { label: 'Custos', routeName: 'app.campanhas.index', active: 'app.campanhas.*', icone: 'custos' },
 ];
 
-const resourceLinks = [
-    { label: 'Stock', routeName: 'app.stock.index', active: 'app.stock.*' },
-    { label: 'Maquinaria', routeName: 'app.maquinaria.index', active: 'app.maquinaria.*' },
-    { label: 'Mão de obra', routeName: 'app.mao-obra.index', active: 'app.mao-obra.index' },
-    { label: 'Localização', routeName: 'app.mao-obra.localizacoes', active: 'app.mao-obra.localizacoes' },
-    { label: 'Despesas', routeName: 'app.despesas.index', active: 'app.despesas.*' },
-];
+function ativo(link) {
+    const padroes = Array.isArray(link.active) ? link.active : [link.active];
+    return padroes.some((padrao) => route().current(padrao));
+}
 
-const canManageUsers = computed(() => {
+const podeGerirUtilizadores = computed(() => {
     return page.props.auth.user &&
         page.props.auth.user.permissions &&
         page.props.auth.user.permissions.some((permission) => permission.name === 'usuarios.manage');
 });
 
-const resourcesActive = computed(() => {
-    return route().current('app.stock.*') ||
-        route().current('app.maquinaria.*') ||
-        route().current('app.maquinas.*') ||
-        route().current('app.alfaias.*') ||
-        route().current('app.mao-obra.*') ||
-        route().current('app.funcionarios.*') ||
-        route().current('app.equipas.*') ||
-        route().current('app.despesas.*');
-});
-
-const resourcesPanelOpen = computed(() => showingResourcesDropdown.value || resourcesActive.value);
 const campaignOptions = computed(() => page.props.workingCampaign?.options ?? []);
 const activeCampaign = computed(() => page.props.workingCampaign?.active ?? null);
+
+const iniciais = computed(() => {
+    const nome = page.props.auth.user?.name ?? '';
+    return nome.split(/\s+/).filter(Boolean).slice(0, 2).map((parte) => parte[0]).join('').toUpperCase();
+});
+
+const nomeCampanha = (campanha) => (campanha?.nome ?? '').replace(/^Campanha\s+/i, '');
 
 function setActiveCampaign(event) {
     router.post(route('app.campanha-ativa.update'), {
@@ -81,233 +118,171 @@ function setActiveCampaign(event) {
         preserveState: false,
     });
 }
+
+// Fecha o menu do telemóvel quando se muda de página
+watch(() => page.url, () => {
+    menuAberto.value = false;
+    menuUtilizador.value = false;
+});
 </script>
 
 <template>
-    <div>
-        <div class="min-h-screen bg-slate-100">
-            <nav class="relative z-[1200] border-b border-emerald-100 bg-white/90 backdrop-blur">
-                <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <div class="flex h-16 justify-between">
-                        <div class="flex items-center gap-4">
-                            <div class="flex shrink-0 items-center">
-                                <Link :href="route('dashboard')" class="flex items-center gap-3" @click="closeDesktopMenus">
-                                    <ApplicationLogo class="block h-10 w-10" />
-                                    <div class="hidden sm:block">
-                                        <p class="text-sm font-black uppercase tracking-[0.24em] text-slate-900">Agro</p>
-                                        <p class="hidden text-xs font-medium uppercase tracking-[0.28em] text-emerald-700 2xl:block">Gestão Agrícola</p>
-                                    </div>
-                                </Link>
-                            </div>
+    <div class="min-h-screen bg-fundo text-slate-900 lg:grid lg:grid-cols-[248px_minmax(0,1fr)]">
+        <!-- Menu lateral (computador) e gaveta (telemóvel) -->
+        <div
+            v-if="menuAberto"
+            class="fixed inset-0 z-[1400] bg-slate-900/50 lg:hidden"
+            aria-hidden="true"
+            @click="menuAberto = false"
+        />
+        <aside
+            class="fixed inset-y-0 left-0 z-[1500] flex w-[280px] flex-col border-r border-slate-200 bg-white px-3 py-5 transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:h-screen lg:w-auto lg:translate-x-0"
+            :class="menuAberto ? 'translate-x-0' : '-translate-x-full'"
+            aria-label="Menu principal"
+        >
+            <div class="flex items-center justify-between gap-2 px-3 pb-4">
+                <Link :href="route('dashboard')" class="flex items-center gap-3 text-slate-900 no-underline">
+                    <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-verde-700 text-sm font-bold text-white">GA</span>
+                    <span class="flex flex-col leading-tight">
+                        <span class="text-[15px] font-bold">Gestão Agrícola</span>
+                        <span class="text-xs text-slate-500">Caderno da exploração</span>
+                    </span>
+                </Link>
+                <button
+                    type="button"
+                    class="flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 lg:hidden"
+                    aria-label="Fechar menu"
+                    @click="menuAberto = false"
+                >
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path v-for="d in icones.fechar" :key="d" :d="d" />
+                    </svg>
+                </button>
+            </div>
 
-                            <div class="hidden items-center gap-2 xl:flex">
-                                <NavLink
-                                    v-for="link in primaryLinks"
-                                    :key="link.routeName"
-                                    :href="route(link.routeName)"
-                                    :active="route().current(link.active)"
-                                    @click="closeDesktopMenus"
-                                >
-                                    {{ link.label }}
-                                </NavLink>
+            <label v-if="campaignOptions.length" class="flex flex-col gap-1.5 px-3 pb-3 text-xs font-semibold text-slate-600">
+                Campanha
+                <select
+                    class="min-h-[40px] rounded-lg border-slate-300 bg-slate-50 py-2 text-sm font-medium text-slate-900 focus:border-verde-600 focus:ring-verde-600"
+                    :value="activeCampaign?.id ?? ''"
+                    @change="setActiveCampaign"
+                >
+                    <option v-for="campanha in campaignOptions" :key="campanha.id" :value="campanha.id">
+                        {{ nomeCampanha(campanha) }}
+                    </option>
+                </select>
+            </label>
 
-                                <div class="relative">
-                                    <button
-                                        type="button"
-                                        class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition"
-                                        :class="resourcesActive ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:text-slate-900'"
-                                        @click="toggleResourcesDropdown"
-                                    >
-                                        Recursos
-                                        <svg class="ml-2 h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-                                        </svg>
-                                    </button>
-                                </div>
-
-                                <div v-if="canManageUsers" class="relative">
-                                    <button
-                                        type="button"
-                                        class="inline-flex items-center rounded-full px-4 py-2 text-sm font-medium text-slate-600 transition hover:text-slate-900"
-                                        @click="toggleAdminDropdown"
-                                    >
-                                        <span class="2xl:hidden">Admin</span>
-                                        <span class="hidden 2xl:inline">Administração</span>
-                                        <svg class="ml-2 h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-                                        </svg>
-                                    </button>
-
-                                    <div
-                                        v-show="showingAdminDropdown"
-                                        class="absolute right-0 z-[1300] mt-2 w-48 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg"
-                                    >
-                                        <Link :href="route('users.index')" class="block rounded-xl px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-50" @click="closeDesktopMenus">
-                                            Utilizadores
-                                        </Link>
-                                        <Link :href="route('roles.index')" class="block rounded-xl px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-50" @click="closeDesktopMenus">
-                                            Perfis
-                                        </Link>
-                                        <Link :href="route('permissions.index')" class="block rounded-xl px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-50" @click="closeDesktopMenus">
-                                            Permissões
-                                        </Link>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="hidden xl:ms-6 xl:flex xl:items-center xl:gap-3">
-                            <div v-if="campaignOptions.length" class="flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5">
-                                <span class="hidden text-[10px] font-bold uppercase tracking-wider text-emerald-700 2xl:inline">Campanha</span>
-                                <select
-                                    class="max-w-[150px] border-0 bg-transparent p-0 text-sm font-semibold text-slate-800 focus:ring-0"
-                                    :value="activeCampaign?.id ?? ''"
-                                    @change="setActiveCampaign"
-                                >
-                                    <option v-for="campanha in campaignOptions" :key="campanha.id" :value="campanha.id">
-                                        {{ campanha.nome }}
-                                    </option>
-                                </select>
-                            </div>
-
-                            <div class="relative ms-3">
-                                <button
-                                    type="button"
-                                    class="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium leading-4 text-slate-600 transition hover:border-emerald-200 hover:text-slate-900 focus:outline-none"
-                                    @click="toggleUserDropdown"
-                                >
-                                    {{ $page.props.auth.user.name }}
-                                    <svg class="ms-2 h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-                                    </svg>
-                                </button>
-
-                                <div
-                                    v-show="showingUserDropdown"
-                                    class="absolute right-0 z-[1300] mt-2 w-48 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg"
-                                >
-                                    <Link :href="route('profile.edit')" class="block rounded-xl px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-50" @click="closeDesktopMenus">
-                                        Perfil
-                                    </Link>
-                                    <Link :href="route('logout')" method="post" as="button" class="block w-full rounded-xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50" @click="closeDesktopMenus">
-                                        Terminar sessão
-                                    </Link>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="-me-2 flex items-center xl:hidden">
-                            <button
-                                class="inline-flex items-center justify-center rounded-md p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-500 focus:bg-gray-100 focus:text-gray-500 focus:outline-none"
-                                @click="showingNavigationDropdown = !showingNavigationDropdown"
-                            >
-                                <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
-                                    <path
-                                        :class="{ hidden: showingNavigationDropdown, 'inline-flex': !showingNavigationDropdown }"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M4 6h16M4 12h16M4 18h16"
-                                    />
-                                    <path
-                                        :class="{ hidden: !showingNavigationDropdown, 'inline-flex': showingNavigationDropdown }"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M6 18L18 6M6 6l12 12"
-                                    />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div v-show="resourcesPanelOpen" class="hidden border-t border-slate-200 bg-white xl:block">
-                    <div class="mx-auto flex max-w-7xl flex-wrap gap-3 px-4 py-3 sm:px-6 lg:px-8">
-                        <Link
-                            v-for="link in resourceLinks"
-                            :key="`desktop-${link.routeName}`"
-                            :href="route(link.routeName)"
-                            class="rounded-full px-4 py-2 text-sm font-medium transition"
-                            :class="route().current(link.active) ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'"
-                            @click="closeDesktopMenus"
+            <nav class="flex-1 overflow-y-auto" aria-label="Secções">
+                <div v-for="grupo in grupos" :key="grupo.titulo ?? 'inicio'" class="flex flex-col gap-0.5">
+                    <span v-if="grupo.titulo" class="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        {{ grupo.titulo }}
+                    </span>
+                    <Link
+                        v-for="link in grupo.links"
+                        :key="link.routeName"
+                        :href="route(link.routeName)"
+                        :aria-current="ativo(link) ? 'page' : undefined"
+                        class="flex min-h-[38px] items-center gap-3 rounded-lg px-3 text-sm no-underline transition"
+                        :class="ativo(link) ? 'bg-verde-100 font-semibold text-verde-800' : 'font-medium text-slate-800 hover:bg-slate-100'"
+                    >
+                        <svg
+                            class="h-5 w-5 shrink-0"
+                            :class="ativo(link) ? 'text-verde-700' : 'text-slate-500'"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
                         >
-                            {{ link.label }}
-                        </Link>
-                    </div>
-                </div>
-
-                <div :class="{ block: showingNavigationDropdown, hidden: !showingNavigationDropdown }" class="xl:hidden">
-                    <div class="space-y-1 pb-3 pt-2">
-                        <ResponsiveNavLink
-                            v-for="link in primaryLinks"
-                            :key="link.routeName"
-                            :href="route(link.routeName)"
-                            :active="route().current(link.active)"
-                        >
-                            {{ link.label }}
-                        </ResponsiveNavLink>
-
-                        <div class="border-t border-gray-200 pb-2 pt-4">
-                            <div class="px-4 text-xs font-semibold uppercase tracking-wider text-gray-500">Recursos</div>
-                            <ResponsiveNavLink
-                                v-for="link in resourceLinks"
-                                :key="link.routeName"
-                                :href="route(link.routeName)"
-                                :active="route().current(link.active)"
-                            >
-                                {{ link.label }}
-                            </ResponsiveNavLink>
-                        </div>
-
-                        <div v-if="canManageUsers" class="border-t border-gray-200 pb-2 pt-4">
-                            <div class="px-4 text-xs font-semibold uppercase tracking-wider text-gray-500">Administração</div>
-                            <ResponsiveNavLink :href="route('users.index')" :active="route().current('users.*')">Utilizadores</ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('roles.index')" :active="route().current('roles.*')">Perfis</ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('permissions.index')" :active="route().current('permissions.*')">Permissões</ResponsiveNavLink>
-                        </div>
-                    </div>
-
-                    <div class="border-t border-gray-200 pb-1 pt-4">
-                        <div class="px-4">
-                            <div class="text-base font-medium text-gray-800">{{ $page.props.auth.user.name }}</div>
-                            <div class="text-sm font-medium text-gray-500">{{ $page.props.auth.user.email }}</div>
-                        </div>
-
-                        <div class="mt-3 space-y-1">
-                            <div v-if="campaignOptions.length" class="px-4 py-2">
-                                <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500">Campanha ativa</label>
-                                <select
-                                    class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                                    :value="activeCampaign?.id ?? ''"
-                                    @change="setActiveCampaign"
-                                >
-                                    <option v-for="campanha in campaignOptions" :key="campanha.id" :value="campanha.id">
-                                        {{ campanha.nome }}
-                                    </option>
-                                </select>
-                            </div>
-                            <ResponsiveNavLink :href="route('profile.edit')">Perfil</ResponsiveNavLink>
-                            <ResponsiveNavLink :href="route('logout')" method="post" as="button">Terminar sessão</ResponsiveNavLink>
-                        </div>
-                    </div>
+                            <path v-for="d in icones[link.icone]" :key="d" :d="d" />
+                        </svg>
+                        {{ link.label }}
+                    </Link>
                 </div>
             </nav>
 
-            <header v-if="$slots.header" class="border-b border-white/60 bg-white/70 shadow-sm backdrop-blur">
-                <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+            <div class="relative mt-3 border-t border-slate-100 pt-3">
+                <button
+                    type="button"
+                    class="flex min-h-[48px] w-full items-center gap-3 rounded-lg px-3 text-left hover:bg-slate-100"
+                    :aria-expanded="menuUtilizador"
+                    @click="menuUtilizador = !menuUtilizador"
+                >
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">{{ iniciais }}</span>
+                    <span class="flex min-w-0 flex-1 flex-col leading-tight">
+                        <span class="truncate text-sm font-semibold">{{ $page.props.auth.user.name }}</span>
+                        <span class="truncate text-xs text-slate-500">{{ $page.props.auth.user.email }}</span>
+                    </span>
+                    <svg class="h-4 w-4 shrink-0 text-slate-500 transition" :class="menuUtilizador ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path v-for="d in icones.seta" :key="d" :d="d" />
+                    </svg>
+                </button>
+                <div v-show="menuUtilizador" class="absolute bottom-full left-0 right-0 mb-2 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                    <Link :href="route('profile.edit')" class="flex min-h-[44px] items-center rounded-md px-3 text-sm text-slate-800 no-underline hover:bg-slate-100">
+                        Perfil
+                    </Link>
+                    <Link :href="route('logout')" method="post" as="button" class="flex min-h-[44px] w-full items-center rounded-md px-3 text-left text-sm text-slate-800 hover:bg-slate-100">
+                        Terminar sessão
+                    </Link>
+                </div>
+            </div>
+        </aside>
+
+        <div class="flex min-w-0 flex-col pb-[76px] lg:pb-0">
+            <!-- Barra de topo (só telemóvel) -->
+            <div class="sticky top-0 z-[1200] flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4 lg:hidden">
+                <Link :href="route('dashboard')" class="flex items-center gap-2 text-slate-900 no-underline">
+                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-verde-700 text-xs font-bold text-white">GA</span>
+                    <span class="text-[15px] font-bold">Gestão Agrícola</span>
+                </Link>
+                <span v-if="activeCampaign" class="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">{{ nomeCampanha(activeCampaign) }}</span>
+            </div>
+
+            <header v-if="$slots.header" class="border-b border-slate-200 bg-white">
+                <div class="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
                     <slot name="header" />
                 </div>
             </header>
 
-            <main>
+            <main class="flex-1">
                 <div v-if="$page.props.flash?.error" class="mx-auto mt-6 max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <div class="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-medium text-red-700">
+                    <div class="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-medium text-red-800" role="alert">
                         {{ $page.props.flash.error }}
                     </div>
                 </div>
                 <slot />
             </main>
         </div>
+
+        <!-- Separadores em baixo (só telemóvel) -->
+        <nav class="fixed inset-x-0 bottom-0 z-[1200] flex border-t border-slate-200 bg-white px-1 pb-[max(8px,env(safe-area-inset-bottom))] pt-1 lg:hidden" aria-label="Atalhos">
+            <Link
+                v-for="link in separadores"
+                :key="link.routeName"
+                :href="route(link.routeName)"
+                :aria-current="ativo(link) ? 'page' : undefined"
+                class="flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1 text-[11px] no-underline"
+                :class="ativo(link) ? 'font-semibold text-verde-700' : 'font-medium text-slate-600'"
+            >
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path v-for="d in icones[link.icone]" :key="d" :d="d" />
+                </svg>
+                {{ link.label }}
+            </Link>
+            <button
+                type="button"
+                class="flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium text-slate-600"
+                :aria-expanded="menuAberto"
+                @click="menuAberto = true"
+            >
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path v-for="d in icones.mais" :key="d" :d="d" />
+                </svg>
+                Mais
+            </button>
+        </nav>
     </div>
 </template>

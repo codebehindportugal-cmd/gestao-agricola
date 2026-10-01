@@ -17,7 +17,7 @@
                                     id="name"
                                     v-model="form.name"
                                     type="text"
-                                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                    class="mt-1 block w-full border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                                     required
                                 />
                                 <div v-if="form.errors.name" class="text-red-600 text-sm mt-1">{{ form.errors.name }}</div>
@@ -29,7 +29,7 @@
                                     id="email"
                                     v-model="form.email"
                                     type="email"
-                                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                    class="mt-1 block w-full border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                                     required
                                 />
                                 <div v-if="form.errors.email" class="text-red-600 text-sm mt-1">{{ form.errors.email }}</div>
@@ -41,7 +41,7 @@
                                     id="password"
                                     v-model="form.password"
                                     type="password"
-                                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                    class="mt-1 block w-full border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                                     required
                                 />
                                 <div v-if="form.errors.password" class="text-red-600 text-sm mt-1">{{ form.errors.password }}</div>
@@ -53,7 +53,7 @@
                                     id="password_confirmation"
                                     v-model="form.password_confirmation"
                                     type="password"
-                                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                    class="mt-1 block w-full border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                                     required
                                 />
                             </div>
@@ -66,7 +66,7 @@
                                             v-model="form.roles"
                                             :value="role.id"
                                             type="checkbox"
-                                            class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                                            class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                                         />
                                         <span class="ml-2 text-sm text-gray-700">{{ role.name }}</span>
                                     </label>

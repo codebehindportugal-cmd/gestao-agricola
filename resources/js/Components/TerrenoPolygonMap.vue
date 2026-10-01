@@ -313,7 +313,7 @@ onBeforeUnmount(() => {
 
 <template>
     <div class="space-y-3">
-        <div class="rounded-3xl border border-emerald-100 bg-emerald-50/60 p-4 text-sm leading-6 text-slate-700">
+        <div class="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 text-sm leading-6 text-slate-700">
             Desenha o perímetro no mapa. Podes editar ou apagar o polígono e o centro será atualizado automaticamente.
             <span v-if="selectableContextPolygon" class="block text-slate-600">
                 Também podes clicar no contorno do terreno para o usar como polígono da parcela.
@@ -322,6 +322,6 @@ onBeforeUnmount(() => {
                 Area calculada: {{ formattedArea }} ha
             </span>
         </div>
-        <div :ref="(el) => mapContainer = el" class="w-full overflow-hidden rounded-3xl border border-slate-200" :class="heightClass" />
+        <div :ref="(el) => mapContainer = el" class="w-full overflow-hidden rounded-xl border border-slate-200" :class="heightClass" />
     </div>
 </template>

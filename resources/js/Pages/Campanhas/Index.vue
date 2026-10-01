@@ -73,8 +73,8 @@ const statusBadgeClass = (status) => ({
         <template #header>
             <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700">Custos e campanhas</p>
-                    <h1 class="mt-2 text-3xl font-black text-slate-900">Fechar campanhas com custos, produção e caderno de campo</h1>
+                    <p class="text-sm font-semibold text-verde-700">Custos e campanhas</p>
+                    <h1 class="mt-1 text-[28px] font-bold leading-tight text-slate-900">Fechar campanhas com custos, produção e caderno de campo</h1>
                     <p class="mt-2 max-w-3xl text-sm text-slate-600">
                         Esta área deve responder a três perguntas: quanto custou, quanto produziu e que operações ficaram registadas.
                     </p>
@@ -82,46 +82,46 @@ const statusBadgeClass = (status) => ({
             </div>
         </template>
 
-        <div class="bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_32%),linear-gradient(180deg,_#f8fafc_0%,_#eef6f1_100%)] py-10">
+        <div class="py-6">
             <div class="mx-auto flex max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
                 <section class="grid gap-4 md:grid-cols-3">
-                    <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <article class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                         <p class="text-sm font-medium text-slate-500">Campanhas</p>
-                        <p class="mt-3 text-4xl font-black text-slate-900">{{ summary.total }}</p>
+                        <p class="numero mt-1 text-2xl font-bold text-slate-900">{{ summary.total }}</p>
                     </article>
-                    <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <article class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                         <p class="text-sm font-medium text-slate-500">Concluídas</p>
-                        <p class="mt-3 text-4xl font-black text-emerald-700">{{ summary.concluidas }}</p>
+                        <p class="numero mt-1 text-2xl font-bold text-slate-900">{{ summary.concluidas }}</p>
                     </article>
-                    <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <article class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                         <p class="text-sm font-medium text-slate-500">Custo total registado</p>
-                        <p class="mt-3 text-4xl font-black text-amber-700">{{ formatCurrency(summary.custo_total) }}</p>
+                        <p class="numero mt-1 text-2xl font-bold text-slate-900">{{ formatCurrency(summary.custo_total) }}</p>
                     </article>
                 </section>
 
-                <section class="rounded-[32px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                <section class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                     <div class="grid gap-4 md:grid-cols-[1.2fr_0.8fr_0.8fr_1fr]">
                         <div>
                             <InputLabel value="Pesquisar" />
-                            <TextInput v-model="filterState.search" class="mt-2 block w-full rounded-2xl border-slate-200" placeholder="Ano ou cultura" />
+                            <TextInput v-model="filterState.search" class="mt-2 block w-full rounded-lg border-slate-200" placeholder="Ano ou cultura" />
                         </div>
                         <div>
                             <InputLabel value="Estado" />
-                            <select v-model="filterState.status" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                            <select v-model="filterState.status" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500">
                                 <option value="">Todos</option>
                                 <option v-for="status in statusOptions" :key="status" :value="status">{{ statusLabel(status) }}</option>
                             </select>
                         </div>
                         <div>
                             <InputLabel value="Ano" />
-                            <select v-model="filterState.ano" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                            <select v-model="filterState.ano" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500">
                                 <option value="">Todos</option>
                                 <option v-for="ano in anos" :key="ano" :value="ano">{{ ano }}</option>
                             </select>
                         </div>
                         <div>
                             <InputLabel value="Cultura" />
-                            <select v-model="filterState.cultura_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                            <select v-model="filterState.cultura_id" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500">
                                 <option value="">Todas</option>
                                 <option v-for="cultura in culturas" :key="cultura.id" :value="cultura.id">{{ cultura.nome }}</option>
                             </select>
@@ -133,13 +133,13 @@ const statusBadgeClass = (status) => ({
                     <article
                         v-for="campanha in campanhas.data"
                         :key="campanha.id"
-                        class="rounded-[32px] border border-white/80 bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]"
+                        class="rounded-xl border border-slate-200 bg-white p-6"
                     >
                         <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                             <div>
                                 <div class="flex flex-wrap items-center gap-3">
-                                    <h2 class="text-2xl font-black text-slate-900">{{ campanha.cultura_nome }}</h2>
-                                    <span class="rounded-full px-3 py-1 text-xs font-semibold" :class="statusBadgeClass(campanha.status)">
+                                    <h2 class="text-2xl font-bold text-slate-900">{{ campanha.cultura_nome }}</h2>
+                                    <span class="rounded-md px-3 py-1 text-xs font-semibold" :class="statusBadgeClass(campanha.status)">
                                         {{ statusLabel(campanha.status) }}
                                     </span>
                                 </div>
@@ -151,25 +151,25 @@ const statusBadgeClass = (status) => ({
                             <div class="flex flex-wrap gap-2">
                                 <Link
                                     :href="route('app.campanhas.show', campanha.id)"
-                                    class="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                                    class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                                 >
                                     Ver detalhe
                                 </Link>
                                 <Link
                                     :href="route('app.campanhas.relatorio', campanha.id)"
-                                    class="inline-flex items-center rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+                                    class="inline-flex items-center rounded-lg border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
                                 >
                                     Relatório
                                 </Link>
                                 <Link
                                     :href="route('app.campanhas.caderno-campo', campanha.id)"
-                                    class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100"
+                                    class="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100"
                                 >
                                     Caderno de campo
                                 </Link>
                                 <Link
                                     :href="route('app.campanhas.custos-pdf', campanha.id)"
-                                    class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-100"
+                                    class="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-100"
                                 >
                                     Custos PDF
                                 </Link>
@@ -177,27 +177,27 @@ const statusBadgeClass = (status) => ({
                         </div>
 
                         <div class="mt-6 grid gap-4 md:grid-cols-4">
-                            <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Produção real</p>
+                            <div class="rounded-xl bg-slate-50 p-4">
+                                <p class="text-xs font-semibold text-slate-400">Produção real</p>
                                 <p class="mt-2 text-lg font-bold text-slate-900">{{ formatNumber(campanha.producao_real) }} kg</p>
                             </div>
-                            <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Custo total</p>
+                            <div class="rounded-xl bg-slate-50 p-4">
+                                <p class="text-xs font-semibold text-slate-400">Custo total</p>
                                 <p class="mt-2 text-lg font-bold text-slate-900">{{ formatCurrency(campanha.custo_total) }}</p>
                             </div>
-                            <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Custo por kg</p>
+                            <div class="rounded-xl bg-slate-50 p-4">
+                                <p class="text-xs font-semibold text-slate-400">Custo por kg</p>
                                 <p class="mt-2 text-lg font-bold text-slate-900">{{ formatCurrency(campanha.custo_por_kg) }}</p>
                             </div>
-                            <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Registos</p>
+                            <div class="rounded-xl bg-slate-50 p-4">
+                                <p class="text-xs font-semibold text-slate-400">Registos</p>
                                 <p class="mt-2 text-lg font-bold text-slate-900">{{ campanha.operacoes_count }} operações · {{ campanha.colheitas_count }} colheitas</p>
                             </div>
                         </div>
                     </article>
                 </section>
 
-                <section v-if="!campanhas.data.length" class="rounded-[32px] border border-dashed border-slate-300 bg-white/70 px-6 py-12 text-center text-sm leading-7 text-slate-600">
+                <section v-if="!campanhas.data.length" class="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm leading-7 text-slate-600">
                     Nenhuma campanha encontrada com os filtros atuais.
                 </section>
 

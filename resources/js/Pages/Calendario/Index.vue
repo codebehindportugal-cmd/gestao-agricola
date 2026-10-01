@@ -254,20 +254,20 @@ const eliminar = (item, serie = false) => {
 
                 <!-- Resumo -->
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="bg-white rounded-lg shadow p-4">
-                        <p class="text-xs uppercase tracking-wide text-gray-500">A pagar este mês</p>
+                    <div class="bg-white rounded-lg p-4">
+                        <p class="text-xs text-gray-500">A pagar este mês</p>
                         <p class="text-2xl font-semibold text-gray-900 mt-1">{{ euros(resumo.por_pagar_mes) || '—' }}</p>
                     </div>
-                    <div class="bg-white rounded-lg shadow p-4">
-                        <p class="text-xs uppercase tracking-wide text-gray-500">Total do mês</p>
+                    <div class="bg-white rounded-lg p-4">
+                        <p class="text-xs text-gray-500">Total do mês</p>
                         <p class="text-2xl font-semibold text-gray-900 mt-1">{{ euros(resumo.total_mes) || '—' }}</p>
                     </div>
-                    <div class="bg-white rounded-lg shadow p-4">
-                        <p class="text-xs uppercase tracking-wide text-gray-500">Pendentes</p>
+                    <div class="bg-white rounded-lg p-4">
+                        <p class="text-xs text-gray-500">Pendentes</p>
                         <p class="text-2xl font-semibold text-gray-900 mt-1">{{ resumo.pendentes ?? 0 }}</p>
                     </div>
-                    <div class="bg-white rounded-lg shadow p-4" :class="resumo.atrasados > 0 ? 'ring-2 ring-red-400' : ''">
-                        <p class="text-xs uppercase tracking-wide text-gray-500">Em atraso</p>
+                    <div class="bg-white rounded-lg p-4" :class="resumo.atrasados > 0 ? 'ring-2 ring-red-400' : ''">
+                        <p class="text-xs text-gray-500">Em atraso</p>
                         <p class="text-2xl font-semibold mt-1" :class="resumo.atrasados > 0 ? 'text-red-600' : 'text-gray-900'">
                             {{ resumo.atrasados ?? 0 }}
                         </p>
@@ -275,7 +275,7 @@ const eliminar = (item, serie = false) => {
                 </div>
 
                 <!-- Barra de controlo -->
-                <div class="bg-white rounded-lg shadow p-4 flex flex-wrap items-center gap-3">
+                <div class="bg-white rounded-lg p-4 flex flex-wrap items-center gap-3">
                     <!-- No telemovel esta barra tem 311px: o min-w-[10rem] reservava
                          160px de folga que nada podia encolher e empurrava o "Hoje"
                          (e depois o "Novo") para fora do ecra. -->
@@ -324,7 +324,7 @@ const eliminar = (item, serie = false) => {
 
                 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
                     <!-- Grelha do mês -->
-                    <div class="xl:col-span-2 bg-white rounded-lg shadow overflow-hidden">
+                    <div class="xl:col-span-2 bg-white rounded-lg overflow-hidden">
                         <div class="grid grid-cols-7 border-b bg-gray-50">
                             <div v-for="d in DIAS" :key="d"
                                 class="px-2 py-2 text-xs font-semibold text-gray-500 text-center uppercase">
@@ -356,7 +356,7 @@ const eliminar = (item, serie = false) => {
                     </div>
 
                     <!-- Próximos 60 dias -->
-                    <div class="bg-white rounded-lg shadow p-4">
+                    <div class="bg-white rounded-lg p-4">
                         <h3 class="font-semibold text-gray-800 mb-3">Próximos 60 dias</h3>
                         <p v-if="!proximos.length" class="text-sm text-gray-500">Nada agendado.</p>
                         <ul class="space-y-2">

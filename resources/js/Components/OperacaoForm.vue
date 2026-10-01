@@ -642,13 +642,13 @@ const setActiveTab = (tabId) => {
                         v-model="form.parcela_ids"
                         multiple
                         size="6"
-                        class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                        class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                     >
                         <option v-for="parcela in parcelas" :key="parcela.id" :value="String(parcela.id)">
                             {{ parcela.nome }} - {{ parcela.terreno_nome }}
                         </option>
                     </select>
-                    <select v-else v-model="form.parcela_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                    <select v-else v-model="form.parcela_id" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500">
                         <option value="">Selecionar parcela</option>
                         <option v-for="parcela in parcelas" :key="parcela.id" :value="String(parcela.id)">
                             {{ parcela.nome }} - {{ parcela.terreno_nome }}
@@ -660,7 +660,7 @@ const setActiveTab = (tabId) => {
 
                 <div>
                     <InputLabel value="Tipo" />
-                    <select v-model="form.tipo" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                    <select v-model="form.tipo" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500">
                         <option value="">Selecionar tipo</option>
                         <option v-for="tipo in tipoOptions" :key="tipo" :value="tipo">{{ tipo }}</option>
                     </select>
@@ -669,7 +669,7 @@ const setActiveTab = (tabId) => {
 
                 <div>
                     <InputLabel value="Estado" />
-                    <select v-model="form.estado" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                    <select v-model="form.estado" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500">
                         <option v-for="estado in estadoOptions" :key="estado" :value="estado">{{ estadoLabel(estado) }}</option>
                     </select>
                     <InputError class="mt-2" :message="form.errors.estado" />
@@ -677,7 +677,7 @@ const setActiveTab = (tabId) => {
 
                 <div v-if="selectedParcelaCulturas.length" class="sm:col-span-2">
                     <InputLabel :value="selectedParcelaCulturas.length > 1 ? 'Cultura / variedade' : 'Cultura'" />
-                    <select v-model="form.cultura_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                    <select v-model="form.cultura_id" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500">
                         <option value="">Selecionar cultura</option>
                         <option v-for="cultura in selectedParcelaCulturas" :key="cultura.id" :value="String(cultura.id)">
                             {{ culturaLabel(cultura) }}
@@ -688,46 +688,46 @@ const setActiveTab = (tabId) => {
                     </p>
                     <InputError class="mt-2" :message="form.errors.cultura_id" />
                 </div>
-                <div v-else-if="selectedParcela && isColheita(form.tipo)" class="sm:col-span-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <div v-else-if="selectedParcela && isColheita(form.tipo)" class="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                     Esta parcela ainda não tem uma cultura/variedade registada. Cria primeiro a cultura para conseguires guardar a colheita.
                     <InputError class="mt-2" :message="form.errors.cultura_id" />
                 </div>
 
                 <div>
                     <InputLabel value="Data e hora de início" />
-                    <TextInput v-model="form.data_hora_inicio" type="datetime-local" class="mt-2 block w-full rounded-2xl" />
+                    <TextInput v-model="form.data_hora_inicio" type="datetime-local" class="mt-2 block w-full rounded-lg" />
                     <InputError class="mt-2" :message="form.errors.data_hora_inicio" />
                 </div>
 
                 <div>
                     <InputLabel value="Data e hora de fim" />
-                    <TextInput v-model="form.data_hora_fim" type="datetime-local" class="mt-2 block w-full rounded-2xl" />
+                    <TextInput v-model="form.data_hora_fim" type="datetime-local" class="mt-2 block w-full rounded-lg" />
                     <InputError class="mt-2" :message="form.errors.data_hora_fim" />
                 </div>
 
-                <div v-if="isColheita(form.tipo) && colheitasCount > 1" class="sm:col-span-2 rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <div v-if="isColheita(form.tipo) && colheitasCount > 1" class="sm:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                     Esta apanha tem {{ colheitasCount }} colheitas registadas — uma por pomar — e o custo
                     reparte-se pelos quilos de cada uma. Os quilos editam-se no ecrã da campanha ou pela API;
                     aqui não se mexe em nenhuma.
                 </div>
 
-                <div v-if="isColheita(form.tipo) && colheitasCount <= 1" class="sm:col-span-2 rounded-3xl border border-emerald-100 bg-emerald-50/70 p-4">
+                <div v-if="isColheita(form.tipo) && colheitasCount <= 1" class="sm:col-span-2 rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
                     <div class="grid gap-4 sm:grid-cols-3">
                         <div>
                             <InputLabel value="Kg apanhados" />
-                            <TextInput v-model="form.colheita_quantidade_total" type="number" step="0.01" min="0.01" class="mt-2 block w-full rounded-2xl bg-white" />
+                            <TextInput v-model="form.colheita_quantidade_total" type="number" step="0.01" min="0.01" class="mt-2 block w-full rounded-lg bg-white" />
                             <InputError class="mt-2" :message="form.errors.colheita_quantidade_total" />
                         </div>
 
                         <div>
                             <InputLabel value="Perdas (kg)" />
-                            <TextInput v-model="form.colheita_quantidade_perdas" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl bg-white" />
+                            <TextInput v-model="form.colheita_quantidade_perdas" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-lg bg-white" />
                             <InputError class="mt-2" :message="form.errors.colheita_quantidade_perdas" />
                         </div>
 
                         <div>
                             <InputLabel value="Qualidade" />
-                            <select v-model="form.colheita_qualidade" class="mt-2 block w-full rounded-2xl border-slate-200 bg-white shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                            <select v-model="form.colheita_qualidade" class="mt-2 block w-full rounded-lg border-slate-200 bg-white focus:border-emerald-500 focus:ring-emerald-500">
                                 <option value="premium">Premium</option>
                                 <option value="superior">Superior</option>
                                 <option value="comercial">Comercial</option>
@@ -740,7 +740,7 @@ const setActiveTab = (tabId) => {
 
                 <div class="sm:col-span-2">
                     <InputLabel value="Observações" />
-                    <textarea v-model="form.observacoes" rows="4" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500" />
+                    <textarea v-model="form.observacoes" rows="4" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500" />
                     <InputError class="mt-2" :message="form.errors.observacoes" />
                 </div>
             </div>
@@ -748,7 +748,7 @@ const setActiveTab = (tabId) => {
             <div v-show="activeTab === 'recursos'" class="grid gap-4 sm:grid-cols-2">
                 <div>
                     <InputLabel value="Trabalhador" />
-                    <select v-model="form.funcionario_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                    <select v-model="form.funcionario_id" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500">
                         <option value="">Sem trabalhador</option>
                         <option v-for="funcionario in funcionarios" :key="funcionario.id" :value="String(funcionario.id)">
                             {{ funcionario.nome }}{{ funcionario.cargo ? ` - ${funcionario.cargo}` : '' }}
@@ -759,7 +759,7 @@ const setActiveTab = (tabId) => {
 
                 <div>
                     <InputLabel value="Equipa" />
-                    <select v-model="form.equipa_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                    <select v-model="form.equipa_id" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500">
                         <option value="">Sem equipa</option>
                         <option v-for="equipa in equipas" :key="equipa.id" :value="String(equipa.id)">{{ equipa.nome }}</option>
                     </select>
@@ -768,7 +768,7 @@ const setActiveTab = (tabId) => {
 
                 <div>
                     <InputLabel value="Máquina" />
-                    <select v-model="form.maquina_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                    <select v-model="form.maquina_id" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500">
                         <option value="">Sem máquina</option>
                         <option v-for="maquina in maquinas" :key="maquina.id" :value="String(maquina.id)">{{ maquina.nome }}</option>
                     </select>
@@ -777,7 +777,7 @@ const setActiveTab = (tabId) => {
 
                 <div>
                     <InputLabel value="Alfaia" />
-                    <select v-model="form.alfaia_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                    <select v-model="form.alfaia_id" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500">
                         <option value="">Sem alfaia</option>
                         <option v-for="alfaia in alfaias" :key="alfaia.id" :value="String(alfaia.id)">{{ alfaia.nome }}</option>
                     </select>
@@ -787,11 +787,11 @@ const setActiveTab = (tabId) => {
                 <div>
                     <InputLabel value="Duração (h)" />
                     <div class="mt-2 flex gap-2">
-                        <TextInput v-model="form.duracao_horas" type="number" step="0.01" min="0" class="block w-full rounded-2xl" placeholder="Horas reais da parcela" />
+                        <TextInput v-model="form.duracao_horas" type="number" step="0.01" min="0" class="block w-full rounded-lg" placeholder="Horas reais da parcela" />
                         <SecondaryButton
                             v-if="calculatedDuration"
                             type="button"
-                            class="shrink-0 rounded-full px-4 py-2 text-xs normal-case tracking-normal"
+                            class="shrink-0 rounded-md px-4 py-2 text-xs normal-case tracking-normal"
                             @click="applyCalculatedDuration"
                         >
                             Usar cálculo
@@ -805,13 +805,13 @@ const setActiveTab = (tabId) => {
 
                 <div v-if="selectedMachineIsVehicle">
                     <InputLabel value="Distância (km)" />
-                    <TextInput v-model="form.distancia_km" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                    <TextInput v-model="form.distancia_km" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-lg" />
                     <InputError class="mt-2" :message="form.errors.distancia_km" />
                 </div>
 
                 <div v-if="selectedMachine?.consumo_combustivel">
                     <InputLabel value="Combustível gasto (L)" />
-                    <TextInput v-model="form.combustivel_gasto_l" readonly class="mt-2 block w-full rounded-2xl bg-amber-50 text-slate-700" />
+                    <TextInput v-model="form.combustivel_gasto_l" readonly class="mt-2 block w-full rounded-lg bg-amber-50 text-slate-700" />
                     <p class="mt-2 text-xs text-slate-500">
                         {{ selectedMachineIsVehicle ? `${selectedMachine.consumo_combustivel} L/100 km` : `${selectedMachine.consumo_combustivel} L/h` }}
                     </p>
@@ -820,7 +820,7 @@ const setActiveTab = (tabId) => {
 
                 <div>
                     <InputLabel value="Operador sistema" />
-                    <select v-model="form.operador_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                    <select v-model="form.operador_id" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500">
                         <option value="">Sem operador</option>
                         <option v-for="operador in operadores" :key="operador.id" :value="String(operador.id)">
                             {{ operador.name ?? operador.nome }}
@@ -830,17 +830,17 @@ const setActiveTab = (tabId) => {
                 </div>
 
                 <!-- Todas as maquinas da operacao, com o custo de cada uma -->
-                <div class="sm:col-span-2 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                <div class="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                            <h3 class="text-sm font-black text-slate-900">Máquinas e transporte</h3>
+                            <h3 class="text-sm font-bold text-slate-900">Máquinas e transporte</h3>
                             <p class="mt-1 text-xs text-slate-500">
                                 Acrescenta aqui todas as máquinas, alfaias e viaturas usadas. Cada linha entra no custo da operação.
                             </p>
                         </div>
                         <SecondaryButton
                             type="button"
-                            class="shrink-0 rounded-full px-4 py-2 text-xs normal-case tracking-normal"
+                            class="shrink-0 rounded-md px-4 py-2 text-xs normal-case tracking-normal"
                             @click="addRecursoRow(form)"
                         >
                             Adicionar máquina
@@ -855,13 +855,13 @@ const setActiveTab = (tabId) => {
                         <div
                             v-for="(recurso, index) in form.recursos"
                             :key="`recurso-${index}`"
-                            class="grid gap-3 rounded-2xl bg-white p-4 sm:grid-cols-2"
+                            class="grid gap-3 rounded-lg bg-white p-4 sm:grid-cols-2"
                         >
                             <div>
                                 <InputLabel value="Máquina" />
                                 <select
                                     v-model="recurso.maquina_id"
-                                    class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                                    class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                                     @change="applyRecursoDefaults(form, index)"
                                 >
                                     <option value="">Sem máquina</option>
@@ -874,7 +874,7 @@ const setActiveTab = (tabId) => {
                                 <InputLabel value="Alfaia" />
                                 <select
                                     v-model="recurso.alfaia_id"
-                                    class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                                    class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                                     @change="applyRecursoDefaults(form, index)"
                                 >
                                     <option value="">Sem alfaia</option>
@@ -885,43 +885,43 @@ const setActiveTab = (tabId) => {
 
                             <div v-if="!recurso.maquina_id && !recurso.alfaia_id">
                                 <InputLabel value="Nome (fora do cadastro)" />
-                                <TextInput v-model="recurso.nome" class="mt-2 block w-full rounded-2xl" placeholder="Carro de transporte, trator alugado..." />
+                                <TextInput v-model="recurso.nome" class="mt-2 block w-full rounded-lg" placeholder="Carro de transporte, trator alugado..." />
                                 <InputError class="mt-2" :message="form.errors[`recursos.${index}.nome`]" />
                             </div>
 
                             <div>
                                 <InputLabel value="Função" />
-                                <TextInput v-model="recurso.papel" class="mt-2 block w-full rounded-2xl" placeholder="apanha, transporte, carga..." />
+                                <TextInput v-model="recurso.papel" class="mt-2 block w-full rounded-lg" placeholder="apanha, transporte, carga..." />
                             </div>
 
                             <div>
                                 <InputLabel value="Unidades iguais" />
-                                <TextInput v-model="recurso.unidades" type="number" step="1" min="1" class="mt-2 block w-full rounded-2xl" />
+                                <TextInput v-model="recurso.unidades" type="number" step="1" min="1" class="mt-2 block w-full rounded-lg" />
                                 <p class="mt-1 text-xs text-slate-400">Dois empilhadores iguais: uma linha com 2.</p>
                                 <InputError class="mt-2" :message="form.errors[`recursos.${index}.unidades`]" />
                             </div>
 
                             <div>
                                 <InputLabel value="Horas totais" />
-                                <TextInput v-model="recurso.horas" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                                <TextInput v-model="recurso.horas" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-lg" />
                                 <InputError class="mt-2" :message="form.errors[`recursos.${index}.horas`]" />
                             </div>
 
                             <div>
                                 <InputLabel value="Custo por hora (€/h)" />
-                                <TextInput v-model="recurso.custo_hora" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                                <TextInput v-model="recurso.custo_hora" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-lg" />
                                 <InputError class="mt-2" :message="form.errors[`recursos.${index}.custo_hora`]" />
                             </div>
 
                             <div>
                                 <InputLabel value="Km percorridos" />
-                                <TextInput v-model="recurso.km" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                                <TextInput v-model="recurso.km" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-lg" />
                                 <InputError class="mt-2" :message="form.errors[`recursos.${index}.km`]" />
                             </div>
 
                             <div>
                                 <InputLabel value="Custo por km (€/km)" />
-                                <TextInput v-model="recurso.custo_km" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                                <TextInput v-model="recurso.custo_km" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-lg" />
                                 <InputError class="mt-2" :message="form.errors[`recursos.${index}.custo_km`]" />
                             </div>
 
@@ -931,7 +931,7 @@ const setActiveTab = (tabId) => {
                                 </p>
                                 <button
                                     type="button"
-                                    class="rounded-full px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                                    class="rounded-md px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
                                     @click="removeRecursoRow(form, index)"
                                 >
                                     Remover
@@ -939,7 +939,7 @@ const setActiveTab = (tabId) => {
                             </div>
                         </div>
 
-                        <p class="text-right text-sm font-black text-slate-900">
+                        <p class="text-right text-sm font-bold text-slate-900">
                             Total de máquinas e transporte: € {{ formatCurrency(totalCustoRecursos) }}
                         </p>
                     </div>
@@ -947,42 +947,42 @@ const setActiveTab = (tabId) => {
             </div>
 
             <div v-show="activeTab === 'produtos'" class="space-y-4">
-                <div v-if="isTratamentoFitossanitario(form.tipo)" class="rounded-3xl border border-sky-100 bg-sky-50 p-4">
+                <div v-if="isTratamentoFitossanitario(form.tipo)" class="rounded-xl border border-sky-100 bg-sky-50 p-4">
                     <h3 class="mb-4 text-lg font-semibold text-sky-900">Dados da aplicação (Caderno de Campo DGAV)</h3>
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div>
                             <InputLabel value="Produtor" />
-                            <TextInput v-model="form.produtor_nome" class="mt-2 block w-full rounded-2xl" />
+                            <TextInput v-model="form.produtor_nome" class="mt-2 block w-full rounded-lg" />
                             <InputError class="mt-2" :message="form.errors.produtor_nome" />
                         </div>
 
                         <div>
                             <InputLabel value="Aplicador / entidade" />
-                            <TextInput v-model="form.aplicador_nome" class="mt-2 block w-full rounded-2xl" />
+                            <TextInput v-model="form.aplicador_nome" class="mt-2 block w-full rounded-lg" />
                             <InputError class="mt-2" :message="form.errors.aplicador_nome" />
                         </div>
 
                         <div>
                             <InputLabel value="N.º autorização do aplicador" />
-                            <TextInput v-model="form.aplicador_numero_autorizacao" class="mt-2 block w-full rounded-2xl" />
+                            <TextInput v-model="form.aplicador_numero_autorizacao" class="mt-2 block w-full rounded-lg" />
                             <InputError class="mt-2" :message="form.errors.aplicador_numero_autorizacao" />
                         </div>
 
                         <div>
                             <InputLabel value="Concelho" />
-                            <TextInput v-model="form.exploracao_concelho" class="mt-2 block w-full rounded-2xl" />
+                            <TextInput v-model="form.exploracao_concelho" class="mt-2 block w-full rounded-lg" />
                             <InputError class="mt-2" :message="form.errors.exploracao_concelho" />
                         </div>
 
                         <div>
                             <InputLabel value="Freguesia" />
-                            <TextInput v-model="form.exploracao_freguesia" class="mt-2 block w-full rounded-2xl" />
+                            <TextInput v-model="form.exploracao_freguesia" class="mt-2 block w-full rounded-lg" />
                             <InputError class="mt-2" :message="form.errors.exploracao_freguesia" />
                         </div>
                     </div>
                 </div>
 
-                <div v-if="canUpload" class="rounded-3xl border border-slate-200 bg-slate-50/60 p-4">
+                <div v-if="canUpload" class="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
                         <div class="flex-1">
                             <p class="text-sm font-semibold text-slate-800">Imagem da ficha de aplicação</p>
@@ -1012,14 +1012,14 @@ const setActiveTab = (tabId) => {
                                 <img
                                     :src="currentImageUrl"
                                     alt="Ficha de aplicação"
-                                    class="h-24 w-24 rounded-2xl object-cover shadow-sm ring-1 ring-slate-200 transition hover:opacity-90"
+                                    class="h-24 w-24 rounded-lg object-cover ring-1 ring-slate-200 transition hover:opacity-90"
                                 >
                             </a>
                         </div>
                     </div>
                 </div>
 
-                <div v-if="canExtract" class="rounded-3xl border border-violet-100 bg-violet-50/60 p-4">
+                <div v-if="canExtract" class="rounded-xl border border-violet-100 bg-violet-50/60 p-4">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <p class="text-sm font-semibold text-violet-900">Extração automática de imagem</p>
@@ -1030,7 +1030,7 @@ const setActiveTab = (tabId) => {
                         <button
                             type="button"
                             :disabled="extracting"
-                            class="flex shrink-0 items-center gap-2 rounded-full bg-violet-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-600 disabled:opacity-60"
+                            class="flex shrink-0 items-center gap-2 rounded-lg bg-violet-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-600 disabled:opacity-60"
                             @click="extrairDadosImagem"
                         >
                             <svg v-if="!extracting" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1043,15 +1043,15 @@ const setActiveTab = (tabId) => {
                             {{ extracting ? 'A analisar imagem…' : 'Extrair dados da imagem' }}
                         </button>
                     </div>
-                    <p v-if="extractSuccess" class="mt-3 rounded-2xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800">
+                    <p v-if="extractSuccess" class="mt-3 rounded-lg bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800">
                         Dados extraídos com sucesso. Verifica os campos preenchidos antes de guardar.
                     </p>
-                    <p v-if="extractError" class="mt-3 rounded-2xl bg-red-100 px-4 py-2 text-sm font-medium text-red-800">
+                    <p v-if="extractError" class="mt-3 rounded-lg bg-red-100 px-4 py-2 text-sm font-medium text-red-800">
                         {{ extractError }}
                     </p>
                 </div>
 
-                <div class="rounded-3xl border border-emerald-100 bg-emerald-50/60 p-4">
+                <div class="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <InputLabel :value="productTitle(form)" />
@@ -1061,18 +1061,18 @@ const setActiveTab = (tabId) => {
                             </p>
                         </div>
 
-                        <SecondaryButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="addProductRow(form)">
+                        <SecondaryButton type="button" class="rounded-lg px-4 py-2 text-sm normal-case tracking-normal" @click="addProductRow(form)">
                             Adicionar produto
                         </SecondaryButton>
                     </div>
 
                     <InputError class="mt-2" :message="form.errors.produtos" />
 
-                    <div v-if="allowMultipleParcelas" class="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+                    <div v-if="allowMultipleParcelas" class="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
                         Ao selecionar várias parcelas, indica a quantidade total usada na tarefa. O sistema reparte essa quantidade pelas parcelas pela área de cada uma, evitando duplicar litros ou kg no stock e nos custos.
                     </div>
 
-                    <div v-if="!productOptionsFor(form).length" class="mt-3 rounded-2xl border border-dashed border-emerald-200 bg-white/70 p-4 text-sm text-slate-600">
+                    <div v-if="!productOptionsFor(form).length" class="mt-3 rounded-lg border border-dashed border-emerald-200 bg-white p-4 text-sm text-slate-600">
                         Não existem produtos deste tipo na lista.
                         <button
                             type="button"
@@ -1084,12 +1084,12 @@ const setActiveTab = (tabId) => {
                     </div>
 
                     <div class="mt-4 space-y-4">
-                        <div v-for="(produto, index) in form.produtos" :key="`produto-${index}`" class="grid gap-3 rounded-2xl bg-white p-4 sm:grid-cols-2">
+                        <div v-for="(produto, index) in form.produtos" :key="`produto-${index}`" class="grid gap-3 rounded-lg bg-white p-4 sm:grid-cols-2">
                             <div class="sm:col-span-2">
                                 <InputLabel value="Produto" />
                                 <select
                                     v-model="produto.produto_id"
-                                    class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                                    class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                                     @change="updateProductDefaults(form, index)"
                                 >
                                     <option value="">Selecionar produto</option>
@@ -1100,22 +1100,22 @@ const setActiveTab = (tabId) => {
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.produto_id`]" />
                             </div>
 
-                            <div v-if="isTratamentoFitossanitario(form.tipo) && selectedProduct(produto.produto_id)" class="sm:col-span-2 rounded-2xl bg-slate-50 p-4">
+                            <div v-if="isTratamentoFitossanitario(form.tipo) && selectedProduct(produto.produto_id)" class="sm:col-span-2 rounded-lg bg-slate-50 p-4">
                                 <div class="grid gap-3 sm:grid-cols-3">
                                     <div>
-                                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">N.º DGAV</p>
+                                        <p class="text-xs font-semibold text-slate-400">N.º DGAV</p>
                                         <p class="mt-2 text-sm font-semibold text-slate-800">
                                             {{ selectedProduct(produto.produto_id)?.numero_autorizacao_dgav || 'Sem registo' }}
                                         </p>
                                     </div>
                                     <div>
-                                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Estabelecimento</p>
+                                        <p class="text-xs font-semibold text-slate-400">Estabelecimento</p>
                                         <p class="mt-2 text-sm font-semibold text-slate-800">
                                             {{ selectedProduct(produto.produto_id)?.estabelecimento_venda_nome || 'Sem registo' }}
                                         </p>
                                     </div>
                                     <div>
-                                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Autorização</p>
+                                        <p class="text-xs font-semibold text-slate-400">Autorização</p>
                                         <p class="mt-2 text-sm font-semibold text-slate-800">
                                             {{ selectedProduct(produto.produto_id)?.estabelecimento_venda_autorizacao || 'Sem registo' }}
                                         </p>
@@ -1131,7 +1131,7 @@ const setActiveTab = (tabId) => {
                                     step="0.001"
                                     min="0.001"
                                     :readonly="usesDoseAreaCalculation(form.tipo) && calculatedProductQuantity(produto) !== null"
-                                    class="mt-2 block w-full rounded-2xl"
+                                    class="mt-2 block w-full rounded-lg"
                                     :class="{ 'bg-slate-50 text-slate-600': usesDoseAreaCalculation(form.tipo) && calculatedProductQuantity(produto) !== null }"
                                 />
                                 <p v-if="usesDoseAreaCalculation(form.tipo) && calculatedProductQuantity(produto) !== null" class="mt-1 text-xs text-slate-500">
@@ -1142,48 +1142,48 @@ const setActiveTab = (tabId) => {
 
                             <div>
                                 <InputLabel value="Unidade" />
-                                <TextInput v-model="produto.unidade_medida" readonly class="mt-2 block w-full rounded-2xl bg-slate-50 text-slate-600" />
+                                <TextInput v-model="produto.unidade_medida" readonly class="mt-2 block w-full rounded-lg bg-slate-50 text-slate-600" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.unidade_medida`]" />
                             </div>
 
                             <div v-if="usesDoseAreaCalculation(form.tipo)">
                                 <InputLabel value="Dose" />
-                                <TextInput v-model="produto.dose" type="number" step="0.001" min="0" class="mt-2 block w-full rounded-2xl" />
+                                <TextInput v-model="produto.dose" type="number" step="0.001" min="0" class="mt-2 block w-full rounded-lg" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.dose`]" />
                             </div>
 
                             <div v-if="usesDoseAreaCalculation(form.tipo)">
                                 <InputLabel value="Unidade da dose" />
-                                <TextInput v-model="produto.dose_unidade" class="mt-2 block w-full rounded-2xl" placeholder="L/ha, kg/ha" />
+                                <TextInput v-model="produto.dose_unidade" class="mt-2 block w-full rounded-lg" placeholder="L/ha, kg/ha" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.dose_unidade`]" />
                             </div>
 
                             <div v-if="usesDoseAreaCalculation(form.tipo)">
                                 <InputLabel value="Área tratada (ha)" />
-                                <TextInput v-model="produto.area_tratada" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                                <TextInput v-model="produto.area_tratada" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-lg" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.area_tratada`]" />
                             </div>
 
                             <div v-if="isTratamentoFitossanitario(form.tipo)">
                                 <InputLabel value="Volume de calda (L/ha)" />
-                                <TextInput v-model="produto.volume_calda" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-2xl" />
+                                <TextInput v-model="produto.volume_calda" type="number" step="0.01" min="0" class="mt-2 block w-full rounded-lg" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.volume_calda`]" />
                             </div>
 
                             <div v-if="isTratamentoFitossanitario(form.tipo)">
                                 <InputLabel value="Finalidade / inimigo" />
-                                <TextInput v-model="produto.finalidade" class="mt-2 block w-full rounded-2xl" />
+                                <TextInput v-model="produto.finalidade" class="mt-2 block w-full rounded-lg" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.finalidade`]" />
                             </div>
 
                             <div v-if="isTratamentoFitossanitario(form.tipo)">
                                 <InputLabel value="Intervalo de segurança (dias)" />
-                                <TextInput v-model="produto.intervalo_seguranca_dias" type="number" min="0" class="mt-2 block w-full rounded-2xl" />
+                                <TextInput v-model="produto.intervalo_seguranca_dias" type="number" min="0" class="mt-2 block w-full rounded-lg" />
                                 <InputError class="mt-2" :message="form.errors[`produtos.${index}.intervalo_seguranca_dias`]" />
                             </div>
 
-                            <div class="rounded-2xl bg-emerald-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Preço automático</p>
+                            <div class="rounded-lg bg-emerald-50 p-4">
+                                <p class="text-xs font-semibold text-emerald-700">Preço automático</p>
                                 <p class="mt-2 text-sm font-semibold text-emerald-900">
                                     {{ produto.custo_unitario ? `€ ${formatCurrency(parseFloat(produto.custo_unitario) || 0)}` : 'Sem preço definido no produto' }}
                                 </p>
@@ -1193,7 +1193,7 @@ const setActiveTab = (tabId) => {
                             </div>
 
                             <div class="flex items-end">
-                                <DangerButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="removeProductRow(form, index)">
+                                <DangerButton type="button" class="rounded-lg px-4 py-2 text-sm normal-case tracking-normal" @click="removeProductRow(form, index)">
                                     Remover
                                 </DangerButton>
                             </div>
@@ -1203,7 +1203,7 @@ const setActiveTab = (tabId) => {
             </div>
 
             <div v-show="activeTab === 'custos'" class="space-y-4">
-                <div class="rounded-2xl bg-amber-50 p-4 text-sm text-slate-600">
+                <div class="rounded-lg bg-amber-50 p-4 text-sm text-slate-600">
                     Os custos de produtos são calculados a partir das quantidades e preços unitários, e os das máquinas
                     a partir das linhas do separador Recursos. Aqui escreves apenas o que não está em nenhum dos dois —
                     mão de obra, serviços contratados.
@@ -1214,7 +1214,7 @@ const setActiveTab = (tabId) => {
                         <InputLabel value="Custo estimado (€)" />
                         <div class="relative mt-2">
                             <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">€</span>
-                            <TextInput v-model="form.custo_estimado" type="number" step="0.01" min="0" class="block w-full rounded-2xl pl-8" />
+                            <TextInput v-model="form.custo_estimado" type="number" step="0.01" min="0" class="block w-full rounded-lg pl-8" />
                         </div>
                         <InputError class="mt-2" :message="form.errors.custo_estimado" />
                     </div>
@@ -1223,24 +1223,24 @@ const setActiveTab = (tabId) => {
                         <InputLabel value="Outros custos reais (€)" />
                         <div class="relative mt-2">
                             <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">€</span>
-                            <TextInput v-model="form.custo_real" type="number" step="0.01" min="0" class="block w-full rounded-2xl pl-8" />
+                            <TextInput v-model="form.custo_real" type="number" step="0.01" min="0" class="block w-full rounded-lg pl-8" />
                         </div>
                         <p class="mt-1 text-xs text-slate-400">Mão de obra e serviços. As máquinas somam-se a este valor.</p>
                         <InputError class="mt-2" :message="form.errors.custo_real" />
                     </div>
 
-                    <div v-if="totalCustoRecursos > 0" class="sm:col-span-2 rounded-2xl bg-emerald-50 p-4">
-                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Calculado automaticamente</p>
+                    <div v-if="totalCustoRecursos > 0" class="sm:col-span-2 rounded-lg bg-emerald-50 p-4">
+                        <p class="text-xs font-semibold text-emerald-700">Calculado automaticamente</p>
                         <p class="mt-2 text-sm font-medium text-emerald-900">
                             Máquinas e transporte: € {{ formatCurrency(totalCustoRecursos) }}
                         </p>
-                        <p class="mt-1 text-sm font-black text-emerald-900">
+                        <p class="mt-1 text-sm font-bold text-emerald-900">
                             Custo real da operação: € {{ formatCurrency(custoRealTotal) }}
                         </p>
                     </div>
 
-                    <div v-if="form.produtos?.length" class="sm:col-span-2 rounded-2xl bg-emerald-50 p-4">
-                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Calculado automaticamente</p>
+                    <div v-if="form.produtos?.length" class="sm:col-span-2 rounded-lg bg-emerald-50 p-4">
+                        <p class="text-xs font-semibold text-emerald-700">Calculado automaticamente</p>
                         <p class="mt-2 text-sm font-medium text-emerald-900">
                             Custo total de produtos: € {{ formatCurrency(totalCustoProdutos) }}
                         </p>
@@ -1249,10 +1249,10 @@ const setActiveTab = (tabId) => {
             </div>
 
             <div class="mt-6 flex justify-end gap-3">
-                <SecondaryButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="emit('cancel')">
+                <SecondaryButton type="button" class="rounded-lg px-4 py-2 text-sm normal-case tracking-normal" @click="emit('cancel')">
                     Cancelar
                 </SecondaryButton>
-                <PrimaryButton class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" :class="submitButtonClass" :disabled="form.processing">
+                <PrimaryButton class="rounded-lg px-4 py-2 text-sm normal-case tracking-normal" :class="submitButtonClass" :disabled="form.processing">
                     {{ submitLabel }}
                 </PrimaryButton>
             </div>

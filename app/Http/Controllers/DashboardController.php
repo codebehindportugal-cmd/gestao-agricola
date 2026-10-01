@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Alfaia;
 use App\Models\Campanha;
+use App\Models\Compromisso;
 use App\Models\Cultura;
 use App\Models\Despesa;
 use App\Models\Maquina;
@@ -12,15 +13,23 @@ use App\Models\Operacao;
 use App\Models\Parcela;
 use App\Models\Produto;
 use App\Models\Terreno;
+use App\Services\ResumoPorEspecieService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function __invoke(): Response
+    public function __invoke(Request $request, ResumoPorEspecieService $resumoEspecies): Response
     {
+        $campanha = $this->campanhaEmFoco($request);
+        $resumo = $this->buildResumoCampanha($campanha, $resumoEspecies);
+
         return Inertia::render('Dashboard', [
+            'resumoCampanha' => $resumo,
+            'atencao' => $this->buildAtencao($campanha, $resumo),
+            'proximosPagamentos' => $this->buildProximosPagamentos(),
             'stats' => $this->buildStats(),
             'statusCards' => $this->buildStatusCards(),
             'recentOperations' => $this->buildRecentOperations(),
@@ -90,7 +99,7 @@ class DashboardController extends Controller
         return Operacao::query()
             ->with(['parcela:id,nome', 'cultura:id,nome', 'maquina:id,nome'])
             ->latest('data_hora_inicio')
-            ->limit(5)
+            ->limit(80)
             ->get()
             ->map(function (Operacao $operacao) {
                 return [
@@ -98,6 +107,7 @@ class DashboardController extends Controller
                     'tipo' => $operacao->tipo,
                     'estado' => $operacao->estado,
                     'inicio' => optional($operacao->data_hora_inicio)?->format('d/m/Y H:i'),
+                    'dia' => optional($operacao->data_hora_inicio)?->format('Y-m-d'),
                     'parcela' => $operacao->parcela?->nome ?? 'Sem parcela',
                     'cultura' => $operacao->cultura?->nome ?? 'Sem cultura',
                     'maquina' => $operacao->maquina?->nome ?? 'Sem máquina',
@@ -306,5 +316,175 @@ class DashboardController extends Controller
         }
 
         return $model::query()->where($column, $value)->count();
+    }
+
+    /**
+     * A campanha que o utilizador escolheu no menu (ano guardado na sessao);
+     * dentro desse ano, a que esta em curso.
+     */
+    private function campanhaEmFoco(Request $request): ?Campanha
+    {
+        if (! Schema::hasTable('campanhas')) {
+            return null;
+        }
+
+        $ano = $request->session()->get('campanha_ativa_ano');
+        $query = Campanha::query();
+
+        if ($ano) {
+            $query->where('ano', (int) $ano);
+        }
+
+        return $query->orderByRaw("status = 'em_curso' desc")->orderByDesc('data_inicio')->orderByDesc('id')->first()
+            ?? Campanha::query()->orderByDesc('ano')->orderByDesc('id')->first();
+    }
+
+    private function buildResumoCampanha(?Campanha $campanha, ResumoPorEspecieService $servico): ?array
+    {
+        if (! $campanha) {
+            return null;
+        }
+
+        try {
+            $resumo = $servico->paraCampanha($campanha);
+        } catch (\Throwable $erro) {
+            report($erro);
+
+            return null;
+        }
+
+        $total = $resumo['total'] ?? [];
+
+        return [
+            'id' => $campanha->id,
+            'nome' => $resumo['campanha']['nome'] ?? $campanha->nome,
+            'fim' => $campanha->data_fim?->format('d/m/Y'),
+            'terminou' => $campanha->data_fim !== null && $campanha->data_fim->lt(now()->startOfDay()),
+            'kg' => (float) ($total['kg'] ?? 0),
+            'kg_vendidos' => (float) ($total['kg_vendidos'] ?? 0),
+            'vendas' => (float) ($total['vendas'] ?? 0),
+            'custo_total' => (float) ($total['custo_total'] ?? 0),
+            'margem' => (float) ($total['margem'] ?? 0),
+            'custo_kg' => $total['custo_kg'] ?? null,
+            'preco_medio_kg' => $total['preco_medio_kg'] ?? null,
+            'especies' => collect($resumo['especies'] ?? [])
+                ->map(fn (array $linha) => [
+                    'especie' => $linha['especie'],
+                    'area_ha' => (float) ($linha['area_ha'] ?? 0),
+                    'kg' => (float) ($linha['kg'] ?? 0),
+                    'kg_vendidos' => (float) ($linha['kg_vendidos'] ?? 0),
+                    'vendas' => (float) ($linha['vendas'] ?? 0),
+                    'custo_total' => (float) ($linha['custo_total'] ?? 0),
+                    'custo_kg' => $linha['custo_kg'] ?? null,
+                    'margem' => (float) ($linha['margem'] ?? 0),
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * O que precisa de uma mao: cada entrada diz o problema e para onde ir.
+     */
+    private function buildAtencao(?Campanha $campanha, ?array $resumo): array
+    {
+        $itens = [];
+
+        foreach ($resumo['especies'] ?? [] as $linha) {
+            if ($linha['especie'] === ResumoPorEspecieService::SEM_ESPECIE || $linha['kg'] <= 0 || $linha['kg_vendidos'] > 0) {
+                continue;
+            }
+
+            $kg = number_format($linha['kg'], 0, ',', ' ');
+            $itens[] = [
+                'titulo' => "Vendas de {$this->minuscula($linha['especie'])} por registar",
+                'texto' => "{$kg} kg colhidos e nenhuma venda ligada. Sem isto a margem aparece negativa.",
+                'acao' => 'Ver custos e vendas',
+                'href' => route('app.campanhas.index'),
+                'tom' => 'aviso',
+            ];
+        }
+
+        $semEspecie = collect($resumo['especies'] ?? [])->firstWhere('especie', ResumoPorEspecieService::SEM_ESPECIE);
+        if ($semEspecie && $semEspecie['kg_vendidos'] > 0) {
+            $kg = number_format($semEspecie['kg_vendidos'], 0, ',', ' ');
+            $itens[] = [
+                'titulo' => 'Vendas sem espécie',
+                'texto' => "{$kg} kg vendidos não dizem se são pera ou maçã, por isso não entram na margem de cada uma.",
+                'acao' => 'Corrigir vendas',
+                'href' => route('app.campanhas.index'),
+                'tom' => 'aviso',
+            ];
+        }
+
+        if (Schema::hasTable('parcelas')) {
+            $semArea = Parcela::query()
+                ->where(fn ($query) => $query->whereNull('area_util')->orWhere('area_util', '<=', 0))
+                ->where(fn ($query) => $query->whereNull('area_total')->orWhere('area_total', '<=', 0))
+                ->orderBy('nome')
+                ->pluck('nome');
+
+            if ($semArea->isNotEmpty()) {
+                $itens[] = [
+                    'titulo' => $semArea->count() === 1 ? '1 parcela sem área' : "{$semArea->count()} parcelas sem área",
+                    'texto' => $semArea->take(4)->implode(', ').'. As doses por hectare e o rateio precisam dela.',
+                    'acao' => 'Abrir parcelas',
+                    'href' => route('app.parcelas.index'),
+                    'tom' => 'info',
+                ];
+            }
+        }
+
+        if ($campanha && $campanha->data_fim && $campanha->data_fim->lt(now()->startOfDay())
+            && ! Campanha::query()->whereDate('data_inicio', '>', $campanha->data_fim)->exists()) {
+            $itens[] = [
+                'titulo' => 'A campanha terminou a '.$campanha->data_fim->format('d/m'),
+                'texto' => 'Abre a campanha seguinte para os novos registos não caírem nesta.',
+                'acao' => 'Abrir campanha',
+                'href' => route('app.campanhas.index'),
+                'tom' => 'info',
+            ];
+        }
+
+        return $itens;
+    }
+
+    private function buildProximosPagamentos(): array
+    {
+        if (! Schema::hasTable('compromissos')) {
+            return [];
+        }
+
+        $hoje = now()->startOfDay();
+
+        return Compromisso::query()
+            ->where('estado', 'pendente')
+            ->whereDate('data', '<=', $hoje->copy()->addDays(45))
+            ->orderBy('data')
+            ->limit(6)
+            ->get(['id', 'titulo', 'categoria', 'tipo', 'entidade', 'data', 'valor'])
+            ->map(function (Compromisso $compromisso) use ($hoje) {
+                $data = \Illuminate\Support\Carbon::parse($compromisso->data)->startOfDay();
+
+                return [
+                    'id' => $compromisso->id,
+                    'titulo' => $compromisso->titulo,
+                    'detalhe' => $compromisso->entidade ?: ($compromisso->tipo ?: ucfirst(str_replace('_', ' ', (string) $compromisso->categoria))),
+                    'dia' => $data->format('d'),
+                    'mes' => mb_substr($data->locale('pt')->translatedFormat('M'), 0, 3),
+                    'dias' => (int) $hoje->diffInDays($data, false),
+                    'valor' => $compromisso->valor !== null ? (float) $compromisso->valor : null,
+                ];
+            })
+            ->all();
+    }
+
+    private function minuscula(string $texto): string
+    {
+        return [
+            'Pereira' => 'pera',
+            'Macieira' => 'maçã',
+            'Pessegueiro' => 'pêssego',
+        ][$texto] ?? mb_strtolower($texto);
     }
 }

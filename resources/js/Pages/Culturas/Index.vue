@@ -251,10 +251,10 @@ const estadoLabel = (estado) => ({
         <template #header>
             <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700">
+                    <p class="text-sm font-semibold text-verde-700">
                         Produção
                     </p>
-                    <h1 class="mt-2 text-3xl font-black text-slate-900">
+                    <h1 class="mt-1 text-[28px] font-bold leading-tight text-slate-900">
                         Culturas
                     </h1>
                     <p class="mt-2 max-w-2xl text-sm text-slate-600">
@@ -264,7 +264,7 @@ const estadoLabel = (estado) => ({
 
                 <PrimaryButton
                     v-if="can.create"
-                    class="justify-center rounded-full bg-emerald-700 px-5 py-3 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600"
+                    class="justify-center rounded-lg bg-emerald-700 px-5 py-3 text-sm hover:bg-verde-800 focus:bg-verde-800 text-white font-semibold inline-flex items-center"
                     @click="openCreateModal"
                 >
                     Nova cultura
@@ -272,45 +272,45 @@ const estadoLabel = (estado) => ({
             </div>
         </template>
 
-        <div class="bg-[radial-gradient(circle_at_top_right,_rgba(132,204,22,0.16),_transparent_28%),linear-gradient(180deg,_#f8fafc_0%,_#eef6f1_100%)] py-10">
+        <div class="py-6">
             <div class="mx-auto flex max-w-7xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
                 <div
                     v-if="flashSuccess"
-                    class="rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-800"
+                    class="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-800"
                 >
                     {{ flashSuccess }}
                 </div>
 
                 <section class="grid gap-4 md:grid-cols-5">
-                    <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <article class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                         <p class="text-sm font-medium text-slate-500">Culturas registadas</p>
-                        <p class="mt-3 text-4xl font-black text-slate-900">{{ summary.total }}</p>
+                        <p class="numero mt-1 text-2xl font-bold text-slate-900">{{ summary.total }}</p>
                     </article>
-                    <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <article class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                         <p class="text-sm font-medium text-slate-500">Ativas</p>
-                        <p class="mt-3 text-4xl font-black text-emerald-700">{{ summary.ativas }}</p>
+                        <p class="numero mt-1 text-2xl font-bold text-slate-900">{{ summary.ativas }}</p>
                     </article>
-                    <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <article class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                         <p class="text-sm font-medium text-slate-500">Permanentes</p>
-                        <p class="mt-3 text-4xl font-black text-amber-700">{{ summary.permanentes }}</p>
+                        <p class="numero mt-1 text-2xl font-bold text-slate-900">{{ summary.permanentes }}</p>
                     </article>
-                    <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <article class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                         <p class="text-sm font-medium text-slate-500">Colhidas</p>
-                        <p class="mt-3 text-4xl font-black text-lime-700">{{ summary.colhidas }}</p>
+                        <p class="numero mt-1 text-2xl font-bold text-slate-900">{{ summary.colhidas }}</p>
                     </article>
-                    <article class="rounded-[28px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                    <article class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                         <p class="text-sm font-medium text-slate-500">Quantidade esperada</p>
-                        <p class="mt-3 text-4xl font-black text-slate-900">{{ formatNumber(summary.quantidade_esperada) }}</p>
+                        <p class="numero mt-1 text-2xl font-bold text-slate-900">{{ formatNumber(summary.quantidade_esperada) }}</p>
                     </article>
                 </section>
 
-                <section class="rounded-[32px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                <section class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                     <div class="grid gap-4 md:grid-cols-[1fr_0.8fr_0.85fr_0.85fr_0.85fr_auto]">
                         <div>
                             <InputLabel value="Pesquisar" />
                             <TextInput
                                 v-model="filterState.search"
-                                class="mt-2 block w-full rounded-2xl border-slate-200"
+                                class="mt-2 block w-full rounded-lg border-slate-200"
                                 placeholder="Nome, tipo ou variedade"
                             />
                         </div>
@@ -318,7 +318,7 @@ const estadoLabel = (estado) => ({
                             <InputLabel value="Estado" />
                             <select
                                 v-model="filterState.estado"
-                                class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                                class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                             >
                                 <option value="">Todos</option>
                                 <option v-for="estado in estadoOptions" :key="estado" :value="estado">
@@ -330,7 +330,7 @@ const estadoLabel = (estado) => ({
                             <InputLabel value="Parcela" />
                             <select
                                 v-model="filterState.parcela_id"
-                                class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                                class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                             >
                                 <option value="">Todas</option>
                                 <option v-for="parcela in parcelas" :key="parcela.id" :value="String(parcela.id)">
@@ -342,7 +342,7 @@ const estadoLabel = (estado) => ({
                             <InputLabel value="Grupo" />
                             <select
                                 v-model="filterState.grupo_cultura"
-                                class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                                class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                             >
                                 <option value="">Todos</option>
                                 <option v-for="grupo in grupoOptions" :key="grupo.value" :value="grupo.value">
@@ -354,13 +354,13 @@ const estadoLabel = (estado) => ({
                             <InputLabel value="Tipo" />
                             <TextInput
                                 v-model="filterState.tipo"
-                                class="mt-2 block w-full rounded-2xl border-slate-200"
+                                class="mt-2 block w-full rounded-lg border-slate-200"
                                 placeholder="Ex: cereal"
                             />
                         </div>
                         <div class="flex items-end">
                             <SecondaryButton
-                                class="w-full justify-center rounded-full px-5 py-3 text-sm normal-case tracking-normal"
+                                class="w-full justify-center rounded-lg px-5 py-3 text-sm "
                                 @click="
                                     filterState.search = '';
                                     filterState.estado = '';
@@ -379,14 +379,14 @@ const estadoLabel = (estado) => ({
                     <article
                         v-for="cultura in culturas.data"
                         :key="cultura.id"
-                        class="rounded-[32px] border border-white/80 bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]"
+                        class="rounded-xl border border-slate-200 bg-white p-6"
                     >
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                             <div>
                                 <div class="flex flex-wrap items-center gap-3">
-                                    <h2 class="break-words text-xl font-black sm:text-2xl text-slate-900">{{ cultura.nome }}</h2>
+                                    <h2 class="break-words text-xl font-bold sm:text-2xl text-slate-900">{{ cultura.nome }}</h2>
                                     <span
-                                        class="rounded-full px-3 py-1 text-xs font-semibold"
+                                        class="rounded-md px-3 py-1 text-xs font-semibold"
                                         :class="estadoBadgeClass(cultura.estado)"
                                     >
                                         {{ estadoLabel(cultura.estado) }}
@@ -395,28 +395,28 @@ const estadoLabel = (estado) => ({
                                 <p class="mt-2 text-sm text-slate-500">
                                     {{ cultura.terreno_nome || 'Sem terreno' }} · {{ cultura.parcela_nome || 'Sem parcela' }}
                                 </p>
-                                <p class="mt-2 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                                <p class="mt-2 inline-flex rounded-md bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
                                     {{ cultura.ciclo_produtivo === 'permanente' ? 'Cultura permanente' : 'Cultura anual' }}
                                 </p>
                             </div>
                             <div class="min-w-0 break-words sm:text-right">
-                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">{{ cultura.grupo_cultura || 'outro' }}</p>
-                                <p class="text-lg font-black text-slate-900">{{ cultura.tipo }}</p>
+                                <p class="text-xs font-semibold text-emerald-600">{{ cultura.grupo_cultura || 'outro' }}</p>
+                                <p class="text-lg font-bold text-slate-900">{{ cultura.tipo }}</p>
                                 <p class="text-sm text-slate-500">{{ cultura.variedade || 'Sem variedade' }}</p>
                             </div>
                         </div>
 
                         <div class="mt-6 grid gap-4 sm:grid-cols-2">
-                            <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Plantação</p>
+                            <div class="rounded-xl bg-slate-50 p-4">
+                                <p class="text-xs font-semibold text-slate-400">Plantação</p>
                                 <p class="mt-2 text-sm text-slate-700">{{ cultura.data_plantacao || 'Sem data' }}</p>
                             </div>
-                            <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Previsão</p>
+                            <div class="rounded-xl bg-slate-50 p-4">
+                                <p class="text-xs font-semibold text-slate-400">Previsão</p>
                                 <p class="mt-2 text-sm text-slate-700">{{ cultura.previsao_colheita || 'Sem previsão' }}</p>
                             </div>
-                            <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Ciclo</p>
+                            <div class="rounded-xl bg-slate-50 p-4">
+                                <p class="text-xs font-semibold text-slate-400">Ciclo</p>
                                 <p class="mt-2 text-sm text-slate-700">
                                     {{ cultura.ciclo_produtivo === 'permanente' ? 'Permanente' : `${cultura.ciclo_dias || '-'} dias` }}
                                 </p>
@@ -424,23 +424,23 @@ const estadoLabel = (estado) => ({
                                     Início de produção: {{ cultura.ano_inicio_producao }}
                                 </p>
                             </div>
-                            <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Quantidade esperada</p>
+                            <div class="rounded-xl bg-slate-50 p-4">
+                                <p class="text-xs font-semibold text-slate-400">Quantidade esperada</p>
                                 <p class="mt-2 text-sm text-slate-700">
                                     {{ formatNumber(cultura.quantidade_esperada) }} {{ cultura.unidade_medida || '' }}
                                 </p>
                             </div>
-                            <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Operações</p>
+                            <div class="rounded-xl bg-slate-50 p-4">
+                                <p class="text-xs font-semibold text-slate-400">Operações</p>
                                 <p class="mt-2 text-sm text-slate-700">{{ cultura.operacoes_count }}</p>
                             </div>
-                            <div class="rounded-3xl bg-slate-50 p-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Colheitas</p>
+                            <div class="rounded-xl bg-slate-50 p-4">
+                                <p class="text-xs font-semibold text-slate-400">Colheitas</p>
                                 <p class="mt-2 text-sm text-slate-700">{{ cultura.colheitas_count }}</p>
                             </div>
                         </div>
 
-                        <div class="mt-5 rounded-3xl bg-lime-50/50 p-4">
+                        <div class="mt-5 rounded-xl bg-lime-50/50 p-4">
                             <p class="text-sm leading-7 text-slate-600">
                                 {{ cultura.observacoes || 'Sem observações adicionais para esta cultura.' }}
                             </p>
@@ -449,26 +449,26 @@ const estadoLabel = (estado) => ({
                         <div class="mt-6 flex flex-wrap gap-3">
                             <Link
                                 :href="route('app.operacoes.index', { parcela_id: cultura.parcela_id, tipo: undefined, search: cultura.nome })"
-                                class="inline-flex items-center rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                                class="inline-flex items-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                             >
                                 Ver operações
                             </Link>
                             <Link
                                 :href="route('app.parcelas.index', { parcela_id: cultura.parcela_id })"
-                                class="inline-flex items-center rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                                class="inline-flex items-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                             >
                                 Ver parcela
                             </Link>
                             <PrimaryButton
                                 v-if="can.create"
-                                class="rounded-full bg-slate-900 px-4 py-2 text-sm normal-case tracking-normal hover:bg-slate-800 focus:bg-slate-800"
+                                class="rounded-lg bg-slate-900 px-4 py-2 text-sm hover:bg-slate-800 focus:bg-slate-800 text-white font-semibold inline-flex items-center"
                                 @click="openEditModal(cultura)"
                             >
                                 Editar
                             </PrimaryButton>
                             <DangerButton
                                 v-if="can.delete"
-                                class="rounded-full px-4 py-2 text-sm normal-case tracking-normal"
+                                class="rounded-lg px-4 py-2 text-sm "
                                 @click="deleteCultura(cultura)"
                             >
                                 Remover
@@ -479,7 +479,7 @@ const estadoLabel = (estado) => ({
 
                 <section
                     v-if="!culturas.data.length"
-                    class="rounded-[32px] border border-dashed border-slate-300 bg-white/70 px-6 py-12 text-center text-sm leading-7 text-slate-600"
+                    class="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm leading-7 text-slate-600"
                 >
                     Nenhuma cultura encontrada com os filtros atuais.
                 </section>
@@ -493,10 +493,10 @@ const estadoLabel = (estado) => ({
                         v-for="link in culturas.links"
                         :key="`${link.label}-${link.url}`"
                         :href="link.url || undefined"
-                        class="rounded-full px-4 py-2 text-sm transition"
+                        class="rounded-lg px-4 py-2 text-sm transition"
                         :class="link.active
-                            ? 'bg-emerald-700 text-white'
-                            : 'bg-white text-slate-600 shadow hover:bg-slate-50'"
+ ? 'bg-emerald-700 text-white'
+ : 'bg-white text-slate-600 hover:bg-slate-50'"
                         v-html="link.label"
                     />
                 </section>
@@ -505,7 +505,7 @@ const estadoLabel = (estado) => ({
 
         <Modal :show="createModalOpen" max-width="2xl" @close="closeCreateModal">
             <div class="p-6 sm:p-8">
-                <h2 class="text-2xl font-black text-slate-900">Nova cultura</h2>
+                <h2 class="text-2xl font-bold text-slate-900">Nova cultura</h2>
                 <p class="mt-2 text-sm text-slate-500">
                     Regista uma cultura numa parcela existente.
                 </p>
@@ -513,7 +513,7 @@ const estadoLabel = (estado) => ({
                 <form class="mt-6 grid gap-4 sm:grid-cols-2" @submit.prevent="submitCreate">
                     <div
                         v-if="createErrorMessages.length"
-                        class="sm:col-span-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+                        class="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
                     >
                         <p class="font-semibold">Não foi possível guardar a cultura. Revê estes pontos:</p>
                         <ul class="mt-2 list-disc space-y-1 pl-5">
@@ -525,7 +525,7 @@ const estadoLabel = (estado) => ({
                         <InputLabel value="Parcela" />
                         <select
                             v-model="createForm.parcela_id"
-                            class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                            class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                         >
                             <option value="">Selecionar parcela</option>
                             <option v-for="parcela in parcelas" :key="parcela.id" :value="String(parcela.id)">
@@ -536,14 +536,14 @@ const estadoLabel = (estado) => ({
                     </div>
                     <div>
                         <InputLabel value="Nome" />
-                        <TextInput v-model="createForm.nome" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="createForm.nome" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="createForm.errors.nome" />
                     </div>
                     <div>
                         <InputLabel value="Grupo de cultura" />
                         <select
                             v-model="createForm.grupo_cultura"
-                            class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                            class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                         >
                             <option v-for="grupo in grupoOptions" :key="grupo.value" :value="grupo.value">
                                 {{ grupo.label }}
@@ -555,7 +555,7 @@ const estadoLabel = (estado) => ({
                         <InputLabel value="Ciclo produtivo" />
                         <select
                             v-model="createForm.ciclo_produtivo"
-                            class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                            class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                         >
                             <option v-for="ciclo in cicloOptions" :key="ciclo.value" :value="ciclo.value">
                                 {{ ciclo.label }}
@@ -568,19 +568,19 @@ const estadoLabel = (estado) => ({
                     </div>
                     <div>
                         <InputLabel value="Tipo / especie" />
-                        <TextInput v-model="createForm.tipo" list="cultura-tipos" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="createForm.tipo" list="cultura-tipos" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="createForm.errors.tipo" />
                     </div>
                     <div>
                         <InputLabel value="Variedade" />
-                        <TextInput v-model="createForm.variedade" list="cultura-variedades" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="createForm.variedade" list="cultura-variedades" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="createForm.errors.variedade" />
                     </div>
                     <div>
                         <InputLabel value="Estado" />
                         <select
                             v-model="createForm.estado"
-                            class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                            class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                         >
                             <option v-for="estado in estadoOptions" :key="estado" :value="estado">
                                 {{ estadoLabel(estado) }}
@@ -590,55 +590,55 @@ const estadoLabel = (estado) => ({
                     </div>
                     <div>
                         <InputLabel value="Data de plantação" />
-                        <TextInput v-model="createForm.data_plantacao" type="date" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="createForm.data_plantacao" type="date" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="createForm.errors.data_plantacao" />
                     </div>
                     <div v-if="createForm.ciclo_produtivo === 'permanente'">
                         <InputLabel value="Ano inicio producao" />
-                        <TextInput v-model="createForm.ano_inicio_producao" class="mt-2 block w-full rounded-2xl" placeholder="Ex: 2026" />
+                        <TextInput v-model="createForm.ano_inicio_producao" class="mt-2 block w-full rounded-lg" placeholder="Ex: 2026" />
                         <InputError class="mt-2" :message="createForm.errors.ano_inicio_producao" />
                     </div>
                     <div v-if="createForm.ciclo_produtivo === 'permanente'">
                         <InputLabel value="Fim de producao" />
-                        <TextInput v-model="createForm.data_fim_producao" type="date" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="createForm.data_fim_producao" type="date" class="mt-2 block w-full rounded-lg" />
                         <p class="mt-2 text-xs text-slate-500">Opcional. Usa apenas quando o pomar/vinha/olival deixar de produzir.</p>
                         <InputError class="mt-2" :message="createForm.errors.data_fim_producao" />
                     </div>
                     <div>
                         <InputLabel value="Previsão de colheita" />
-                        <TextInput v-model="createForm.previsao_colheita" type="date" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="createForm.previsao_colheita" type="date" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="createForm.errors.previsao_colheita" />
                     </div>
                     <div>
                         <InputLabel value="Ciclo (dias)" />
-                        <TextInput v-model="createForm.ciclo_dias" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="createForm.ciclo_dias" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="createForm.errors.ciclo_dias" />
                     </div>
                     <div>
                         <InputLabel value="Quantidade esperada" />
-                        <TextInput v-model="createForm.quantidade_esperada" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="createForm.quantidade_esperada" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="createForm.errors.quantidade_esperada" />
                     </div>
                     <div>
                         <InputLabel value="Unidade" />
-                        <TextInput v-model="createForm.unidade_medida" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="createForm.unidade_medida" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="createForm.errors.unidade_medida" />
                     </div>
                     <div class="sm:col-span-2">
                         <InputLabel value="Observações" />
                         <textarea
                             v-model="createForm.observacoes"
-                            class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                            class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                             rows="4"
                         />
                         <InputError class="mt-2" :message="createForm.errors.observacoes" />
                     </div>
 
                     <div class="sm:col-span-2 flex justify-end gap-3">
-                        <SecondaryButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="closeCreateModal">
+                        <SecondaryButton type="button" class="rounded-lg px-4 py-2 text-sm " @click="closeCreateModal">
                             Cancelar
                         </SecondaryButton>
-                        <PrimaryButton class="rounded-full bg-emerald-700 px-4 py-2 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600" :disabled="createForm.processing">
+                        <PrimaryButton class="rounded-lg bg-emerald-700 px-4 py-2 text-sm hover:bg-verde-800 focus:bg-verde-800 text-white font-semibold inline-flex items-center" :disabled="createForm.processing">
                             Guardar cultura
                         </PrimaryButton>
                     </div>
@@ -648,7 +648,7 @@ const estadoLabel = (estado) => ({
 
         <Modal :show="!!editingCultura" max-width="2xl" @close="closeEditModal">
             <div class="p-6 sm:p-8">
-                <h2 class="text-2xl font-black text-slate-900">Editar cultura</h2>
+                <h2 class="text-2xl font-bold text-slate-900">Editar cultura</h2>
                 <p class="mt-2 text-sm text-slate-500">
                     Atualiza os dados de {{ editingCultura?.nome }}.
                 </p>
@@ -656,7 +656,7 @@ const estadoLabel = (estado) => ({
                 <form class="mt-6 grid gap-4 sm:grid-cols-2" @submit.prevent="submitEdit">
                     <div
                         v-if="editErrorMessages.length"
-                        class="sm:col-span-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+                        class="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
                     >
                         <p class="font-semibold">Não foi possível atualizar a cultura. Revê estes pontos:</p>
                         <ul class="mt-2 list-disc space-y-1 pl-5">
@@ -668,7 +668,7 @@ const estadoLabel = (estado) => ({
                         <InputLabel value="Parcela" />
                         <select
                             v-model="editForm.parcela_id"
-                            class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                            class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                         >
                             <option value="">Selecionar parcela</option>
                             <option v-for="parcela in parcelas" :key="parcela.id" :value="String(parcela.id)">
@@ -679,14 +679,14 @@ const estadoLabel = (estado) => ({
                     </div>
                     <div>
                         <InputLabel value="Nome" />
-                        <TextInput v-model="editForm.nome" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="editForm.nome" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="editForm.errors.nome" />
                     </div>
                     <div>
                         <InputLabel value="Grupo de cultura" />
                         <select
                             v-model="editForm.grupo_cultura"
-                            class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                            class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                         >
                             <option v-for="grupo in grupoOptions" :key="grupo.value" :value="grupo.value">
                                 {{ grupo.label }}
@@ -698,7 +698,7 @@ const estadoLabel = (estado) => ({
                         <InputLabel value="Ciclo produtivo" />
                         <select
                             v-model="editForm.ciclo_produtivo"
-                            class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                            class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                         >
                             <option v-for="ciclo in cicloOptions" :key="ciclo.value" :value="ciclo.value">
                                 {{ ciclo.label }}
@@ -711,19 +711,19 @@ const estadoLabel = (estado) => ({
                     </div>
                     <div>
                         <InputLabel value="Tipo / especie" />
-                        <TextInput v-model="editForm.tipo" list="cultura-tipos" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="editForm.tipo" list="cultura-tipos" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="editForm.errors.tipo" />
                     </div>
                     <div>
                         <InputLabel value="Variedade" />
-                        <TextInput v-model="editForm.variedade" list="cultura-variedades" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="editForm.variedade" list="cultura-variedades" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="editForm.errors.variedade" />
                     </div>
                     <div>
                         <InputLabel value="Estado" />
                         <select
                             v-model="editForm.estado"
-                            class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                            class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                         >
                             <option v-for="estado in estadoOptions" :key="estado" :value="estado">
                                 {{ estadoLabel(estado) }}
@@ -733,55 +733,55 @@ const estadoLabel = (estado) => ({
                     </div>
                     <div>
                         <InputLabel value="Data de plantação" />
-                        <TextInput v-model="editForm.data_plantacao" type="date" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="editForm.data_plantacao" type="date" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="editForm.errors.data_plantacao" />
                     </div>
                     <div v-if="editForm.ciclo_produtivo === 'permanente'">
                         <InputLabel value="Ano inicio producao" />
-                        <TextInput v-model="editForm.ano_inicio_producao" class="mt-2 block w-full rounded-2xl" placeholder="Ex: 2026" />
+                        <TextInput v-model="editForm.ano_inicio_producao" class="mt-2 block w-full rounded-lg" placeholder="Ex: 2026" />
                         <InputError class="mt-2" :message="editForm.errors.ano_inicio_producao" />
                     </div>
                     <div v-if="editForm.ciclo_produtivo === 'permanente'">
                         <InputLabel value="Fim de producao" />
-                        <TextInput v-model="editForm.data_fim_producao" type="date" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="editForm.data_fim_producao" type="date" class="mt-2 block w-full rounded-lg" />
                         <p class="mt-2 text-xs text-slate-500">Opcional. Usa apenas quando o pomar/vinha/olival deixar de produzir.</p>
                         <InputError class="mt-2" :message="editForm.errors.data_fim_producao" />
                     </div>
                     <div>
                         <InputLabel value="Previsão de colheita" />
-                        <TextInput v-model="editForm.previsao_colheita" type="date" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="editForm.previsao_colheita" type="date" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="editForm.errors.previsao_colheita" />
                     </div>
                     <div>
                         <InputLabel value="Ciclo (dias)" />
-                        <TextInput v-model="editForm.ciclo_dias" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="editForm.ciclo_dias" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="editForm.errors.ciclo_dias" />
                     </div>
                     <div>
                         <InputLabel value="Quantidade esperada" />
-                        <TextInput v-model="editForm.quantidade_esperada" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="editForm.quantidade_esperada" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="editForm.errors.quantidade_esperada" />
                     </div>
                     <div>
                         <InputLabel value="Unidade" />
-                        <TextInput v-model="editForm.unidade_medida" class="mt-2 block w-full rounded-2xl" />
+                        <TextInput v-model="editForm.unidade_medida" class="mt-2 block w-full rounded-lg" />
                         <InputError class="mt-2" :message="editForm.errors.unidade_medida" />
                     </div>
                     <div class="sm:col-span-2">
                         <InputLabel value="Observações" />
                         <textarea
                             v-model="editForm.observacoes"
-                            class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+                            class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500"
                             rows="4"
                         />
                         <InputError class="mt-2" :message="editForm.errors.observacoes" />
                     </div>
 
                     <div class="sm:col-span-2 flex justify-end gap-3">
-                        <SecondaryButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal" @click="closeEditModal">
+                        <SecondaryButton type="button" class="rounded-lg px-4 py-2 text-sm " @click="closeEditModal">
                             Cancelar
                         </SecondaryButton>
-                        <PrimaryButton class="rounded-full bg-slate-900 px-4 py-2 text-sm normal-case tracking-normal hover:bg-slate-800 focus:bg-slate-800" :disabled="editForm.processing">
+                        <PrimaryButton class="rounded-lg bg-slate-900 px-4 py-2 text-sm hover:bg-slate-800 focus:bg-slate-800 text-white font-semibold inline-flex items-center" :disabled="editForm.processing">
                             Atualizar cultura
                         </PrimaryButton>
                     </div>

@@ -193,23 +193,23 @@ const submit = () => {
         <template #header>
             <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.3em] text-sky-700">Parcelas</p>
-                    <h1 class="mt-2 text-3xl font-black text-slate-900">{{ title }}</h1>
+                    <p class="text-xs font-semibold text-sky-700">Parcelas</p>
+                    <h1 class="mt-1 text-[28px] font-bold leading-tight text-slate-900">{{ title }}</h1>
                     <p class="mt-2 max-w-2xl text-sm text-slate-600">
                         Desenha a parcela sobre a imagem satélite. Quando selecionas um terreno, o seu contorno aparece como referência.
                     </p>
                 </div>
                 <Link :href="pathWithQuery('/parcelas')">
-                    <SecondaryButton class="rounded-full px-5 py-3 text-sm normal-case tracking-normal">Voltar</SecondaryButton>
+                    <SecondaryButton class="rounded-lg px-5 py-3 text-sm ">Voltar</SecondaryButton>
                 </Link>
             </div>
         </template>
 
-        <div class="bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.14),_transparent_30%),linear-gradient(180deg,_#f8fafc_0%,_#eef6f1_100%)] py-10">
+        <div class="py-6">
             <form class="mx-auto grid max-w-7xl gap-6 px-4 sm:px-6 lg:grid-cols-[0.86fr_1.4fr] lg:px-8" @submit.prevent="submit">
-                <section class="rounded-[32px] bg-white p-6 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)]">
+                <section class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
                     <div class="grid gap-4 sm:grid-cols-2">
-                        <div v-if="errorMessages.length" class="sm:col-span-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                        <div v-if="errorMessages.length" class="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                             <p class="font-semibold">Não foi possível guardar a parcela. Revê estes pontos:</p>
                             <ul class="mt-2 list-disc space-y-1 pl-5">
                                 <li v-for="message in errorMessages" :key="message">{{ message }}</li>
@@ -218,7 +218,7 @@ const submit = () => {
 
                         <div class="sm:col-span-2">
                             <InputLabel value="Terreno" />
-                            <select v-model="form.terreno_id" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                            <select v-model="form.terreno_id" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500">
                                 <option value="">Selecionar terreno</option>
                                 <option v-for="terreno in terrenos" :key="terreno.id" :value="String(terreno.id)">{{ terreno.nome }}</option>
                             </select>
@@ -226,26 +226,26 @@ const submit = () => {
                         </div>
                         <div class="sm:col-span-2">
                             <InputLabel value="Nome" />
-                            <TextInput v-model="form.nome" class="mt-2 block w-full rounded-2xl" />
+                            <TextInput v-model="form.nome" class="mt-2 block w-full rounded-lg" />
                             <InputError class="mt-2" :message="form.errors.nome" />
                         </div>
                         <div>
                             <InputLabel value="Número da parcela" />
-                            <TextInput v-model="form.numero_parcela" class="mt-2 block w-full rounded-2xl" />
+                            <TextInput v-model="form.numero_parcela" class="mt-2 block w-full rounded-lg" />
                             <InputError class="mt-2" :message="form.errors.numero_parcela" />
                         </div>
                         <div>
                             <InputLabel value="Estado" />
-                            <select v-model="form.estado" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                            <select v-model="form.estado" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500">
                                 <option v-for="estado in estadoOptions" :key="estado" :value="estado">{{ estadoLabel(estado) }}</option>
                             </select>
                             <InputError class="mt-2" :message="form.errors.estado" />
                         </div>
-                        <div class="sm:col-span-2 rounded-3xl border border-emerald-100 bg-emerald-50/50 p-4">
+                        <div class="sm:col-span-2 rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
                             <div class="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <InputLabel value="Tipo de ocupação" />
-                                    <select v-model="form.tipo_ocupacao" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                    <select v-model="form.tipo_ocupacao" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500">
                                         <option value="culturas_anuais">Culturas anuais</option>
                                         <option value="pomar">Pomar / árvores</option>
                                         <option value="misto">Misto</option>
@@ -256,48 +256,48 @@ const submit = () => {
                                 </div>
                                 <div>
                                     <InputLabel value="Número de árvores" />
-                                    <TextInput v-model="form.numero_arvores" class="mt-2 block w-full rounded-2xl" />
+                                    <TextInput v-model="form.numero_arvores" class="mt-2 block w-full rounded-lg" />
                                     <InputError class="mt-2" :message="form.errors.numero_arvores" />
                                 </div>
                                 <div>
                                     <InputLabel value="Compasso entre linhas (m)" />
-                                    <TextInput v-model="form.compasso_linha_m" class="mt-2 block w-full rounded-2xl" />
+                                    <TextInput v-model="form.compasso_linha_m" class="mt-2 block w-full rounded-lg" />
                                     <InputError class="mt-2" :message="form.errors.compasso_linha_m" />
                                 </div>
                                 <div>
                                     <InputLabel value="Compasso entre plantas (m)" />
-                                    <TextInput v-model="form.compasso_planta_m" class="mt-2 block w-full rounded-2xl" />
+                                    <TextInput v-model="form.compasso_planta_m" class="mt-2 block w-full rounded-lg" />
                                     <InputError class="mt-2" :message="form.errors.compasso_planta_m" />
                                 </div>
                             </div>
                         </div>
                         <div>
                             <InputLabel value="Área total (ha)" />
-                            <TextInput v-model="form.area_total" class="mt-2 block w-full rounded-2xl" />
+                            <TextInput v-model="form.area_total" class="mt-2 block w-full rounded-lg" />
                             <InputError class="mt-2" :message="form.errors.area_total" />
                         </div>
                         <div>
                             <InputLabel value="Área útil (ha)" />
-                            <TextInput v-model="form.area_util" class="mt-2 block w-full rounded-2xl" />
+                            <TextInput v-model="form.area_util" class="mt-2 block w-full rounded-lg" />
                             <InputError class="mt-2" :message="form.errors.area_util" />
                         </div>
                         <div>
                             <InputLabel value="Latitude do centro" />
-                            <TextInput v-model="form.latitude" class="mt-2 block w-full rounded-2xl" />
+                            <TextInput v-model="form.latitude" class="mt-2 block w-full rounded-lg" />
                             <InputError class="mt-2" :message="form.errors.latitude" />
                         </div>
                         <div>
                             <InputLabel value="Longitude do centro" />
-                            <TextInput v-model="form.longitude" class="mt-2 block w-full rounded-2xl" />
+                            <TextInput v-model="form.longitude" class="mt-2 block w-full rounded-lg" />
                             <InputError class="mt-2" :message="form.errors.longitude" />
                         </div>
                         <div class="sm:col-span-2">
                             <InputLabel value="Descrição" />
-                            <textarea v-model="form.descricao" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500" rows="5" />
+                            <textarea v-model="form.descricao" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500" rows="5" />
                             <InputError class="mt-2" :message="form.errors.descricao" />
                         </div>
 
-                        <div class="sm:col-span-2 rounded-3xl border border-amber-200 bg-amber-50/60 p-4">
+                        <div class="sm:col-span-2 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
                             <div class="flex flex-wrap items-center justify-between gap-2">
                                 <div>
                                     <p class="text-sm font-semibold text-slate-800">Cultura da parcela</p>
@@ -311,7 +311,7 @@ const submit = () => {
                                 <span
                                     v-for="cultura in culturasList"
                                     :key="cultura.id"
-                                    class="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-xs text-slate-600 shadow-sm"
+                                    class="inline-flex items-center gap-1 rounded-md bg-white px-3 py-1 text-xs text-slate-600"
                                 >
                                     {{ cultura.label }}
                                     <span class="text-slate-400">· {{ culturaEstadoLabel(cultura.estado) }}</span>
@@ -321,27 +321,27 @@ const submit = () => {
                             <div class="mt-4 grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <InputLabel value="Nome da cultura" />
-                                    <TextInput v-model="form.cultura_nome" class="mt-2 block w-full rounded-2xl" placeholder="Ex.: Oliveira" />
+                                    <TextInput v-model="form.cultura_nome" class="mt-2 block w-full rounded-lg" placeholder="Ex.: Oliveira" />
                                     <InputError class="mt-2" :message="form.errors.cultura_nome" />
                                 </div>
                                 <div>
                                     <InputLabel value="Variedade" />
-                                    <TextInput v-model="form.cultura_variedade" class="mt-2 block w-full rounded-2xl" placeholder="Ex.: Galega" />
+                                    <TextInput v-model="form.cultura_variedade" class="mt-2 block w-full rounded-lg" placeholder="Ex.: Galega" />
                                     <InputError class="mt-2" :message="form.errors.cultura_variedade" />
                                 </div>
                                 <div>
                                     <InputLabel value="Tipo" />
-                                    <TextInput v-model="form.cultura_tipo" class="mt-2 block w-full rounded-2xl" placeholder="Ex.: Oliveira" />
+                                    <TextInput v-model="form.cultura_tipo" class="mt-2 block w-full rounded-lg" placeholder="Ex.: Oliveira" />
                                     <InputError class="mt-2" :message="form.errors.cultura_tipo" />
                                 </div>
                                 <div>
                                     <InputLabel value="Data de plantação" />
-                                    <TextInput v-model="form.cultura_data_plantacao" type="date" class="mt-2 block w-full rounded-2xl" />
+                                    <TextInput v-model="form.cultura_data_plantacao" type="date" class="mt-2 block w-full rounded-lg" />
                                     <InputError class="mt-2" :message="form.errors.cultura_data_plantacao" />
                                 </div>
                                 <div>
                                     <InputLabel value="Estado da cultura" />
-                                    <select v-model="form.cultura_estado" class="mt-2 block w-full rounded-2xl border-slate-200 shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                    <select v-model="form.cultura_estado" class="mt-2 block w-full rounded-lg border-slate-200 focus:border-emerald-500 focus:ring-emerald-500">
                                         <option v-for="opt in culturaEstadoOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                                     </select>
                                     <InputError class="mt-2" :message="form.errors.cultura_estado" />
@@ -355,15 +355,15 @@ const submit = () => {
 
                     <div class="mt-6 flex justify-end gap-3">
                         <Link :href="pathWithQuery('/parcelas')">
-                            <SecondaryButton type="button" class="rounded-full px-4 py-2 text-sm normal-case tracking-normal">Cancelar</SecondaryButton>
+                            <SecondaryButton type="button" class="rounded-lg px-4 py-2 text-sm ">Cancelar</SecondaryButton>
                         </Link>
-                        <PrimaryButton class="rounded-full bg-emerald-700 px-5 py-2 text-sm normal-case tracking-normal hover:bg-emerald-600 focus:bg-emerald-600" :disabled="form.processing">
+                        <PrimaryButton class="rounded-lg bg-emerald-700 px-5 py-2 text-sm hover:bg-verde-800 focus:bg-verde-800 text-white font-semibold inline-flex items-center" :disabled="form.processing">
                             {{ isEditing ? 'Atualizar parcela' : 'Guardar parcela' }}
                         </PrimaryButton>
                     </div>
                 </section>
 
-                <section class="rounded-[32px] bg-white p-4 shadow-[0_18px_45px_-24px_rgba(15,23,42,0.18)] lg:sticky lg:top-6 lg:self-start">
+                <section class="rounded-xl bg-white p-4 lg:sticky lg:top-6 lg:self-start border border-slate-200">
                     <InputLabel value="Polígono da parcela" />
                     <p v-if="selectedTerreno?.poligono?.length" class="mt-2 text-xs leading-6 text-slate-500">
                         O contorno tracejado mostra o terreno selecionado como referência visual.
@@ -371,7 +371,7 @@ const submit = () => {
                     <SecondaryButton
                         v-if="selectedTerreno?.poligono?.length"
                         type="button"
-                        class="mt-3 rounded-full px-4 py-2 text-sm normal-case tracking-normal"
+                        class="mt-3 rounded-lg px-4 py-2 text-sm "
                         @click="useSelectedTerrenoPolygon"
                     >
                         Usar polígono do terreno
