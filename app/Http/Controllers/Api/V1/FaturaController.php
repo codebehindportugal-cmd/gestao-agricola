@@ -116,7 +116,7 @@ class FaturaController extends Controller
 
             if ($validador->fails()) {
                 $falhadas++;
-                $erros["faturas.{$indice}"] = $validador->errors()->toArray();
+                $erros['faturas'][$indice] = $validador->errors()->toArray();
                 $resultados[] = $this->resultadoLote($indice, $referencia, 'erro', null, [], $validador->errors()->toArray());
 
                 continue;
@@ -155,7 +155,7 @@ class FaturaController extends Controller
                 );
             } catch (ValidationException $excepcao) {
                 $falhadas++;
-                $erros["faturas.{$indice}"] = $excepcao->errors();
+                $erros['faturas'][$indice] = $excepcao->errors();
                 $resultados[] = $this->resultadoLote($indice, $referencia, 'erro', null, [], $excepcao->errors());
             } catch (Throwable $excepcao) {
                 // Sem isto, um erro numa fatura do meio devolvia 500 e o
@@ -168,7 +168,7 @@ class FaturaController extends Controller
                 ]);
 
                 $falhadas++;
-                $erros["faturas.{$indice}"] = ['fatura' => ['Erro inesperado ao registar: '.$excepcao->getMessage()]];
+                $erros['faturas'][$indice] = ['fatura' => ['Erro inesperado ao registar: '.$excepcao->getMessage()]];
                 $resultados[] = $this->resultadoLote(
                     $indice,
                     $referencia,

@@ -18,6 +18,7 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\DespesaManagementController;
 use App\Http\Controllers\FaturaExtracaoController;
+use App\Http\Controllers\FornecedorContaController;
 use App\Http\Controllers\StockManagementController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -110,6 +111,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/despesas/partilhados/{custo}', [DespesaManagementController::class, 'destroyPartilhado'])->name('app.despesas.partilhados.destroy');
     Route::get('/despesas/resumo-pdf', [DespesaManagementController::class, 'exportarResumoMensal'])->name('app.despesas.resumo-pdf');
     Route::get('/despesas/exportar-csv', [DespesaManagementController::class, 'exportarCsv'])->name('app.despesas.exportar-csv');
+
+    // Conta corrente dos fornecedores: faturas, recibos e quanto se deve.
+    Route::get('/fornecedores', [FornecedorContaController::class, 'index'])->name('app.fornecedores.index');
+    Route::get('/fornecedores/{fornecedor}', [FornecedorContaController::class, 'show'])->name('app.fornecedores.show');
+    Route::post('/fornecedores/{fornecedor}/pagamentos', [FornecedorContaController::class, 'storePagamento'])->name('app.fornecedores.pagamentos.store');
+    Route::post('/fornecedores/{fornecedor}/imputar', [FornecedorContaController::class, 'imputar'])->name('app.fornecedores.imputar');
+    Route::post('/fornecedores/{fornecedor}/juntar', [FornecedorContaController::class, 'juntar'])->name('app.fornecedores.juntar');
+    Route::delete('/fornecedores/pagamentos/{pagamento}', [FornecedorContaController::class, 'destroyPagamento'])->name('app.fornecedores.pagamentos.destroy');
+    Route::patch('/fornecedores/faturas/{despesa}/pago-no-ato', [FornecedorContaController::class, 'pagoNoAto'])->name('app.fornecedores.pago-no-ato');
 
     // Painel de casa (camaras + sensores + calendario) para o ecra do escritorio.
     // O video nao passa aqui: a pagina aponta directamente ao go2rtc da rede de

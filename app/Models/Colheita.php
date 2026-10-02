@@ -13,6 +13,15 @@ class Colheita extends Model
 
     protected $table = 'colheitas';
 
+    /**
+     * A coluna `qualidade` e obrigatoria na base de dados e nao tem valor por
+     * omissao: quem criasse uma colheita sem a indicar levava um erro de SQL.
+     * Os ecras e a API ja usavam 'comercial' quando vinha vazia.
+     */
+    protected $attributes = [
+        'qualidade' => 'comercial',
+    ];
+
     protected $fillable = [
         'cultura_id',
         'operacao_id',

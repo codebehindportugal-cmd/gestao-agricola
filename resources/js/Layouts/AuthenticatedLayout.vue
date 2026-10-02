@@ -20,6 +20,7 @@ const icones = {
     local: ['M12 21s7-6.2 7-11.5a7 7 0 1 0-14 0C5 14.8 12 21 12 21z', 'M12 7a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z'],
     custos: ['M4 19V9M10 19V5M16 19v-7M22 19H2'],
     despesas: ['M6 3h12v18l-3-2-3 2-3-2-3 2z', 'M9 8h6M9 12h6'],
+    fornecedores: ['M3 7h18v12H3z', 'M3 11h18', 'M7 3h10v4', 'M15 15h3'],
     casa: ['M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z', 'M8 21h8M12 17v4'],
     admin: ['M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z', 'm9 12 2 2 4-4'],
     mais: ['M4 6h16M4 12h16M4 18h16'],
@@ -57,6 +58,7 @@ const grupos = computed(() => {
             links: [
                 { label: 'Custos da campanha', routeName: 'app.campanhas.index', active: 'app.campanhas.*', icone: 'custos' },
                 { label: 'Despesas', routeName: 'app.despesas.index', active: 'app.despesas.*', icone: 'despesas' },
+                { label: 'Fornecedores', routeName: 'app.fornecedores.index', active: 'app.fornecedores.*', icone: 'fornecedores' },
             ],
         },
         {

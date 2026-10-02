@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\V1\FaturaController;
 use App\Http\Controllers\Api\V1\ManutencaoController;
 use App\Http\Controllers\Api\V1\PingController;
 use App\Http\Controllers\Api\V1\ReceitaController;
+use App\Http\Controllers\Api\V1\PagamentoController;
 use App\Http\Controllers\Api\V1\TesourariaController;
 use App\Http\Controllers\Api\V1\TrabalhoController;
 
@@ -88,6 +89,10 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->group(functio
     Route::get('movimentos-stock', [ConsultaController::class, 'movimentosStock']);
     Route::get('manutencoes', [ConsultaController::class, 'manutencoes']);
 
+    // Conta corrente dos fornecedores: quanto se deve a cada um.
+    Route::get('fornecedores/saldos', [PagamentoController::class, 'saldos']);
+    Route::get('fornecedores/{referencia}/conta', [PagamentoController::class, 'conta']);
+
     /*
     |----------------------------------------------------------------------
     | Cadastro - escrita (exige role de escrita)
@@ -144,6 +149,21 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->group(functio
 
     Route::post('receitas', [ReceitaController::class, 'store'])
         ->middleware(['abilities:receitas:write', 'api.write.role']);
+
+    /*
+    |----------------------------------------------------------------------
+    | Pagamentos a fornecedores (recibos)
+    |----------------------------------------------------------------------
+    |
+    | O recibo diz que faturas pagou; o servidor imputa-lhes o valor e devolve
+    | o saldo do fornecedor. Idempotente por numero_recibo do fornecedor.
+    */
+    Route::middleware(['ability:pagamentos:write,faturas:write,custos:write', 'api.write.role'])->group(function () {
+        Route::post('pagamentos', [PagamentoController::class, 'store']);
+        Route::post('pagamentos/{pagamento}/ficheiro', [PagamentoController::class, 'ficheiro']);
+        Route::delete('pagamentos/{pagamento}', [PagamentoController::class, 'destroy']);
+        Route::post('pagamentos/{id}/restaurar', [PagamentoController::class, 'restore']);
+    });
 
     /*
     |----------------------------------------------------------------------

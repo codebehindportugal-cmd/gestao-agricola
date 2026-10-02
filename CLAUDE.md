@@ -113,6 +113,16 @@ php artisan make:migration add_campo_to_tabela_table
 - Referencias podem ser enviadas por ID ou nome/codigo; se houver ambiguidade, a API devolve 422 com candidatos.
 - Tesouraria cruza `receitas` como entradas e `custos` como saidas, com filtros opcionais `campanha`, `de` e `ate`.
 
+## Fornecedores: conta corrente (recibos e dívida)
+
+- `despesas.fornecedor_id` liga a fatura à ficha do fornecedor; é preenchido sozinho a partir do texto `fornecedor` (`Fornecedor::paraNome`, compara sem acentos, maiúsculas nem "Lda"). A migração de 2026-10-02 criou as fichas para as faturas antigas.
+- `despesas.pago_no_ato` — FR, FS e VD ficam marcadas sozinhas e não contam na dívida. Corrigível no ecrã do fornecedor.
+- `pagamentos_fornecedores` (o recibo) + `pagamento_fornecedor_despesa` (que faturas pagou e quanto). Recibo apagado = soft delete; as faturas voltam a ficar em aberto.
+- `ContaCorrenteFornecedores`: saldos, faturas em aberto, extrato, registar recibo, abater o valor sem fatura nas faturas mais antigas, juntar dois fornecedores. Saldo = faturado − pago.
+- Recibo que indica uma fatura ainda não registada guarda-a em `faturas_pendentes`; quando a fatura entrar (ecrã ou API), liga-se sozinha (`Despesa::saved`).
+- Ecrã: `/fornecedores` e `/fornecedores/{id}` (`FornecedorContaController`, `Pages/Fornecedores`).
+- API: `GET /api/v1/fornecedores/saldos`, `GET /api/v1/fornecedores/{nome|id}/conta`, `POST /api/v1/pagamentos` (idempotente por `numero_recibo` do fornecedor), `POST /api/v1/pagamentos/{id}/ficheiro`, `DELETE /api/v1/pagamentos/{id}`. Ability `pagamentos:write`, `faturas:write` ou `custos:write`.
+
 ## Campanhas
 
 - Uma campanha **geral** (`nome` preenchido, `cultura_id` nulo) cobre várias parcelas pela tabela `campanha_parcela`. As campanhas antigas eram uma por cultura — logo uma por parcela — e é isso que enche a lista de campanhas repetidas.
